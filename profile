@@ -5,3 +5,7 @@ function reduce_framerate() {
 function heic_to_jpeg() {
 	docker run --rm -it --volume=$(pwd):/image/ --workdir=/image/ --network=none dpokidov/imagemagick "$1" -quality 90% "$1.jpeg"
 }
+
+function unrar() {
+	docker run --rm -it --volume=$(pwd):/files/ --workdir=/files/ --network=none maxcnunes/unrar unrar e -r "$1"
+}
