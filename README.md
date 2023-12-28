@@ -1,10 +1,13 @@
 # Util
-This is @nborgers' utility repo. The original motivation for this is that when I change jobs I lose the little utilities I've put together for myself and that's annoying. A former colleague, [Michael Jarvis](https://www.linkedin.com/in/michaeljarvis/) shared the idea of keeping one's shell environment in a public repository so that wherever you setup you bring your etils and environment with you. This repo doesn't go quite that far, but is a step in that direction.
+This is my utility repo. The original motivation for this is that when I change jobs I lose the little utilities I've put together for myself and that's annoying. A former colleague, [Michael Jarvis](https://www.linkedin.com/in/michaeljarvis/) shared the idea of keeping one's shell environment in a public repository so that wherever you setup you bring your utils and environment with you. This repo doesn't go quite that far, but is a step in that direction.
 
 
 ## Installation
-There is a tooling prerequisite of `docker` to use these.
-There is a setup prerequisite if adding the entries in [profile](profile) to your shell profile, such as `.bashrc` or `.zshrc` or wherever you want.
+Prerequisites:
+  * Docker needs to be installed and accessible as `docker`
+
+Setup:
+  * Add the entries in [profile](profile) to your shell profile, such as `.bashrc` or `.zshrc` or wherever you want.
 
 ## Inventory
 The only things I actually have in here right now are image and video conversion tools. This is becuase I often need to share content in various ways that are made easier with some conversion.
@@ -12,7 +15,7 @@ The only things I actually have in here right now are image and video conversion
 I use Apple products so photos are often taken in HEIC, but a lot of tools and folks can only consume non-Apple formats. This just converts an image with a oneliner.
 ### reduce_framerate
 Given a .mov file (e.g. a Quicktime screen recording), simply reduce its size by reducing the framerate. Not suitable for everything, but most screen recordings I'm trying to sling to a colleague don't need full framerate and this is a very easy way to SIGNIFICANTLY reduce file size.
-### move_to_gif
+### mov_to_gif
 Converts a given .mov file to an animated GIF, such as to include in a repository like the demo GIF.
 
 ## Demo
