@@ -8,6 +8,8 @@ Prerequisites:
 
 Setup:
   * Add the entries in [profile](profile) to your shell profile, such as `.bashrc` or `.zshrc` or wherever you want.
+    * You can clone the repo and then run `cat profile >> .bashrc` or something like that
+    * You can literally just open [profile](profile) and paste into your relevant file; you don't need anything else from this repo
 
 ## Inventory
 The only things I actually have in here right now are image and video conversion tools. This is becuase I often need to share content in various ways that are made easier with some conversion.
@@ -23,4 +25,4 @@ Converts a given .mov file to an animated GIF, such as to include in a repositor
 ## Security
 You're somewhat trusting [this Docker image proffered via DockerHub](https://hub.docker.com/repository/docker/nickborgers/mov-to-gif/general). It's built from this repo in a [GitHub Workflow](.github/workflows/publish.yml). My GitHub account is protected with FIDO/FIDO2 (only possible to establish a session with FIDO/FIDO2) and I don't store my SSH key in cleartext on any disk. GitHub has a DockerHub token and the DockerHub account password is stored only in an offline password database.
 
-Note that the Docker containers are given no network interface, so I see no way the image could exfil your data even if it wanted to.
+Note that the Docker containers are given no network interface (`--network=none`), so I see no way the image could exfil your data even if it wanted to.
