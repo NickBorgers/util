@@ -13,3 +13,12 @@ function mov_to_gif() {
 function unrar() {
 	docker run --rm -it --volume=$(pwd):/files/ --workdir=/files/ --network=none maxcnunes/unrar unrar e -r "$1"
 }
+
+function stabilize_video() {
+	if [ -z "$2" ]; then
+		ZOOM_PERCENTAGE=5
+	else
+		ZOOM_PERCENTAGE=$2
+	fi
+	docker run --rm -it --volume=$(pwd):/video/ --workdir=/video/ --network=none nickborgers/mov-to-gif ash -c "ffmpeg -i \"$1\" -vf vidstabdetect -f null - && ffmpeg -i \"$1\" -vf vidstabtransform=smoothing=30:zoom=50:input="transforms.trf" -c:v libx264 -crf 19 -preset slow -c:a copy \"/video/stabilized.$1\""
+}
