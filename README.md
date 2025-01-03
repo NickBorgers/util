@@ -19,6 +19,8 @@ I use Apple products so photos are often taken in HEIC, but a lot of tools and f
 Given a .mov file (e.g. a Quicktime screen recording), simply reduce its size by reducing the framerate. Not suitable for everything, but most screen recordings I'm trying to sling to a colleague don't need full framerate and this is a very easy way to SIGNIFICANTLY reduce file size.
 ### mov_to_gif
 Converts a given .mov file to an animated GIF, such as to include in a repository like the demo GIF.
+### update_pdf
+Upgrades a target PDF file to v1.4. I didn't even know this versioning existed but needed to upgrade some documents before a site would accept them as uploads and MacOS produced v1.3 files when I printed as PDF.
 
 ## Demo
 ![demo.gif](demo.gif)
