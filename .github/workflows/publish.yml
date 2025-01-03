@@ -33,8 +33,10 @@ jobs:
         id: meta
         uses: docker/metadata-action@9ec57ed1fcdbf14dcef7dfbe97b2010124a938b7
         with:
-          images: nickborgers/mov-to-gif
-      - name: Build and push
+          images: 
+            - nickborgers/mov-to-gif
+            - nickborgers/update-pdf
+      - name: Build and push mov-to-gif
         uses: docker/build-push-action@v5
         with:
           context: ./mov-to-gif/
@@ -43,7 +45,7 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-      - name: Build and push
+      - name: Build and push update-pdf
         uses: docker/build-push-action@v5
         with:
           context: ./nickborgers/update-pdf/
