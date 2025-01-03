@@ -40,8 +40,8 @@ jobs:
       - name: Build and push update-pdf
         uses: docker/build-push-action@v5
         with:
-          context: ./nickborgers/update-pdf/
-          file: ./nickborgers/update-pdf/Dockerfile
+          context: ./update-pdf/
+          file: ./update-pdf/Dockerfile
           platforms: linux/amd64,linux/arm64
           push: true
           tags: nickborgers/update-pdf:latest,nickborgers/update-pdf:${{ github.ref_name }}
