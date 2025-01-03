@@ -29,13 +29,6 @@ jobs:
         with:
           username: nickborgers
           password: ${{ secrets.DOCKER_HUB_PAT }}
-      - name: Extract metadata (tags, labels) for Docker
-        id: meta
-        uses: docker/metadata-action@9ec57ed1fcdbf14dcef7dfbe97b2010124a938b7
-        with:
-          images: 
-            - nickborgers/mov-to-gif
-            - nickborgers/update-pdf
       - name: Build and push mov-to-gif
         uses: docker/build-push-action@v5
         with:
@@ -43,8 +36,9 @@ jobs:
           file: ./mov-to-gif/Dockerfile
           platforms: linux/amd64,linux/arm64
           push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+          tags: 
+            - nickborgers/mov-to-gif:latest
+            - nickborgers/mov-to-gif:${{ github.ref_name }}
       - name: Build and push update-pdf
         uses: docker/build-push-action@v5
         with:
@@ -52,5 +46,6 @@ jobs:
           file: ./nickborgers/update-pdf/Dockerfile
           platforms: linux/amd64,linux/arm64
           push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+          tags: 
+            - nickborgers/update-pdf:latest
+            - nickborgers/update-pdf:${{ github.ref_name }}
