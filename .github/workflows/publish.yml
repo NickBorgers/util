@@ -36,9 +36,7 @@ jobs:
           file: ./mov-to-gif/Dockerfile
           platforms: linux/amd64,linux/arm64
           push: true
-          tags: 
-            - nickborgers/mov-to-gif:latest
-            - nickborgers/mov-to-gif:${{ github.ref_name }}
+          tags: nickborgers/mov-to-gif:latest,nickborgers/mov-to-gif:${{ github.ref_name }}
       - name: Build and push update-pdf
         uses: docker/build-push-action@v5
         with:
@@ -46,6 +44,4 @@ jobs:
           file: ./nickborgers/update-pdf/Dockerfile
           platforms: linux/amd64,linux/arm64
           push: true
-          tags: 
-            - nickborgers/update-pdf:latest
-            - nickborgers/update-pdf:${{ github.ref_name }}
+          tags: nickborgers/update-pdf:latest,nickborgers/update-pdf:${{ github.ref_name }}
