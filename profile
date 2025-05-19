@@ -26,3 +26,14 @@ function stabilize_video() {
 function update_pdf() {
 	docker run --rm -it --volume=$(pwd):/content/ --workdir=/content/ --network=none nickborgers/update-pdf ash -c "gs -sDEVICE=pdfwrite -dCompatibilityLevel=1.4 -o /content/1_4.\"$1\" /content/\"$1\""
 }
+
+function get_docker_pids() {
+	docker ps --format '{{.ID}} {{.Names}}' | while read cid cname; do \
+	  for pid in $(docker inspect --format '{{.State.Pid}}' "$cid"); do \
+	    uid=$(awk '/^Uid:/ {print $2}' /proc/$pid/status 2>/dev/null); \
+	    user=$(getent passwd "$uid" | cut -d: -f1); \
+	    [ -z "$user" ] && user="(unknown)"; \
+	    echo "$cname $uid $user $pid"; \
+	  done; \
+	done
+}
