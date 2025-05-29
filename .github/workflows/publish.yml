@@ -45,3 +45,11 @@ jobs:
           platforms: linux/amd64,linux/arm64
           push: true
           tags: nickborgers/update-pdf:latest,nickborgers/update-pdf:${{ github.ref_name }}
+      - name: Build and push stress
+        uses: docker/build-push-action@v5
+        with:
+          context: ./stress/
+          file: ./stress/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: nickborgers/stress:latest,nickborgers/stress:${{ github.ref_name }}
