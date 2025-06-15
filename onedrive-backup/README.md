@@ -32,7 +32,7 @@ The default configuration will keep old backups for one year - you have one year
 ## Why do this?
 Specifically, why backup a cloud storage solution a vendor is promising you has HA and its own backups? It even has ransomware protection so if your data gets hosed that way they can help you recover it.
 
-Honestly this is more about protecting from human error, but also it is *possible* MSFT could screw up bad enough to lose everything. In a way it's still a single copy, and OneDrive clients might go delete the local copies of the server told them to.
+Honestly this is more about protecting from human error, but also it is *possible* MSFT could screw up bad enough to lose everything. In a way it's still a single copy, and OneDrive clients might go delete the local copies if the server told them to.
 
 Storage is cheap, family memories are not.
 
