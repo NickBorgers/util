@@ -4,7 +4,7 @@
 
 # Defaults
 MODE="${MODE:-heavy}"
-DURATION="${DURATION:-10}"
+DURATION="${DURATION:-10s}"
 IO_THREADS="${IO_THREADS:-0}"
 
 # Determine scale factor
@@ -54,7 +54,7 @@ VM_WORKERS=$(( CPU_WORKERS / 2 ))
 
 echo "Running stress test:"
 echo "- Mode: $MODE"
-echo "- Duration: ${DURATION}s"
+echo "- Duration: ${DURATION}"
 echo "- CPU Workers: $CPU_WORKERS"
 echo "- VM Workers: $VM_WORKERS"
 echo "- Memory Use: $MEM_TO_USE"
