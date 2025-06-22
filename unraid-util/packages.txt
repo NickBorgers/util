@@ -1,0 +1,4 @@
+tcpdump
+ncat
+inetutils-ping
+dnsutils
