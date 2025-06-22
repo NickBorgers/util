@@ -4,5 +4,6 @@ FROM ubuntu:noble
 
 RUN apt-get update && apt-get install -y stress && rm -rf /var/lib/apt/lists/*
 
-ENTRYPOINT ["/usr/bin/stress", "--verbose"]
-CMD []
+COPY script.sh /usr/lib/load.sh
+
+CMD /usr/lib/load.sh
