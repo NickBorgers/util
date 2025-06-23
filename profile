@@ -41,24 +41,23 @@ function get_docker_pids() {
 function network_blip() {
     set -x
     date
-    ping -c 2 8.8.8.8
-    
+
     # Determine OS
     if [[ $(uname) == "Darwin" ]]; then
         # macOS: get default gateway
         GATEWAY=$(route -n get default | awk '/gateway/ {print $2}')
-        IFCONFIG_CMD="ifconfig"  
-        NETSTAT_CMD="netstat -rn"
+        ifconfig
+        netstat -rn
     else
         # Linux: get default gateway
         GATEWAY=$(ip route | awk '/^default/ {print $3}')
-        IFCONFIG_CMD="ip addr"
-        NETSTAT_CMD="ip route"
+        ip addr
+        ip route
     fi
-    
-    ping -c 2 $GATEWAY
-    $IFCONFIG_CMD
+
     arp -a
-    $NETSTAT_CMD
+
+    ping -c 2 -t 1 8.8.8.8
+    ping -c 2 -t 1 $GATEWAY
     set +x
 }
