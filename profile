@@ -39,25 +39,31 @@ function get_docker_pids() {
 }
 
 function network_blip() {
-    set -x
-    date
+    LOGFILE="/tmp/network_blips.log"
+    {
+        set -x
 
-    # Determine OS
-    if [[ $(uname) == "Darwin" ]]; then
-        # macOS: get default gateway
-        GATEWAY=$(route -n get default | awk '/gateway/ {print $2}')
-        ifconfig
-        netstat -rn
-    else
-        # Linux: get default gateway
-        GATEWAY=$(ip route | awk '/^default/ {print $3}')
-        ip addr
-        ip route
-    fi
+        date
 
-    arp -a
+        # Determine OS
+        if [[ $(uname) == "Darwin" ]]; then
+            # macOS: get default gateway
+            GATEWAY=$(route -n get default | awk '/gateway/ {print $2}')
+            ifconfig
+            netstat -rn
+        else
+            # Linux: get default gateway
+            GATEWAY=$(ip route | awk '/^default/ {print $3}')
+            ip addr
+            ip route
+        fi
 
-    ping -c 2 -t 1 8.8.8.8
-    ping -c 2 -t 1 $GATEWAY
-    set +x
+        arp -a
+
+        ping -c 2 -t 1 8.8.8.8
+        ping -c 2 -t 1 $GATEWAY
+
+        set +x
+    } >>"$LOGFILE" 2>&1
 }
+
