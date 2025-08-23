@@ -4,3 +4,4 @@ inetutils-ping
 dnsutils
 iproute2
 xxd
+ethtool
