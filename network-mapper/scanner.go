@@ -216,6 +216,84 @@ func (ns *NetworkScanner) displayInterfaces() {
 }
 
 func (ns *NetworkScanner) scanDevices() {
+	// Use intelligent discovery for comprehensive, firewall-test, and intelligent modes
+	if ns.scanMode == ScanModeComprehensive || ns.scanMode == ScanModeFirewallTest || ns.scanMode == ScanModeIntelligent {
+		ns.scanDevicesIntelligent()
+		return
+	}
+
+	// Use traditional scanning for quick and normal modes
+	ns.scanDevicesTraditional()
+}
+
+func (ns *NetworkScanner) scanDevicesIntelligent() {
+	fmt.Println("🧠 Using intelligent subnet discovery...")
+
+	// Create intelligent discovery instance
+	intelligentDiscovery := NewIntelligentDiscovery(ns.verbose, ns.scanTimeout)
+
+	// Discover active subnets using heuristics
+	activeSubnets := intelligentDiscovery.DiscoverActiveSubnets(ns.interfaces)
+
+	// Convert to scan ranges
+	var scanRanges []ScanRange
+	var totalIPs uint32
+
+	for i, subnet := range activeSubnets {
+		scanRange := ScanRange{
+			Network:     subnet.Network,
+			Priority:    subnet.Priority,
+			Description: fmt.Sprintf("Intelligent discovery - %s", subnet.Source),
+		}
+		scanRanges = append(scanRanges, scanRange)
+
+		// Calculate IPs in this range
+		startIP := subnet.Network.IP
+		endIP := ns.getLastIP(subnet.Network)
+		rangeIPs := ns.countIPsInRange(startIP, endIP)
+		totalIPs += rangeIPs
+
+		if i < 5 && ns.verbose {
+			fmt.Printf("🎯 Will scan: %s (%d IPs, %s)\n",
+				subnet.Network.String(), rangeIPs, subnet.Source)
+		}
+	}
+
+	if len(activeSubnets) > 5 && ns.verbose {
+		fmt.Printf("   ... and %d more subnets\n", len(activeSubnets)-5)
+	}
+
+	// Initialize progress tracking
+	ns.progressTracker = NewScanProgress(len(scanRanges), totalIPs, ns.verbose)
+
+	// Show scan information
+	fmt.Printf("📊 Scan mode: Intelligent discovery (%s)\n", ns.networkExpansion.GetScanModeDescription(ns.scanMode))
+	fmt.Printf("🎯 Discovered %d active subnets covering %d IP addresses\n", len(scanRanges), totalIPs)
+
+	estimate := ns.scanEstimator.GetEstimateDescription(totalIPs, ns.scanMode)
+	fmt.Printf("⏱️  Estimated scan time: %s\n", estimate)
+
+	fmt.Println() // Add space before progress tracking
+
+	// Scan the discovered ranges
+	var wg sync.WaitGroup
+
+	for i, scanRange := range scanRanges {
+		wg.Add(1)
+		go func(rangeIndex int, sr ScanRange) {
+			defer wg.Done()
+			ns.scanRangeWithProgress(rangeIndex, sr)
+		}(i, scanRange)
+	}
+
+	wg.Wait()
+
+	// Show final progress and summary
+	ns.progressTracker.ForceUpdate()
+	ns.progressTracker.ShowFinalSummary()
+}
+
+func (ns *NetworkScanner) scanDevicesTraditional() {
 	// Get expanded scan ranges based on current scan mode
 	scanRanges := ns.networkExpansion.ExpandScanRanges(ns.interfaces)
 

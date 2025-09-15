@@ -22,6 +22,7 @@ const (
 	ScanModeNormal                       // Intelligent expansion within RFC1918
 	ScanModeComprehensive                // Full RFC1918 range scanning
 	ScanModeFirewallTest                 // Targeted firewall testing ranges
+	ScanModeIntelligent                  // Intelligent discovery with gateway probing
 )
 
 type NetworkExpansion struct {
@@ -343,6 +344,8 @@ func (ne *NetworkExpansion) GetScanModeDescription(mode ScanMode) string {
 		return "Comprehensive scan (full RFC1918 ranges)"
 	case ScanModeFirewallTest:
 		return "Firewall test scan (security-focused ranges)"
+	case ScanModeIntelligent:
+		return "Intelligent scan (gateway probing and heuristics)"
 	default:
 		return "Unknown scan mode"
 	}

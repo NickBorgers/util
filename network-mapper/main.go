@@ -42,6 +42,8 @@ DHCP lease analysis, and comprehensive service identification.`,
 			mode = ScanModeComprehensive
 		case "firewall-test":
 			mode = ScanModeFirewallTest
+		case "intelligent":
+			mode = ScanModeIntelligent
 		default:
 			fmt.Printf("Invalid scan mode: %s. Using 'normal' mode.\n", scanMode)
 			mode = ScanModeNormal
@@ -57,7 +59,7 @@ func init() {
 	rootCmd.Flags().BoolVar(&disableDNSLookup, "no-dns", false, "Disable reverse DNS lookups for faster scanning")
 	rootCmd.Flags().IntVar(&scanTimeout, "timeout", 5, "Service discovery timeout in seconds")
 	rootCmd.Flags().BoolVar(&verbose, "verbose", false, "Enable verbose output")
-	rootCmd.Flags().StringVar(&scanMode, "scan-mode", "normal", "Scan mode: quick, normal, comprehensive, firewall-test")
+	rootCmd.Flags().StringVar(&scanMode, "scan-mode", "normal", "Scan mode: quick, normal, comprehensive, firewall-test, intelligent")
 }
 
 func main() {
