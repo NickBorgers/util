@@ -453,10 +453,6 @@ func (ns *NetworkScanner) scanRangeWithProgress(rangeIndex int, scanRange ScanRa
 	ns.progressTracker.CompleteRange(rangeIndex, scanRange.Description, devicesFound)
 }
 
-// Keep the old method for backward compatibility
-func (ns *NetworkScanner) scanRange(scanRange ScanRange) {
-	ns.scanRangeWithProgress(-1, scanRange)
-}
 
 
 // Helper methods for IP range scanning
@@ -486,9 +482,6 @@ func (ns *NetworkScanner) ipToUint32(ip net.IP) uint32 {
 	return uint32(ip[0])<<24 + uint32(ip[1])<<16 + uint32(ip[2])<<8 + uint32(ip[3])
 }
 
-func (ns *NetworkScanner) uint32ToIP(n uint32) net.IP {
-	return net.IPv4(byte(n>>24), byte(n>>16), byte(n>>8), byte(n))
-}
 
 func (ns *NetworkScanner) incrementIP(ip net.IP) {
 	for i := len(ip) - 1; i >= 0; i-- {
@@ -517,11 +510,7 @@ func (ns *NetworkScanner) isNetworkOrBroadcast(ip net.IP, network *net.IPNet) bo
 
 	// Skip broadcast address (last IP)
 	lastIP := ns.getLastIP(network)
-	if ip.Equal(lastIP) {
-		return true
-	}
-
-	return false
+	return ip.Equal(lastIP)
 }
 
 func (ns *NetworkScanner) performBulkDNSLookup() {

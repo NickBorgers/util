@@ -21,13 +21,8 @@ type ScanProgress struct {
 }
 
 type RangeProgress struct {
-	rangeIndex    int
-	rangeName     string
-	totalIPs      uint32
-	scannedIPs    uint32
-	devicesFound  int
-	startTime     time.Time
-	estimatedEnd  time.Time
+	// Fields removed as they were unused (detected by staticcheck)
+	// This struct is kept for potential future use
 }
 
 func NewScanProgress(totalRanges int, totalIPs uint32, verbose bool) *ScanProgress {
