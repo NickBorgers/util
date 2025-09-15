@@ -164,12 +164,28 @@ The tool supports multiple scan modes for different use cases:
 - **Comprehensive Mode**: Scans entire RFC1918 private address spaces
 - **Firewall Test Mode**: Targets common internal network ranges for security testing
 
+### Progress Tracking & Performance
+
+The tool now provides detailed progress tracking with time estimates:
+
+```bash
+# Shows estimated completion time and real-time progress
+./network-mapper --scan-mode comprehensive
+
+# Verbose output with detailed range information
+./network-mapper --verbose --scan-mode firewall-test
+
+# Example output with progress tracking:
+📊 Scan mode: Comprehensive scan (full RFC1918 ranges)
+🎯 Expanded to 3 scan range(s) covering 1,048,576 IP addresses
+⏱️  Estimated scan time: ~5.8 hours
+
+📊 Progress: [████████░░░░░░░░░░░░] 42.3% (443,821/1,048,576 IPs) (ETA: 3h 22m) - Active: 98 scans
+```
+
 ### Other Options
 
 ```bash
-# Verbose output showing scan progress and ranges
-./network-mapper --verbose --scan-mode comprehensive
-
 # Fast scanning without DNS lookups or service discovery
 ./network-mapper --no-dns --no-services --scan-mode quick
 

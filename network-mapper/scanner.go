@@ -5,6 +5,7 @@ import (
 	"net"
 	"runtime"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -48,6 +49,8 @@ type NetworkScanner struct {
 	dnsResolver             *DNSResolver
 	scanMode                ScanMode
 	networkExpansion        *NetworkExpansion
+	progressTracker         *ScanProgress
+	scanEstimator          *ScanEstimator
 }
 
 func NewNetworkScanner() *NetworkScanner {
@@ -61,6 +64,7 @@ func NewNetworkScanner() *NetworkScanner {
 		dnsResolver:             NewDNSResolver(10*time.Second, false),
 		scanMode:                ScanModeNormal,
 		networkExpansion:        NewNetworkExpansion(ScanModeNormal, false),
+		scanEstimator:          NewScanEstimator(),
 	}
 }
 
@@ -215,41 +219,68 @@ func (ns *NetworkScanner) scanDevices() {
 	// Get expanded scan ranges based on current scan mode
 	scanRanges := ns.networkExpansion.ExpandScanRanges(ns.interfaces)
 
+	// Calculate total IPs to scan and provide estimate
+	var totalIPs uint32
+	for _, sr := range scanRanges {
+		startIP := sr.Network.IP
+		endIP := ns.getLastIP(sr.Network)
+		rangeIPs := ns.countIPsInRange(startIP, endIP)
+		totalIPs += rangeIPs
+	}
+
+	// Initialize progress tracking
+	ns.progressTracker = NewScanProgress(len(scanRanges), totalIPs, ns.verbose)
+
+	// Show scan information
+	fmt.Printf("📊 Scan mode: %s\n", ns.networkExpansion.GetScanModeDescription(ns.scanMode))
+	fmt.Printf("🎯 Expanded to %d scan range(s) covering %d IP addresses\n", len(scanRanges), totalIPs)
+
+	estimate := ns.scanEstimator.GetEstimateDescription(totalIPs, ns.scanMode)
+	fmt.Printf("⏱️  Estimated scan time: %s\n", estimate)
+
 	if ns.verbose {
-		fmt.Printf("📊 Scan mode: %s\n", ns.networkExpansion.GetScanModeDescription(ns.scanMode))
-		fmt.Printf("🎯 Expanded to %d scan range(s):\n", len(scanRanges))
+		fmt.Printf("📋 Scan ranges:\n")
 		for i, sr := range scanRanges {
-			fmt.Printf("   [%d] %s - %s (priority %d)\n", i+1, sr.Network.String(), sr.Description, sr.Priority)
+			rangeIPs := ns.countIPsInRange(sr.Network.IP, ns.getLastIP(sr.Network))
+			fmt.Printf("   [%d] %s - %s (%d IPs, priority %d)\n",
+				i+1, sr.Network.String(), sr.Description, rangeIPs, sr.Priority)
 		}
 	}
 
+	fmt.Println() // Add space before progress tracking
+
 	var wg sync.WaitGroup
 
-	for _, scanRange := range scanRanges {
+	for i, scanRange := range scanRanges {
 		wg.Add(1)
-		go func(sr ScanRange) {
+		go func(rangeIndex int, sr ScanRange) {
 			defer wg.Done()
-			ns.scanRange(sr)
-		}(scanRange)
+			ns.scanRangeWithProgress(rangeIndex, sr)
+		}(i, scanRange)
 	}
 
 	wg.Wait()
+
+	// Show final progress and summary
+	ns.progressTracker.ForceUpdate()
+	ns.progressTracker.ShowFinalSummary()
 }
 
-func (ns *NetworkScanner) scanRange(scanRange ScanRange) {
-	if ns.verbose {
-		fmt.Printf("🔍 Scanning %s (%s)...\n", scanRange.Network.String(), scanRange.Description)
-	}
-
+func (ns *NetworkScanner) scanRangeWithProgress(rangeIndex int, scanRange ScanRange) {
 	// Calculate the range of IPs to scan
 	startIP := scanRange.Network.IP
 	endIP := ns.getLastIP(scanRange.Network)
-
-	// For very large ranges, implement sampling or chunking
 	totalIPs := ns.countIPsInRange(startIP, endIP)
+
+	// Start range tracking
+	ns.progressTracker.StartRange(rangeIndex, scanRange.Description, totalIPs)
+
 	if totalIPs > 10000 && ns.verbose {
 		fmt.Printf("⚠️  Large range detected (%d IPs). Consider using --scan-mode quick for faster scanning.\n", totalIPs)
 	}
+
+	// Track devices found in this range
+	devicesFoundStart := len(ns.devices)
 
 	// Scan IPs in the range
 	current := make(net.IP, len(startIP))
@@ -257,6 +288,17 @@ func (ns *NetworkScanner) scanRange(scanRange ScanRange) {
 
 	var scanWg sync.WaitGroup
 	semaphore := make(chan struct{}, 100) // Limit concurrent scans
+	var scannedCount uint32
+
+	// Channel to track active scans for progress display
+	activeCounter := make(chan int, 200)
+	go func() {
+		activeCount := 0
+		for delta := range activeCounter {
+			activeCount += delta
+			ns.progressTracker.SetActiveScans(activeCount)
+		}
+	}()
 
 	for !current.Equal(endIP) {
 		// Skip network and broadcast addresses
@@ -267,10 +309,14 @@ func (ns *NetworkScanner) scanRange(scanRange ScanRange) {
 
 		scanWg.Add(1)
 		semaphore <- struct{}{}
+		activeCounter <- 1 // Increment active scans
 
 		go func(ip net.IP) {
 			defer scanWg.Done()
-			defer func() { <-semaphore }()
+			defer func() {
+				<-semaphore
+				activeCounter <- -1 // Decrement active scans
+			}()
 
 			if ns.pingHost(ip.String()) {
 				ports := ns.scanCommonPorts(ip)
@@ -301,6 +347,12 @@ func (ns *NetworkScanner) scanRange(scanRange ScanRange) {
 				ns.devices = append(ns.devices, device)
 				ns.mu.Unlock()
 			}
+
+			// Update progress every few IPs to avoid overwhelming the display
+			count := atomic.AddUint32(&scannedCount, 1)
+			if count%10 == 0 {
+				ns.progressTracker.IncrementScanned(10)
+			}
 		}(ns.copyIP(current))
 
 		ns.incrementIP(current)
@@ -310,6 +362,22 @@ func (ns *NetworkScanner) scanRange(scanRange ScanRange) {
 	}
 
 	scanWg.Wait()
+	close(activeCounter)
+
+	// Final progress update for this range
+	finalCount := atomic.LoadUint32(&scannedCount)
+	if remaining := finalCount % 10; remaining > 0 {
+		ns.progressTracker.IncrementScanned(remaining)
+	}
+
+	// Complete range tracking
+	devicesFound := len(ns.devices) - devicesFoundStart
+	ns.progressTracker.CompleteRange(rangeIndex, scanRange.Description, devicesFound)
+}
+
+// Keep the old method for backward compatibility
+func (ns *NetworkScanner) scanRange(scanRange ScanRange) {
+	ns.scanRangeWithProgress(-1, scanRange)
 }
 
 
