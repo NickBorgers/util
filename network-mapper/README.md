@@ -133,15 +133,56 @@ choco install network-mapper
 
 ## Usage
 
+### Basic Usage
+
 ```bash
 ./network-mapper
 ```
 
+### Advanced Scanning Options
+
+The tool supports multiple scan modes for different use cases:
+
+```bash
+# Quick scan (interface subnets only) - fastest
+./network-mapper --scan-mode quick
+
+# Normal scan (intelligent RFC1918 expansion) - default
+./network-mapper --scan-mode normal
+
+# Comprehensive scan (full RFC1918 ranges) - thorough
+./network-mapper --scan-mode comprehensive
+
+# Firewall test scan (security-focused ranges) - for security testing
+./network-mapper --scan-mode firewall-test
+```
+
+### Scan Mode Details
+
+- **Quick Mode**: Only scans the immediate subnet based on your interface's netmask
+- **Normal Mode**: Intelligently expands to broader RFC1918 ranges (e.g., /16 for 10.x networks)
+- **Comprehensive Mode**: Scans entire RFC1918 private address spaces
+- **Firewall Test Mode**: Targets common internal network ranges for security testing
+
+### Other Options
+
+```bash
+# Verbose output showing scan progress and ranges
+./network-mapper --verbose --scan-mode comprehensive
+
+# Fast scanning without DNS lookups or service discovery
+./network-mapper --no-dns --no-services --scan-mode quick
+
+# Custom timeout for slower networks
+./network-mapper --timeout 10 --scan-mode normal
+```
+
 The tool will automatically:
 1. Discover all network interfaces on your system
-2. Scan each subnet for active devices
-3. Identify device types and services
-4. Display a beautiful network topology map
+2. Expand scan ranges based on RFC1918 networks and selected scan mode
+3. Scan for active devices across the determined ranges
+4. Identify device types and services
+5. Display a beautiful network topology map
 
 ## Example Output
 
@@ -248,13 +289,47 @@ The tool can identify various device types using multiple detection methods:
 - **IEEE OUI Database**: Identifies device manufacturers from MAC addresses
 - **Multicast Monitoring**: Detects devices participating in multicast groups
 
-## Security Considerations
+## Security Considerations & Firewall Testing
 
+### Safe Scanning Practices
 - The tool uses non-intrusive scanning methods
 - Only scans common ports (22, 80, 443, etc.)
 - Uses standard network tools available on the system
 - Respects network timeouts to avoid being too aggressive
-- Only scans local network subnets
+- Only scans RFC1918 private address spaces
+
+### Firewall Configuration Testing
+
+The `--scan-mode firewall-test` option is specifically designed for network security testing:
+
+```bash
+# Test your firewall configuration across network segments
+./network-mapper --scan-mode firewall-test --verbose
+```
+
+This mode helps identify:
+- **Network segmentation gaps**: Devices accessible across supposed network boundaries
+- **Firewall rule effectiveness**: Whether inter-VLAN blocking is working properly
+- **Hidden network ranges**: Additional subnets that may not be immediately visible
+- **Security policy compliance**: Verification that network isolation is functioning
+
+### Example Use Cases
+
+1. **Home Network Security**: If your home network is `10.212.0.0/16` but your WiFi guest network is `10.212.100.0/23`, firewall-test mode will scan both ranges to verify isolation.
+
+2. **Corporate Network Audit**: Test whether development networks can access production subnets, or if guest WiFi is properly segmented.
+
+3. **Network Discovery**: Find additional network ranges that may not be obvious from your current interface configuration.
+
+### RFC1918 Network Expansion
+
+The tool intelligently expands scan ranges based on detected RFC1918 networks:
+
+- **10.x.x.x networks**: Expands to /16 and /12 ranges as appropriate
+- **172.16-31.x.x networks**: Expands to /20 and broader ranges
+- **192.168.x.x networks**: Scans adjacent /24 networks
+
+This expansion only occurs within RFC1918 private address spaces for safety.
 
 ## Development & Contributing
 

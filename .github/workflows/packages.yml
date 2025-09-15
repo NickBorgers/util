@@ -13,10 +13,6 @@ on:
 env:
   GO_VERSION: '1.21'
 
-defaults:
-  run:
-    working-directory: network-mapper
-
 jobs:
   homebrew:
     name: Update Homebrew Formula

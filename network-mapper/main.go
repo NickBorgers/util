@@ -14,6 +14,7 @@ var (
 	disableDNSLookup        bool
 	scanTimeout             int
 	verbose                 bool
+	scanMode                string
 )
 
 var rootCmd = &cobra.Command{
@@ -29,6 +30,24 @@ DHCP lease analysis, and comprehensive service identification.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		scanner := NewNetworkScanner()
 		scanner.SetOptions(disableServiceDiscovery, disableDNSLookup, scanTimeout, verbose)
+
+		// Parse and set scan mode
+		var mode ScanMode
+		switch scanMode {
+		case "quick":
+			mode = ScanModeQuick
+		case "normal":
+			mode = ScanModeNormal
+		case "comprehensive":
+			mode = ScanModeComprehensive
+		case "firewall-test":
+			mode = ScanModeFirewallTest
+		default:
+			fmt.Printf("Invalid scan mode: %s. Using 'normal' mode.\n", scanMode)
+			mode = ScanModeNormal
+		}
+
+		scanner.SetScanMode(mode)
 		scanner.Run()
 	},
 }
@@ -38,6 +57,7 @@ func init() {
 	rootCmd.Flags().BoolVar(&disableDNSLookup, "no-dns", false, "Disable reverse DNS lookups for faster scanning")
 	rootCmd.Flags().IntVar(&scanTimeout, "timeout", 5, "Service discovery timeout in seconds")
 	rootCmd.Flags().BoolVar(&verbose, "verbose", false, "Enable verbose output")
+	rootCmd.Flags().StringVar(&scanMode, "scan-mode", "normal", "Scan mode: quick, normal, comprehensive, firewall-test")
 }
 
 func main() {

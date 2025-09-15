@@ -46,6 +46,8 @@ type NetworkScanner struct {
 	scanTimeout             time.Duration
 	verbose                 bool
 	dnsResolver             *DNSResolver
+	scanMode                ScanMode
+	networkExpansion        *NetworkExpansion
 }
 
 func NewNetworkScanner() *NetworkScanner {
@@ -57,6 +59,8 @@ func NewNetworkScanner() *NetworkScanner {
 		scanTimeout:             5 * time.Second,
 		verbose:                 false,
 		dnsResolver:             NewDNSResolver(10*time.Second, false),
+		scanMode:                ScanModeNormal,
+		networkExpansion:        NewNetworkExpansion(ScanModeNormal, false),
 	}
 }
 
@@ -66,6 +70,12 @@ func (ns *NetworkScanner) SetOptions(disableServices bool, disableDNS bool, time
 	ns.scanTimeout = time.Duration(timeout) * time.Second
 	ns.verbose = verbose
 	ns.dnsResolver = NewDNSResolver(10*time.Second, verbose)
+	ns.networkExpansion = NewNetworkExpansion(ns.scanMode, verbose)
+}
+
+func (ns *NetworkScanner) SetScanMode(mode ScanMode) {
+	ns.scanMode = mode
+	ns.networkExpansion = NewNetworkExpansion(mode, ns.verbose)
 }
 
 func (ns *NetworkScanner) Run() {
@@ -202,52 +212,171 @@ func (ns *NetworkScanner) displayInterfaces() {
 }
 
 func (ns *NetworkScanner) scanDevices() {
+	// Get expanded scan ranges based on current scan mode
+	scanRanges := ns.networkExpansion.ExpandScanRanges(ns.interfaces)
+
+	if ns.verbose {
+		fmt.Printf("📊 Scan mode: %s\n", ns.networkExpansion.GetScanModeDescription(ns.scanMode))
+		fmt.Printf("🎯 Expanded to %d scan range(s):\n", len(scanRanges))
+		for i, sr := range scanRanges {
+			fmt.Printf("   [%d] %s - %s (priority %d)\n", i+1, sr.Network.String(), sr.Description, sr.Priority)
+		}
+	}
+
 	var wg sync.WaitGroup
 
-	for _, iface := range ns.interfaces {
+	for _, scanRange := range scanRanges {
 		wg.Add(1)
-		go func(netInterface NetworkInterface) {
+		go func(sr ScanRange) {
 			defer wg.Done()
-			ns.scanSubnet(netInterface)
-		}(iface)
+			ns.scanRange(sr)
+		}(scanRange)
 	}
 
 	wg.Wait()
 }
 
-func (ns *NetworkScanner) scanSubnet(netInterface NetworkInterface) {
-	ip := netInterface.Subnet.IP
+func (ns *NetworkScanner) scanRange(scanRange ScanRange) {
+	if ns.verbose {
+		fmt.Printf("🔍 Scanning %s (%s)...\n", scanRange.Network.String(), scanRange.Description)
+	}
 
-	for i := 1; i < 255; i++ {
-		testIP := make(net.IP, len(ip))
-		copy(testIP, ip)
-		testIP[3] = byte(i)
+	// Calculate the range of IPs to scan
+	startIP := scanRange.Network.IP
+	endIP := ns.getLastIP(scanRange.Network)
 
-		if !netInterface.Subnet.Contains(testIP) {
+	// For very large ranges, implement sampling or chunking
+	totalIPs := ns.countIPsInRange(startIP, endIP)
+	if totalIPs > 10000 && ns.verbose {
+		fmt.Printf("⚠️  Large range detected (%d IPs). Consider using --scan-mode quick for faster scanning.\n", totalIPs)
+	}
+
+	// Scan IPs in the range
+	current := make(net.IP, len(startIP))
+	copy(current, startIP)
+
+	var scanWg sync.WaitGroup
+	semaphore := make(chan struct{}, 100) // Limit concurrent scans
+
+	for !current.Equal(endIP) {
+		// Skip network and broadcast addresses
+		if ns.isNetworkOrBroadcast(current, scanRange.Network) {
+			ns.incrementIP(current)
 			continue
 		}
 
-		if ns.pingHost(testIP.String()) {
-			ports := ns.scanCommonPorts(testIP)
-			device := Device{
-				IP:         testIP,
-				MAC:        ns.getMACAddress(testIP),
-				MACVendor:  "",
-				Hostname:   "", // Will be populated in bulk DNS lookup
-				DeviceType: ns.identifyDeviceType(testIP, ports),
-				IsGateway:  testIP.Equal(netInterface.Gateway),
-				Ports:      ports,
-				Services:   make([]Service, 0),
-				UPnPInfo:   make(map[string]string),
-			}
+		scanWg.Add(1)
+		semaphore <- struct{}{}
 
-			ns.mu.Lock()
-			ns.devices = append(ns.devices, device)
-			ns.mu.Unlock()
+		go func(ip net.IP) {
+			defer scanWg.Done()
+			defer func() { <-semaphore }()
+
+			if ns.pingHost(ip.String()) {
+				ports := ns.scanCommonPorts(ip)
+
+				// Find which original interface this relates to for gateway detection
+				isGateway := false
+				for _, iface := range ns.interfaces {
+					if ip.Equal(iface.Gateway) {
+						isGateway = true
+						break
+					}
+				}
+
+				device := Device{
+					IP:         make(net.IP, len(ip)),
+					MAC:        ns.getMACAddress(ip),
+					MACVendor:  "",
+					Hostname:   "", // Will be populated in bulk DNS lookup
+					DeviceType: ns.identifyDeviceType(ip, ports),
+					IsGateway:  isGateway,
+					Ports:      ports,
+					Services:   make([]Service, 0),
+					UPnPInfo:   make(map[string]string),
+				}
+				copy(device.IP, ip)
+
+				ns.mu.Lock()
+				ns.devices = append(ns.devices, device)
+				ns.mu.Unlock()
+			}
+		}(ns.copyIP(current))
+
+		ns.incrementIP(current)
+		if ns.isAfter(current, endIP) {
+			break
+		}
+	}
+
+	scanWg.Wait()
+}
+
+
+// Helper methods for IP range scanning
+func (ns *NetworkScanner) getLastIP(network *net.IPNet) net.IP {
+	ip := network.IP.To4()
+	mask := network.Mask
+	lastIP := make(net.IP, len(ip))
+
+	for i := 0; i < len(ip); i++ {
+		lastIP[i] = ip[i] | ^mask[i]
+	}
+
+	return lastIP
+}
+
+func (ns *NetworkScanner) countIPsInRange(start, end net.IP) uint32 {
+	startInt := ns.ipToUint32(start)
+	endInt := ns.ipToUint32(end)
+	if endInt >= startInt {
+		return endInt - startInt + 1
+	}
+	return 0
+}
+
+func (ns *NetworkScanner) ipToUint32(ip net.IP) uint32 {
+	ip = ip.To4()
+	return uint32(ip[0])<<24 + uint32(ip[1])<<16 + uint32(ip[2])<<8 + uint32(ip[3])
+}
+
+func (ns *NetworkScanner) uint32ToIP(n uint32) net.IP {
+	return net.IPv4(byte(n>>24), byte(n>>16), byte(n>>8), byte(n))
+}
+
+func (ns *NetworkScanner) incrementIP(ip net.IP) {
+	for i := len(ip) - 1; i >= 0; i-- {
+		ip[i]++
+		if ip[i] != 0 {
+			break
 		}
 	}
 }
 
+func (ns *NetworkScanner) copyIP(ip net.IP) net.IP {
+	copied := make(net.IP, len(ip))
+	copy(copied, ip)
+	return copied
+}
+
+func (ns *NetworkScanner) isAfter(ip1, ip2 net.IP) bool {
+	return ns.ipToUint32(ip1) > ns.ipToUint32(ip2)
+}
+
+func (ns *NetworkScanner) isNetworkOrBroadcast(ip net.IP, network *net.IPNet) bool {
+	// Skip network address (first IP)
+	if ip.Equal(network.IP) {
+		return true
+	}
+
+	// Skip broadcast address (last IP)
+	lastIP := ns.getLastIP(network)
+	if ip.Equal(lastIP) {
+		return true
+	}
+
+	return false
+}
 
 func (ns *NetworkScanner) performBulkDNSLookup() {
 	// Collect all IPs that need DNS lookup

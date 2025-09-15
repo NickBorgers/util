@@ -14,10 +14,6 @@ on:
 env:
   GO_VERSION: '1.21'
 
-defaults:
-  run:
-    working-directory: network-mapper
-
 jobs:
   test:
     name: Test
@@ -42,24 +38,30 @@ jobs:
           ${{ runner.os }}-go-
 
     - name: Download dependencies
+      working-directory: network-mapper
       run: go mod download
 
     - name: Verify dependencies
+      working-directory: network-mapper
       run: go mod verify
 
     - name: Run tests
+      working-directory: network-mapper
       run: go test -v ./...
 
     - name: Run go vet
+      working-directory: network-mapper
       run: go vet ./...
 
     - name: Install staticcheck
       run: go install honnef.co/go/tools/cmd/staticcheck@latest
 
     - name: Run staticcheck
+      working-directory: network-mapper
       run: staticcheck ./...
 
     - name: Check formatting
+      working-directory: network-mapper
       run: |
         if [ "$(gofmt -s -l . | wc -l)" -gt 0 ]; then
           echo "Code is not formatted properly:"
@@ -99,9 +101,11 @@ jobs:
           ${{ runner.os }}-go-
 
     - name: Download dependencies
+      working-directory: network-mapper
       run: go mod download
 
     - name: Build binary
+      working-directory: network-mapper
       env:
         GOOS: ${{ matrix.goos }}
         GOARCH: ${{ matrix.goarch }}
@@ -115,6 +119,7 @@ jobs:
         go build -ldflags "-X main.version=${GITHUB_REF#refs/tags/}" -o build/${BINARY_NAME} .
 
     - name: Generate checksums
+      working-directory: network-mapper
       run: |
         cd build
         sha256sum * > checksums-${{ matrix.goos }}-${{ matrix.goarch }}.txt
@@ -144,8 +149,8 @@ jobs:
       run: go install github.com/securecodewarrior/gosec/v2/cmd/gosec@latest
 
     - name: Run Gosec Security Scanner
+      working-directory: network-mapper
       run: |
-        cd network-mapper
         gosec -fmt sarif -out results.sarif ./...
 
     - name: Upload SARIF file
@@ -154,7 +159,7 @@ jobs:
         sarif_file: network-mapper/results.sarif
 
     - name: Run Nancy vulnerability scanner
+      working-directory: network-mapper
       run: |
         go install github.com/sonatypecommunity/nancy@latest
-        cd network-mapper
         go list -json -deps ./... | nancy sleuth

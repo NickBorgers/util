@@ -8,10 +8,6 @@ on:
 env:
   GO_VERSION: '1.21'
 
-defaults:
-  run:
-    working-directory: network-mapper
-
 jobs:
   create-release:
     name: Create Release
@@ -28,6 +24,7 @@ jobs:
 
     - name: Generate changelog
       id: changelog
+      working-directory: network-mapper
       run: |
         # Get the tag name
         TAG_NAME=${GITHUB_REF#refs/tags/}
