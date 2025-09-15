@@ -56,9 +56,15 @@ Quick scan (interface subnets only):
 network-mapper --scan-mode quick
 ```
 
-Comprehensive scan (full RFC1918 ranges):
+Intelligent scan with different thoroughness levels:
 ```
-network-mapper --scan-mode comprehensive
+network-mapper --thoroughness 1  # Minimal
+network-mapper --thoroughness 5  # Exhaustive
+```
+
+Brute-force comprehensive scan:
+```
+network-mapper --scan-mode brute-comprehensive
 ```
 
 ## Notes

@@ -1,7 +1,7 @@
 class NetworkMapper < Formula
   desc "Cross-platform network discovery and visualization tool"
   homepage "https://github.com/NickBorgers/util"
-  version "1.0.0"
+  version "2.2.0"
   license "MIT"
 
   on_macos do
@@ -37,6 +37,10 @@ class NetworkMapper < Formula
 
       To run a quick scan:
         network-mapper --scan-mode quick
+
+      To use intelligent discovery with different thoroughness:
+        network-mapper --thoroughness 1  # Minimal
+        network-mapper --thoroughness 5  # Exhaustive
 
       For help:
         network-mapper --help

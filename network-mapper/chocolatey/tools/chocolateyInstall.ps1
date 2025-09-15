@@ -28,4 +28,8 @@ Write-Host ""
 Write-Host "For a quick network scan:" -ForegroundColor Yellow
 Write-Host "  network-mapper --scan-mode quick" -ForegroundColor White
 Write-Host ""
+Write-Host "For intelligent discovery with different thoroughness:" -ForegroundColor Yellow
+Write-Host "  network-mapper --thoroughness 1  # Minimal" -ForegroundColor White
+Write-Host "  network-mapper --thoroughness 5  # Exhaustive" -ForegroundColor White
+Write-Host ""
 Write-Host "Note: Some operations may require elevated privileges (Run as Administrator)" -ForegroundColor Cyan
