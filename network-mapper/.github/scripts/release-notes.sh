@@ -64,8 +64,8 @@ Download the appropriate binary for your platform:
 ### Docker
 
 \`\`\`bash
-docker pull ghcr.io/$(echo $GITHUB_REPOSITORY | tr '[:upper:]' '[:lower:]'):${TAG_NAME}
-docker run --rm --network host ghcr.io/$(echo $GITHUB_REPOSITORY | tr '[:upper:]' '[:lower:]'):${TAG_NAME}
+docker pull ghcr.io/nickborgers/network-mapper:${TAG_NAME}
+docker run --rm --network host ghcr.io/nickborgers/network-mapper:${TAG_NAME}
 \`\`\`
 
 ### Usage

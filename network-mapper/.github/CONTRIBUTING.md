@@ -14,8 +14,8 @@ Thank you for your interest in contributing to Network Mapper! This document pro
 
 1. **Clone the repository**:
    ```bash
-   git clone https://github.com/your-username/network-mapper.git
-   cd network-mapper
+   git clone https://github.com/NickBorgers/util.git
+   cd util/network-mapper
    ```
 
 2. **Using DevContainer (Recommended)**:

@@ -1,9 +1,9 @@
 # Network Mapper 🌐
 
-[![Build Status](https://github.com/your-username/network-mapper/workflows/Build%20and%20Test/badge.svg)](https://github.com/your-username/network-mapper/actions)
-[![Release](https://github.com/your-username/network-mapper/workflows/Release/badge.svg)](https://github.com/your-username/network-mapper/releases)
-[![Docker](https://img.shields.io/badge/docker-available-blue)](https://github.com/your-username/network-mapper/pkgs/container/network-mapper)
-[![Go Report Card](https://goreportcard.com/badge/github.com/your-username/network-mapper)](https://goreportcard.com/report/github.com/your-username/network-mapper)
+[![Build Status](https://github.com/NickBorgers/util/workflows/Build%20and%20Test/badge.svg)](https://github.com/NickBorgers/util/actions)
+[![Release](https://github.com/NickBorgers/util/workflows/Release/badge.svg)](https://github.com/NickBorgers/util/releases)
+[![Docker](https://img.shields.io/badge/docker-available-blue)](https://github.com/NickBorgers/util/pkgs/container/network-mapper)
+[![Go Report Card](https://goreportcard.com/badge/github.com/NickBorgers/util)](https://goreportcard.com/report/github.com/NickBorgers/util)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 A cross-platform CLI tool that scans your local network, discovers devices, and presents a beautiful pictographic representation of the network topology.
@@ -46,7 +46,7 @@ A cross-platform CLI tool that scans your local network, discovers devices, and 
 
 ### Download Pre-built Binaries
 
-Download the latest release for your platform from the [GitHub Releases](https://github.com/your-username/network-mapper/releases) page:
+Download the latest release for your platform from the [GitHub Releases](https://github.com/NickBorgers/util/releases) page:
 
 - **Linux (x64)**: `network-mapper-linux-amd64`
 - **Linux (ARM64)**: `network-mapper-linux-arm64`
@@ -65,13 +65,13 @@ chmod +x network-mapper-*
 Run directly with Docker:
 ```bash
 # Pull from GitHub Container Registry
-docker pull ghcr.io/your-username/network-mapper:latest
+docker pull ghcr.io/nickborgers/network-mapper:latest
 
 # Run with host network access
-docker run --rm --network host ghcr.io/your-username/network-mapper:latest
+docker run --rm --network host ghcr.io/nickborgers/network-mapper:latest
 
 # Quick scan without service discovery
-docker run --rm --network host ghcr.io/your-username/network-mapper:latest --no-services
+docker run --rm --network host ghcr.io/nickborgers/network-mapper:latest --no-services
 ```
 
 ### Build from Source
@@ -89,8 +89,8 @@ This project includes a DevContainer configuration for consistent development:
 
 ```bash
 # Clone and start devcontainer
-git clone https://github.com/your-username/network-mapper.git
-cd network-mapper
+git clone https://github.com/NickBorgers/util.git
+cd util/network-mapper
 devcontainer up --workspace-folder .
 
 # Build all platforms
@@ -103,8 +103,8 @@ devcontainer exec --workspace-folder . go run .
 #### Manual Build
 
 ```bash
-git clone https://github.com/your-username/network-mapper.git
-cd network-mapper
+git clone https://github.com/NickBorgers/util.git
+cd util/network-mapper
 go mod tidy
 go build -o network-mapper
 ```
@@ -115,7 +115,7 @@ go build -o network-mapper
 
 ```bash
 # Coming soon
-brew install your-username/tap/network-mapper
+brew install nickborgers/tap/network-mapper
 ```
 
 #### Chocolatey (Windows)
@@ -266,8 +266,8 @@ See the [Contributing Guide](.github/CONTRIBUTING.md) for detailed development s
 
 ```bash
 # Using DevContainer (recommended)
-git clone https://github.com/your-username/network-mapper.git
-cd network-mapper
+git clone https://github.com/NickBorgers/util.git
+cd util/network-mapper
 devcontainer up --workspace-folder .
 devcontainer exec --workspace-folder . go run .
 

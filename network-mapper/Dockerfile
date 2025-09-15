@@ -58,5 +58,5 @@ CMD ["--help"]
 # Add labels
 LABEL org.opencontainers.image.title="Network Mapper"
 LABEL org.opencontainers.image.description="Cross-platform network discovery and visualization tool"
-LABEL org.opencontainers.image.source="https://github.com/NickBorgers/network-mapper"
+LABEL org.opencontainers.image.source="https://github.com/NickBorgers/util"
 LABEL org.opencontainers.image.licenses="MIT"
