@@ -17,12 +17,16 @@ jobs:
   homebrew:
     name: Update Homebrew Formula
     runs-on: ubuntu-latest
-    if: github.event_name == 'release'
+    if: github.event_name == 'release' || github.event_name == 'workflow_dispatch'
     steps:
     - name: Extract version
       id: version
       run: |
-        VERSION=${GITHUB_REF#refs/tags/}
+        if [ "${{ github.event_name }}" = "release" ]; then
+          VERSION=${GITHUB_REF#refs/tags/}
+        else
+          VERSION="${{ github.event.inputs.version }}"
+        fi
         echo "VERSION=${VERSION}" >> $GITHUB_OUTPUT
         echo "VERSION_NUMBER=${VERSION#v}" >> $GITHUB_OUTPUT
 
@@ -43,7 +47,7 @@ jobs:
   chocolatey:
     name: Update Chocolatey Package
     runs-on: windows-latest
-    if: github.event_name == 'release'
+    if: github.event_name == 'release' || github.event_name == 'workflow_dispatch'
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
@@ -51,7 +55,11 @@ jobs:
     - name: Extract version
       id: version
       run: |
-        $VERSION = $env:GITHUB_REF -replace 'refs/tags/', ''
+        if ("${{ github.event_name }}" -eq "release") {
+          $VERSION = $env:GITHUB_REF -replace 'refs/tags/', ''
+        } else {
+          $VERSION = "${{ github.event.inputs.version }}"
+        }
         $VERSION_NUMBER = $VERSION -replace '^v', ''
         echo "VERSION=$VERSION" >> $env:GITHUB_OUTPUT
         echo "VERSION_NUMBER=$VERSION_NUMBER" >> $env:GITHUB_OUTPUT
@@ -132,7 +140,7 @@ jobs:
   debian-packages:
     name: Build Debian Packages
     runs-on: ubuntu-latest
-    if: github.event_name == 'release'
+    if: github.event_name == 'release' || github.event_name == 'workflow_dispatch'
     strategy:
       matrix:
         arch: [amd64, arm64]
@@ -143,7 +151,11 @@ jobs:
     - name: Extract version
       id: version
       run: |
-        VERSION=${GITHUB_REF#refs/tags/}
+        if [ "${{ github.event_name }}" = "release" ]; then
+          VERSION=${GITHUB_REF#refs/tags/}
+        else
+          VERSION="${{ github.event.inputs.version }}"
+        fi
         echo "VERSION=${VERSION}" >> $GITHUB_OUTPUT
         echo "VERSION_NUMBER=${VERSION#v}" >> $GITHUB_OUTPUT
 
