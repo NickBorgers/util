@@ -140,15 +140,18 @@ jobs:
       with:
         go-version: ${{ env.GO_VERSION }}
 
+    - name: Install Gosec
+      run: go install github.com/securecodewarrior/gosec/v2/cmd/gosec@latest
+
     - name: Run Gosec Security Scanner
-      uses: securecodewarrior/github-action-gosec@master
-      with:
-        args: '-fmt sarif -out results.sarif ./network-mapper/...'
+      run: |
+        cd network-mapper
+        gosec -fmt sarif -out results.sarif ./...
 
     - name: Upload SARIF file
       uses: github/codeql-action/upload-sarif@v2
       with:
-        sarif_file: results.sarif
+        sarif_file: network-mapper/results.sarif
 
     - name: Run Nancy vulnerability scanner
       run: |
