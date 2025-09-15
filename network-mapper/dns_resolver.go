@@ -43,23 +43,19 @@ func (dr *DNSResolver) LookupHostname(ip net.IP) string {
 	ctx, cancel := context.WithTimeout(context.Background(), dr.timeout)
 	defer cancel()
 
-	// Perform reverse DNS lookup
-	resolver := &net.Resolver{
-		PreferGo: true,
-		Dial: func(ctx context.Context, network, address string) (net.Conn, error) {
-			d := net.Dialer{
-				Timeout: dr.timeout,
-			}
-			return d.DialContext(ctx, network, address)
-		},
-	}
+	// Use system's default resolver for better compatibility with Tailscale and other VPNs
+	resolver := net.DefaultResolver
 
 	names, err := resolver.LookupAddr(ctx, ipStr)
 	hostname := ""
 
 	if err != nil || len(names) == 0 {
 		if dr.verbose {
-			fmt.Printf("   ❌ No reverse DNS for %s: %v\n", ipStr, err)
+			if err != nil {
+				fmt.Printf("   ❌ DNS lookup failed for %s: %v\n", ipStr, err)
+			} else {
+				fmt.Printf("   ❌ No reverse DNS records found for %s\n", ipStr)
+			}
 		}
 	} else {
 		// Clean up the hostname (remove trailing dots)
@@ -72,7 +68,7 @@ func (dr *DNSResolver) LookupHostname(ip net.IP) string {
 			}
 		} else {
 			if dr.verbose {
-				fmt.Printf("   ⚠️  Invalid hostname format: %s for %s\n", hostname, ipStr)
+				fmt.Printf("   ⚠️  Rejected invalid hostname: '%s' for %s\n", hostname, ipStr)
 			}
 			hostname = ""
 		}

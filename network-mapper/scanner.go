@@ -56,7 +56,7 @@ func NewNetworkScanner() *NetworkScanner {
 		disableDNSLookup:        false,
 		scanTimeout:             5 * time.Second,
 		verbose:                 false,
-		dnsResolver:             NewDNSResolver(3*time.Second, false),
+		dnsResolver:             NewDNSResolver(10*time.Second, false),
 	}
 }
 
@@ -65,7 +65,7 @@ func (ns *NetworkScanner) SetOptions(disableServices bool, disableDNS bool, time
 	ns.disableDNSLookup = disableDNS
 	ns.scanTimeout = time.Duration(timeout) * time.Second
 	ns.verbose = verbose
-	ns.dnsResolver = NewDNSResolver(3*time.Second, verbose)
+	ns.dnsResolver = NewDNSResolver(10*time.Second, verbose)
 }
 
 func (ns *NetworkScanner) Run() {
