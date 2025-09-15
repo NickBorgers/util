@@ -13,6 +13,10 @@ on:
 env:
   GO_VERSION: '1.21'
 
+defaults:
+  run:
+    working-directory: network-mapper
+
 jobs:
   homebrew:
     name: Update Homebrew Formula
@@ -78,7 +82,7 @@ jobs:
             <licenseUrl>https://github.com/${{ github.repository }}/blob/main/LICENSE</licenseUrl>
             <requireLicenseAcceptance>false</requireLicenseAcceptance>
             <projectSourceUrl>https://github.com/${{ github.repository }}</projectSourceUrl>
-            <docsUrl>https://github.com/${{ github.repository }}/blob/main/README.md</docsUrl>
+            <docsUrl>https://github.com/${{ github.repository }}/blob/main/network-mapper/README.md</docsUrl>
             <bugTrackerUrl>https://github.com/${{ github.repository }}/issues</bugTrackerUrl>
             <tags>network scanner discovery visualization cli tool</tags>
             <summary>Cross-platform network discovery and visualization tool</summary>
@@ -221,7 +225,7 @@ jobs:
         gzip ${PKG_NAME}/usr/share/man/man1/network-mapper.1
 
         # Copy documentation
-        cp README.md ${PKG_NAME}/usr/share/doc/network-mapper/
+        cp network-mapper/README.md ${PKG_NAME}/usr/share/doc/network-mapper/
         cp LICENSE ${PKG_NAME}/usr/share/doc/network-mapper/ 2>/dev/null || true
 
         # Build package

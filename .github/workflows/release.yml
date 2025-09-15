@@ -1,12 +1,18 @@
-name: Release
+name: Release Network Mapper
 
 on:
   push:
     tags:
       - 'v*'
+    paths:
+      - 'network-mapper/**'
 
 env:
   GO_VERSION: '1.21'
+
+defaults:
+  run:
+    working-directory: network-mapper
 
 jobs:
   create-release:
@@ -26,12 +32,12 @@ jobs:
         TAG_NAME=${GITHUB_REF#refs/tags/}
         echo "TAG_NAME=$TAG_NAME" >> $GITHUB_ENV
 
-        # Generate changelog from commits since last tag
+        # Generate changelog from commits since last tag for network-mapper
         PREVIOUS_TAG=$(git describe --abbrev=0 --tags ${TAG_NAME}^ 2>/dev/null || echo "")
         if [ -n "$PREVIOUS_TAG" ]; then
-          CHANGELOG=$(git log --pretty=format:"- %s (%h)" ${PREVIOUS_TAG}..${TAG_NAME})
+          CHANGELOG=$(git log --pretty=format:"- %s (%h)" ${PREVIOUS_TAG}..${TAG_NAME} -- network-mapper/)
         else
-          CHANGELOG=$(git log --pretty=format:"- %s (%h)" ${TAG_NAME})
+          CHANGELOG=$(git log --pretty=format:"- %s (%h)" ${TAG_NAME} -- network-mapper/)
         fi
 
         # Create release notes
@@ -61,10 +67,18 @@ jobs:
 
         - 🌐 Cross-platform network discovery (Linux, macOS, Windows)
         - 📡 Advanced service discovery (mDNS/Bonjour, SSDP/UPnP)
+        - 🌐 Enhanced DNS resolution with bulk lookups and caching
         - 🏭 MAC vendor identification using IEEE OUI database
         - 💾 DHCP lease table analysis
         - 🧠 Smart device classification and fingerprinting
         - 🎨 Beautiful CLI visualization with ASCII art
+
+        ## Docker
+
+        \`\`\`bash
+        docker pull ghcr.io/nickborgers/network-mapper:${TAG_NAME}
+        docker run --rm --network host ghcr.io/nickborgers/network-mapper:${TAG_NAME}
+        \`\`\`
 
         ## Verification
 
@@ -82,7 +96,7 @@ jobs:
       with:
         tag_name: ${{ env.TAG_NAME }}
         release_name: Network Mapper ${{ env.TAG_NAME }}
-        body_path: release_notes.md
+        body_path: network-mapper/release_notes.md
         draft: false
         prerelease: ${{ contains(env.TAG_NAME, '-') }}
 
@@ -113,7 +127,7 @@ jobs:
         path: |
           ~/.cache/go-build
           ~/go/pkg/mod
-        key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+        key: ${{ runner.os }}-go-${{ hashFiles('network-mapper/go.sum') }}
         restore-keys: |
           ${{ runner.os }}-go-
 
@@ -158,7 +172,7 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         upload_url: ${{ needs.create-release.outputs.upload_url }}
-        asset_path: build/${{ env.BINARY_NAME }}
+        asset_path: network-mapper/build/${{ env.BINARY_NAME }}
         asset_name: ${{ env.BINARY_NAME }}
         asset_content_type: application/octet-stream
 
@@ -168,7 +182,7 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         upload_url: ${{ needs.create-release.outputs.upload_url }}
-        asset_path: build/${{ env.ARCHIVE_NAME }}
+        asset_path: network-mapper/build/${{ env.ARCHIVE_NAME }}
         asset_name: ${{ env.ARCHIVE_NAME }}
         asset_content_type: application/octet-stream
 
@@ -178,7 +192,7 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         upload_url: ${{ needs.create-release.outputs.upload_url }}
-        asset_path: build/${{ env.BINARY_NAME }}.sha256
+        asset_path: network-mapper/build/${{ env.BINARY_NAME }}.sha256
         asset_name: ${{ env.BINARY_NAME }}.sha256
         asset_content_type: text/plain
 
@@ -188,7 +202,7 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         upload_url: ${{ needs.create-release.outputs.upload_url }}
-        asset_path: build/${{ env.ARCHIVE_NAME }}.sha256
+        asset_path: network-mapper/build/${{ env.ARCHIVE_NAME }}.sha256
         asset_name: ${{ env.ARCHIVE_NAME }}.sha256
         asset_content_type: text/plain
 
@@ -237,7 +251,7 @@ jobs:
       id: meta
       uses: docker/metadata-action@v5
       with:
-        images: ghcr.io/${{ github.repository }}
+        images: ghcr.io/nickborgers/network-mapper
         tags: |
           type=ref,event=tag
           type=semver,pattern={{version}}
@@ -247,7 +261,7 @@ jobs:
     - name: Build and push Docker image
       uses: docker/build-push-action@v5
       with:
-        context: .
+        context: network-mapper
         platforms: linux/amd64,linux/arm64
         push: true
         tags: ${{ steps.meta.outputs.tags }}
