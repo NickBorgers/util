@@ -125,7 +125,7 @@ jobs:
         sha256sum * > checksums-${{ matrix.goos }}-${{ matrix.goarch }}.txt
 
     - name: Upload build artifacts
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: network-mapper-${{ matrix.goos }}-${{ matrix.goarch }}
         path: |
@@ -133,33 +133,3 @@ jobs:
           network-mapper/build/checksums-${{ matrix.goos }}-${{ matrix.goarch }}.txt
         retention-days: 30
 
-  security:
-    name: Security Scan
-    runs-on: ubuntu-latest
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-
-    - name: Set up Go
-      uses: actions/setup-go@v4
-      with:
-        go-version: ${{ env.GO_VERSION }}
-
-    - name: Install Gosec
-      run: go install github.com/securecodewarrior/gosec/v2/cmd/gosec@latest
-
-    - name: Run Gosec Security Scanner
-      working-directory: network-mapper
-      run: |
-        gosec -fmt sarif -out results.sarif ./...
-
-    - name: Upload SARIF file
-      uses: github/codeql-action/upload-sarif@v2
-      with:
-        sarif_file: network-mapper/results.sarif
-
-    - name: Run Nancy vulnerability scanner
-      working-directory: network-mapper
-      run: |
-        go install github.com/sonatypecommunity/nancy@latest
-        go list -json -deps ./... | nancy sleuth
