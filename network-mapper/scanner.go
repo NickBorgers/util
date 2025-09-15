@@ -51,6 +51,7 @@ type NetworkScanner struct {
 	networkExpansion        *NetworkExpansion
 	progressTracker         *ScanProgress
 	scanEstimator           *ScanEstimator
+	thoroughness            int
 }
 
 func NewNetworkScanner() *NetworkScanner {
@@ -62,9 +63,10 @@ func NewNetworkScanner() *NetworkScanner {
 		scanTimeout:             5 * time.Second,
 		verbose:                 false,
 		dnsResolver:             NewDNSResolver(10*time.Second, false),
-		scanMode:                ScanModeNormal,
-		networkExpansion:        NewNetworkExpansion(ScanModeNormal, false),
+		scanMode:                ScanModeIntelligent,
+		networkExpansion:        NewNetworkExpansion(ScanModeIntelligent, false),
 		scanEstimator:           NewScanEstimator(),
+		thoroughness:            3,
 	}
 }
 
@@ -80,6 +82,10 @@ func (ns *NetworkScanner) SetOptions(disableServices bool, disableDNS bool, time
 func (ns *NetworkScanner) SetScanMode(mode ScanMode) {
 	ns.scanMode = mode
 	ns.networkExpansion = NewNetworkExpansion(mode, ns.verbose)
+}
+
+func (ns *NetworkScanner) SetThoroughness(level int) {
+	ns.thoroughness = level
 }
 
 func (ns *NetworkScanner) Run() {
@@ -228,8 +234,8 @@ func (ns *NetworkScanner) scanDevices() {
 func (ns *NetworkScanner) scanDevicesIntelligent() {
 	fmt.Println("🧠 Using intelligent subnet discovery...")
 
-	// Create intelligent discovery instance
-	intelligentDiscovery := NewIntelligentDiscovery(ns.verbose, ns.scanTimeout)
+	// Create intelligent discovery instance with thoroughness level
+	intelligentDiscovery := NewIntelligentDiscoveryWithThoroughness(ns.verbose, ns.scanTimeout, ns.thoroughness)
 
 	// Discover active subnets using heuristics
 	activeSubnets := intelligentDiscovery.DiscoverActiveSubnets(ns.interfaces)

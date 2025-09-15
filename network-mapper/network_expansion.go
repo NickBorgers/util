@@ -18,11 +18,11 @@ var (
 type ScanMode int
 
 const (
-	ScanModeQuick         ScanMode = iota // Only immediate subnet
-	ScanModeNormal                        // Intelligent expansion within RFC1918
-	ScanModeComprehensive                 // Full RFC1918 range scanning
-	ScanModeFirewallTest                  // Targeted firewall testing ranges
-	ScanModeIntelligent                   // Intelligent discovery with gateway probing
+	ScanModeIntelligent   ScanMode = iota // Smart discovery with gateway probing (default)
+	ScanModeQuick                         // Only immediate subnet (brute-force)
+	ScanModeExpanded                      // Brute-force expansion within RFC1918
+	ScanModeComprehensive                 // Brute-force full RFC1918 range scanning
+	ScanModeFirewallTest                  // Brute-force targeted firewall testing ranges
 )
 
 type NetworkExpansion struct {
@@ -60,16 +60,20 @@ type ScanRange struct {
 
 func (ne *NetworkExpansion) expandInterface(iface NetworkInterface) []ScanRange {
 	switch ne.mode {
+	case ScanModeIntelligent:
+		// Intelligent mode uses intelligent discovery, not traditional expansion
+		return ne.expandQuick(iface) // Fallback for compatibility
 	case ScanModeQuick:
 		return ne.expandQuick(iface)
-	case ScanModeNormal:
-		return ne.expandNormal(iface)
+	case ScanModeExpanded:
+		return ne.expandExpanded(iface)
 	case ScanModeComprehensive:
 		return ne.expandComprehensive(iface)
 	case ScanModeFirewallTest:
 		return ne.expandFirewallTest(iface)
 	default:
-		return ne.expandNormal(iface)
+		// Default to intelligent mode behavior
+		return ne.expandQuick(iface)
 	}
 }
 
@@ -84,7 +88,7 @@ func (ne *NetworkExpansion) expandQuick(iface NetworkInterface) []ScanRange {
 	}
 }
 
-func (ne *NetworkExpansion) expandNormal(iface NetworkInterface) []ScanRange {
+func (ne *NetworkExpansion) expandExpanded(iface NetworkInterface) []ScanRange {
 	ranges := []ScanRange{
 		{
 			Network:     iface.Subnet,
@@ -104,7 +108,7 @@ func (ne *NetworkExpansion) expandNormal(iface NetworkInterface) []ScanRange {
 }
 
 func (ne *NetworkExpansion) expandComprehensive(iface NetworkInterface) []ScanRange {
-	ranges := ne.expandNormal(iface)
+	ranges := ne.expandExpanded(iface)
 
 	// Add full RFC1918 ranges if we're on a private network
 	if ne.isRFC1918(iface.IP) {
@@ -125,7 +129,7 @@ func (ne *NetworkExpansion) expandComprehensive(iface NetworkInterface) []ScanRa
 }
 
 func (ne *NetworkExpansion) expandFirewallTest(iface NetworkInterface) []ScanRange {
-	ranges := ne.expandNormal(iface)
+	ranges := ne.expandExpanded(iface)
 
 	// Add specific ranges for firewall testing
 	if ne.isRFC1918(iface.IP) {
@@ -336,16 +340,16 @@ func (ne *NetworkExpansion) getLastIP(network *net.IPNet) net.IP {
 
 func (ne *NetworkExpansion) GetScanModeDescription(mode ScanMode) string {
 	switch mode {
-	case ScanModeQuick:
-		return "Quick scan (interface subnets only)"
-	case ScanModeNormal:
-		return "Normal scan (intelligent RFC1918 expansion)"
-	case ScanModeComprehensive:
-		return "Comprehensive scan (full RFC1918 ranges)"
-	case ScanModeFirewallTest:
-		return "Firewall test scan (security-focused ranges)"
 	case ScanModeIntelligent:
 		return "Intelligent scan (gateway probing and heuristics)"
+	case ScanModeQuick:
+		return "Quick brute-force scan (interface subnets only)"
+	case ScanModeExpanded:
+		return "Expanded brute-force scan (RFC1918 expansion)"
+	case ScanModeComprehensive:
+		return "Comprehensive brute-force scan (full RFC1918 ranges)"
+	case ScanModeFirewallTest:
+		return "Firewall test brute-force scan (security-focused ranges)"
 	default:
 		return "Unknown scan mode"
 	}

@@ -18,17 +18,23 @@ type SubnetCandidate struct {
 }
 
 type IntelligentDiscovery struct {
-	candidates []SubnetCandidate
-	mu         sync.RWMutex
-	verbose    bool
-	timeout    time.Duration
+	candidates   []SubnetCandidate
+	mu           sync.RWMutex
+	verbose      bool
+	timeout      time.Duration
+	thoroughness int // 1-5, higher = more thorough
 }
 
 func NewIntelligentDiscovery(verbose bool, timeout time.Duration) *IntelligentDiscovery {
+	return NewIntelligentDiscoveryWithThoroughness(verbose, timeout, 3)
+}
+
+func NewIntelligentDiscoveryWithThoroughness(verbose bool, timeout time.Duration, thoroughness int) *IntelligentDiscovery {
 	return &IntelligentDiscovery{
-		candidates: make([]SubnetCandidate, 0),
-		verbose:    verbose,
-		timeout:    timeout,
+		candidates:   make([]SubnetCandidate, 0),
+		verbose:      verbose,
+		timeout:      timeout,
+		thoroughness: thoroughness,
 	}
 }
 
@@ -142,8 +148,8 @@ func (id *IntelligentDiscovery) generateCommonSubnets(interfaces []NetworkInterf
 				continue
 			}
 
-			// Focus on common ranges: 0, 1, 10, 20, 50, 100, 168, 254
-			if !id.isCommonThirdOctet(thirdOctet) {
+			// Thoroughness affects which ranges we include
+			if !id.isCommonThirdOctetForThoroughness(thirdOctet) {
 				continue
 			}
 
@@ -164,11 +170,44 @@ func (id *IntelligentDiscovery) generateCommonSubnets(interfaces []NetworkInterf
 	}
 }
 
-// isCommonThirdOctet returns true for commonly used third octets
+// isCommonThirdOctetForThoroughness returns true for commonly used third octets based on thoroughness
+func (id *IntelligentDiscovery) isCommonThirdOctetForThoroughness(octet int) bool {
+	// Define ranges by thoroughness level
+	switch id.thoroughness {
+	case 1: // Minimal - only most common
+		common := []int{0, 1}
+		return id.containsInt(common, octet)
+	case 2: // Light
+		common := []int{0, 1, 10, 100}
+		return id.containsInt(common, octet)
+	case 3: // Default
+		common := []int{0, 1, 10, 20, 30, 50, 100, 168, 254}
+		return id.containsInt(common, octet)
+	case 4: // Thorough
+		common := []int{0, 1, 2, 5, 10, 11, 15, 20, 25, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 150, 168, 200, 250, 254}
+		return id.containsInt(common, octet)
+	case 5: // Exhaustive - try many more ranges
+		// For level 5, check every 10th number plus commons
+		if octet%10 == 0 || octet%10 == 1 || octet%10 == 5 {
+			return true
+		}
+		common := []int{0, 1, 2, 5, 10, 11, 15, 20, 25, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 150, 168, 200, 250, 254}
+		return id.containsInt(common, octet)
+	default:
+		return id.isCommonThirdOctet(octet)
+	}
+}
+
+// Helper function for old behavior
 func (id *IntelligentDiscovery) isCommonThirdOctet(octet int) bool {
 	common := []int{0, 1, 10, 20, 30, 50, 100, 168, 200, 254}
-	for _, c := range common {
-		if octet == c {
+	return id.containsInt(common, octet)
+}
+
+// containsInt checks if slice contains integer
+func (id *IntelligentDiscovery) containsInt(slice []int, val int) bool {
+	for _, item := range slice {
+		if item == val {
 			return true
 		}
 	}
@@ -322,12 +361,31 @@ func (id *IntelligentDiscovery) getActiveSubnets() []SubnetCandidate {
 		}
 	}
 
-	// Limit to reasonable number to avoid excessive scanning
-	if len(active) > 20 {
-		active = active[:20]
+	// Limit based on thoroughness to avoid excessive scanning
+	maxSubnets := id.getMaxSubnetsForThoroughness()
+	if len(active) > maxSubnets {
+		active = active[:maxSubnets]
 	}
 
 	return active
+}
+
+// getMaxSubnetsForThoroughness returns the maximum number of subnets based on thoroughness
+func (id *IntelligentDiscovery) getMaxSubnetsForThoroughness() int {
+	switch id.thoroughness {
+	case 1:
+		return 5 // Very limited
+	case 2:
+		return 10 // Light
+	case 3:
+		return 20 // Default
+	case 4:
+		return 40 // Thorough
+	case 5:
+		return 80 // Exhaustive
+	default:
+		return 20
+	}
 }
 
 // Quick ping implementation with shorter timeout

@@ -52,8 +52,8 @@ USER netmap
 # Set entrypoint
 ENTRYPOINT ["./network-mapper"]
 
-# Default command
-CMD ["--help"]
+# Default command - run with normal scan mode
+CMD []
 
 # Add labels
 LABEL org.opencontainers.image.title="Network Mapper"

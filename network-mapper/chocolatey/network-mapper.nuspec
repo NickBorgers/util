@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2015/06/nuspec.xsd">
+  <metadata>
+    <id>network-mapper</id>
+    <version>$version$</version>
+    <title>Network Mapper</title>
+    <authors>Nick Borgers</authors>
+    <owners>Nick Borgers</owners>
+    <projectUrl>https://github.com/NickBorgers/util</projectUrl>
+    <licenseUrl>https://github.com/NickBorgers/util/blob/main/LICENSE</licenseUrl>
+    <requireLicenseAcceptance>false</requireLicenseAcceptance>
+    <projectSourceUrl>https://github.com/NickBorgers/util/tree/main/network-mapper</projectSourceUrl>
+    <packageSourceUrl>https://github.com/NickBorgers/util/tree/main/network-mapper/chocolatey</packageSourceUrl>
+    <docsUrl>https://github.com/NickBorgers/util/blob/main/network-mapper/README.md</docsUrl>
+    <bugTrackerUrl>https://github.com/NickBorgers/util/issues</bugTrackerUrl>
+    <tags>network discovery scanner visualization topology cli cross-platform mdns upnp security audit</tags>
+    <summary>A cross-platform CLI tool for network discovery and visualization</summary>
+    <description><![CDATA[
+# Network Mapper
+
+Network Mapper is a cross-platform CLI tool that scans your local network, discovers devices, and presents a beautiful pictographic representation of the network topology.
+
+## Features
+
+### Core Network Discovery
+- Multi-platform support: Works on Linux, macOS, and Windows
+- Automatic network discovery: Finds all network interfaces and their subnets
+- Gateway detection: Automatically discovers network gateways
+- Device identification: Identifies device types based on open ports and services
+- MAC address resolution: Discovers MAC addresses using ARP tables
+- Enhanced DNS resolution: Bulk reverse DNS lookups with intelligent caching
+
+### Advanced Service Discovery
+- mDNS/Bonjour discovery: Discovers Apple devices, AirPlay, HomeKit, and other Bonjour services
+- SSDP/UPnP scanning: Finds media servers, smart TVs, routers, and IoT devices
+- Multicast group detection: Monitors IGMP traffic and common multicast addresses
+- DHCP lease scanning: Extracts device information from DHCP server lease tables
+- MAC vendor identification: Looks up device manufacturers using IEEE OUI database
+- Smart device classification: Enhanced device type detection using service signatures
+
+### Visual Features
+- Beautiful CLI visualization: ASCII art representation of network topology
+- Service mapping: Shows discovered services with source identification
+- Vendor information: Displays manufacturer info for network devices
+- Comprehensive reporting: Detailed statistics and device summaries
+
+## Usage
+
+Basic scan:
+```
+network-mapper
+```
+
+Quick scan (interface subnets only):
+```
+network-mapper --scan-mode quick
+```
+
+Comprehensive scan (full RFC1918 ranges):
+```
+network-mapper --scan-mode comprehensive
+```
+
+## Notes
+
+- Some operations may require elevated privileges (Run as Administrator)
+- The tool only scans RFC1918 private address spaces for safety
+- Uses non-intrusive scanning methods
+]]></description>
+    <releaseNotes>$releasenotes$</releaseNotes>
+    <copyright>2025 Nick Borgers</copyright>
+    <language>en-US</language>
+  </metadata>
+  <files>
+    <file src="tools\**" target="tools" />
+  </files>
+</package>

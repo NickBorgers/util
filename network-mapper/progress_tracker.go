@@ -191,9 +191,11 @@ func (se *ScanEstimator) EstimateDuration(totalIPs uint32, mode ScanMode) time.D
 
 	// Adjust rate based on scan mode (more comprehensive = slower due to more service discovery)
 	switch mode {
+	case ScanModeIntelligent:
+		rate *= 1.2 // Slightly faster due to intelligent targeting
 	case ScanModeQuick:
 		rate *= 1.5 // Faster due to less service discovery
-	case ScanModeNormal:
+	case ScanModeExpanded:
 		rate *= 1.0 // Base rate
 	case ScanModeComprehensive:
 		rate *= 0.7 // Slower due to more thorough scanning
