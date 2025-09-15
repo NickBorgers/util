@@ -257,15 +257,15 @@ func (sd *ServiceDiscovery) discoverMulticastGroups(interfaces []NetworkInterfac
 	fmt.Println("   📻 Scanning multicast groups...")
 
 	commonGroups := []string{
-		"224.0.0.1",   // All Systems
-		"224.0.0.2",   // All Routers
-		"224.0.0.22",  // IGMP
-		"224.0.0.251", // mDNS
-		"224.0.0.252", // LLMNR
+		"224.0.0.1",       // All Systems
+		"224.0.0.2",       // All Routers
+		"224.0.0.22",      // IGMP
+		"224.0.0.251",     // mDNS
+		"224.0.0.252",     // LLMNR
 		"239.255.255.250", // SSDP
-		"224.0.1.60",  // OSPF Hello
-		"224.0.1.129", // Cisco Auto-RP
-		"224.2.127.254", // SLPv2
+		"224.0.1.60",      // OSPF Hello
+		"224.0.1.129",     // Cisco Auto-RP
+		"224.2.127.254",   // SLPv2
 	}
 
 	for _, group := range commonGroups {

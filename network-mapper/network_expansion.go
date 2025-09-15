@@ -9,20 +9,20 @@ import (
 // RFC1918 private network ranges
 var (
 	RFC1918Networks = []*net.IPNet{
-		{IP: net.IPv4(10, 0, 0, 0), Mask: net.CIDRMask(8, 32)},       // 10.0.0.0/8
-		{IP: net.IPv4(172, 16, 0, 0), Mask: net.CIDRMask(12, 32)},    // 172.16.0.0/12
-		{IP: net.IPv4(192, 168, 0, 0), Mask: net.CIDRMask(16, 32)},   // 192.168.0.0/16
+		{IP: net.IPv4(10, 0, 0, 0), Mask: net.CIDRMask(8, 32)},     // 10.0.0.0/8
+		{IP: net.IPv4(172, 16, 0, 0), Mask: net.CIDRMask(12, 32)},  // 172.16.0.0/12
+		{IP: net.IPv4(192, 168, 0, 0), Mask: net.CIDRMask(16, 32)}, // 192.168.0.0/16
 	}
 )
 
 type ScanMode int
 
 const (
-	ScanModeQuick ScanMode = iota        // Only immediate subnet
-	ScanModeNormal                       // Intelligent expansion within RFC1918
-	ScanModeComprehensive                // Full RFC1918 range scanning
-	ScanModeFirewallTest                 // Targeted firewall testing ranges
-	ScanModeIntelligent                  // Intelligent discovery with gateway probing
+	ScanModeQuick         ScanMode = iota // Only immediate subnet
+	ScanModeNormal                        // Intelligent expansion within RFC1918
+	ScanModeComprehensive                 // Full RFC1918 range scanning
+	ScanModeFirewallTest                  // Targeted firewall testing ranges
+	ScanModeIntelligent                   // Intelligent discovery with gateway probing
 )
 
 type NetworkExpansion struct {
@@ -54,7 +54,7 @@ func (ne *NetworkExpansion) ExpandScanRanges(interfaces []NetworkInterface) []Sc
 type ScanRange struct {
 	Network     *net.IPNet
 	Description string
-	Priority    int // Lower = higher priority
+	Priority    int    // Lower = higher priority
 	Source      string // Which interface triggered this range
 }
 
@@ -308,7 +308,7 @@ func (ne *NetworkExpansion) mergeRanges(ranges []ScanRange) []ScanRange {
 		covered := false
 		for _, existing := range merged {
 			if existing.Network.Contains(current.Network.IP) &&
-			   existing.Network.Contains(ne.getLastIP(current.Network)) {
+				existing.Network.Contains(ne.getLastIP(current.Network)) {
 				covered = true
 				break
 			}

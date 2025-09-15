@@ -1,0 +1,1 @@
+- This project is to help users discover things about their home networks. It is not a high power security tool, and it is not trying to discover deliberately hidden subnets. It is intended to provide a fast, easy, lightweight home network security audit. The objective is NOT to find everything, but to help a home user understand their environment.

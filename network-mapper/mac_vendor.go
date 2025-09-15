@@ -14,10 +14,10 @@ import (
 )
 
 type OUIEntry struct {
-	MAC        string `json:"mac"`
-	Vendor     string `json:"vendor"`
-	Country    string `json:"country,omitempty"`
-	BlockType  string `json:"blockType,omitempty"`
+	MAC       string `json:"mac"`
+	Vendor    string `json:"vendor"`
+	Country   string `json:"country,omitempty"`
+	BlockType string `json:"blockType,omitempty"`
 }
 
 type MACVendorLookup struct {

@@ -10,13 +10,13 @@ import (
 )
 
 type Service struct {
-	Name        string
-	Type        string
-	Domain      string
-	Port        int
-	Protocol    string
-	TXT         map[string]string
-	Source      string // "mdns", "ssdp", "upnp", etc.
+	Name     string
+	Type     string
+	Domain   string
+	Port     int
+	Protocol string
+	TXT      map[string]string
+	Source   string // "mdns", "ssdp", "upnp", etc.
 }
 
 type Device struct {
@@ -50,7 +50,7 @@ type NetworkScanner struct {
 	scanMode                ScanMode
 	networkExpansion        *NetworkExpansion
 	progressTracker         *ScanProgress
-	scanEstimator          *ScanEstimator
+	scanEstimator           *ScanEstimator
 }
 
 func NewNetworkScanner() *NetworkScanner {
@@ -64,7 +64,7 @@ func NewNetworkScanner() *NetworkScanner {
 		dnsResolver:             NewDNSResolver(10*time.Second, false),
 		scanMode:                ScanModeNormal,
 		networkExpansion:        NewNetworkExpansion(ScanModeNormal, false),
-		scanEstimator:          NewScanEstimator(),
+		scanEstimator:           NewScanEstimator(),
 	}
 }
 
@@ -205,7 +205,6 @@ func (ns *NetworkScanner) findGateway(subnet *net.IPNet) net.IP {
 		return nil
 	}
 }
-
 
 func (ns *NetworkScanner) displayInterfaces() {
 	for i, iface := range ns.interfaces {
@@ -453,8 +452,6 @@ func (ns *NetworkScanner) scanRangeWithProgress(rangeIndex int, scanRange ScanRa
 	ns.progressTracker.CompleteRange(rangeIndex, scanRange.Description, devicesFound)
 }
 
-
-
 // Helper methods for IP range scanning
 func (ns *NetworkScanner) getLastIP(network *net.IPNet) net.IP {
 	ip := network.IP.To4()
@@ -481,7 +478,6 @@ func (ns *NetworkScanner) ipToUint32(ip net.IP) uint32 {
 	ip = ip.To4()
 	return uint32(ip[0])<<24 + uint32(ip[1])<<16 + uint32(ip[2])<<8 + uint32(ip[3])
 }
-
 
 func (ns *NetworkScanner) incrementIP(ip net.IP) {
 	for i := len(ip) - 1; i >= 0; i-- {
@@ -535,4 +531,3 @@ func (ns *NetworkScanner) performBulkDNSLookup() {
 	successful, total := ns.dnsResolver.GetCacheStats()
 	fmt.Printf("✅ DNS lookups complete: %d/%d successful\n", successful, total)
 }
-
