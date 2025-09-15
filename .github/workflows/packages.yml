@@ -1,4 +1,4 @@
-name: Package Publishing
+name: Package Manager Publishing
 
 on:
   release:
@@ -6,241 +6,174 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version to package'
+        description: 'Version to publish (e.g., v1.0.0)'
         required: true
-        default: 'latest'
-
-env:
-  GO_VERSION: '1.21'
+        type: string
 
 jobs:
-  homebrew:
-    name: Update Homebrew Formula
+  update-homebrew-tap:
+    name: Update Homebrew Tap
     runs-on: ubuntu-latest
-    if: github.event_name == 'release' || github.event_name == 'workflow_dispatch'
     steps:
-    - name: Extract version
-      id: version
+    - name: Checkout util repository
+      uses: actions/checkout@v4
+
+    - name: Get release information
+      id: release_info
       run: |
         if [ "${{ github.event_name }}" = "release" ]; then
-          VERSION=${GITHUB_REF#refs/tags/}
+          VERSION="${{ github.event.release.tag_name }}"
         else
           VERSION="${{ github.event.inputs.version }}"
         fi
-        echo "VERSION=${VERSION}" >> $GITHUB_OUTPUT
-        echo "VERSION_NUMBER=${VERSION#v}" >> $GITHUB_OUTPUT
+        echo "VERSION=${VERSION}" >> $GITHUB_ENV
+
+        # Download checksums from release
+        RELEASE_URL="https://github.com/NickBorgers/util/releases/download/${VERSION}"
+
+        # Download and extract SHA256 checksums
+        curl -sL "${RELEASE_URL}/network-mapper-darwin-arm64.tar.gz.sha256" -o darwin-arm64.sha256
+        curl -sL "${RELEASE_URL}/network-mapper-darwin-amd64.tar.gz.sha256" -o darwin-amd64.sha256
+        curl -sL "${RELEASE_URL}/network-mapper-linux-arm64.tar.gz.sha256" -o linux-arm64.sha256
+        curl -sL "${RELEASE_URL}/network-mapper-linux-amd64.tar.gz.sha256" -o linux-amd64.sha256
+
+        SHA_DARWIN_ARM64=$(cut -d' ' -f1 darwin-arm64.sha256)
+        SHA_DARWIN_AMD64=$(cut -d' ' -f1 darwin-amd64.sha256)
+        SHA_LINUX_ARM64=$(cut -d' ' -f1 linux-arm64.sha256)
+        SHA_LINUX_AMD64=$(cut -d' ' -f1 linux-amd64.sha256)
+
+        echo "SHA_DARWIN_ARM64=${SHA_DARWIN_ARM64}" >> $GITHUB_ENV
+        echo "SHA_DARWIN_AMD64=${SHA_DARWIN_AMD64}" >> $GITHUB_ENV
+        echo "SHA_LINUX_ARM64=${SHA_LINUX_ARM64}" >> $GITHUB_ENV
+        echo "SHA_LINUX_AMD64=${SHA_LINUX_AMD64}" >> $GITHUB_ENV
 
     - name: Update Homebrew formula
-      uses: mislav/bump-homebrew-formula-action@v3
+      run: |
+        # Update the formula with actual version and checksums
+        sed -i "s/version \".*\"/version \"${VERSION#v}\"/" network-mapper/homebrew/network-mapper.rb
+        sed -i "s/PLACEHOLDER_SHA256_DARWIN_ARM64/${SHA_DARWIN_ARM64}/" network-mapper/homebrew/network-mapper.rb
+        sed -i "s/PLACEHOLDER_SHA256_DARWIN_AMD64/${SHA_DARWIN_AMD64}/" network-mapper/homebrew/network-mapper.rb
+        sed -i "s/PLACEHOLDER_SHA256_LINUX_ARM64/${SHA_LINUX_ARM64}/" network-mapper/homebrew/network-mapper.rb
+        sed -i "s/PLACEHOLDER_SHA256_LINUX_AMD64/${SHA_LINUX_AMD64}/" network-mapper/homebrew/network-mapper.rb
+
+    - name: Checkout homebrew-tap repository
+      uses: actions/checkout@v4
       with:
-        formula-name: network-mapper
-        formula-path: Formula/network-mapper.rb
-        homebrew-tap: ${{ github.repository_owner }}/homebrew-tap
-        download-url: https://github.com/${{ github.repository }}/releases/download/${{ steps.version.outputs.VERSION }}/network-mapper-darwin-amd64.tar.gz
-        commit-message: |
-          network-mapper ${{ steps.version.outputs.VERSION_NUMBER }}
+        repository: NickBorgers/homebrew-tap
+        token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+        path: homebrew-tap
 
-          Created by https://github.com/mislav/bump-homebrew-formula-action
-      env:
-        COMMITTER_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+    - name: Copy formula to tap
+      run: |
+        mkdir -p homebrew-tap/Formula
+        cp network-mapper/homebrew/network-mapper.rb homebrew-tap/Formula/
 
-  chocolatey:
-    name: Update Chocolatey Package
+    - name: Commit and push to tap
+      working-directory: homebrew-tap
+      run: |
+        git config user.name "GitHub Actions"
+        git config user.email "actions@github.com"
+        git add Formula/network-mapper.rb
+        git commit -m "Update network-mapper to ${VERSION}" || echo "No changes to commit"
+        git push
+
+  publish-chocolatey:
+    name: Publish to Chocolatey
     runs-on: windows-latest
-    if: github.event_name == 'release' || github.event_name == 'workflow_dispatch'
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
 
-    - name: Extract version
-      id: version
+    - name: Get release information
+      id: release_info
+      shell: pwsh
       run: |
         if ("${{ github.event_name }}" -eq "release") {
-          $VERSION = $env:GITHUB_REF -replace 'refs/tags/', ''
+          $version = "${{ github.event.release.tag_name }}"
         } else {
-          $VERSION = "${{ github.event.inputs.version }}"
+          $version = "${{ github.event.inputs.version }}"
         }
-        $VERSION_NUMBER = $VERSION -replace '^v', ''
-        echo "VERSION=$VERSION" >> $env:GITHUB_OUTPUT
-        echo "VERSION_NUMBER=$VERSION_NUMBER" >> $env:GITHUB_OUTPUT
+        $versionClean = $version -replace '^v', ''
+        Write-Output "VERSION=$versionClean" >> $env:GITHUB_ENV
 
-    - name: Create Chocolatey package
-      run: |
-        # Create chocolatey directory structure
-        mkdir chocolatey
-        cd chocolatey
-
-        # Create nuspec file
-        @"
-        <?xml version="1.0" encoding="utf-8"?>
-        <package xmlns="http://schemas.microsoft.com/packaging/2015/06/nuspec.xsd">
-          <metadata>
-            <id>network-mapper</id>
-            <version>${{ steps.version.outputs.VERSION_NUMBER }}</version>
-            <packageSourceUrl>https://github.com/${{ github.repository }}</packageSourceUrl>
-            <owners>${{ github.repository_owner }}</owners>
-            <title>Network Mapper</title>
-            <authors>${{ github.repository_owner }}</authors>
-            <projectUrl>https://github.com/${{ github.repository }}</projectUrl>
-            <iconUrl>https://raw.githubusercontent.com/${{ github.repository }}/main/assets/icon.png</iconUrl>
-            <licenseUrl>https://github.com/${{ github.repository }}/blob/main/LICENSE</licenseUrl>
-            <requireLicenseAcceptance>false</requireLicenseAcceptance>
-            <projectSourceUrl>https://github.com/${{ github.repository }}</projectSourceUrl>
-            <docsUrl>https://github.com/${{ github.repository }}/blob/main/network-mapper/README.md</docsUrl>
-            <bugTrackerUrl>https://github.com/${{ github.repository }}/issues</bugTrackerUrl>
-            <tags>network scanner discovery visualization cli tool</tags>
-            <summary>Cross-platform network discovery and visualization tool</summary>
-            <description>
-        Network Mapper is a CLI tool that scans your local network, discovers devices, and presents a beautiful pictographic representation of the network topology. Features include mDNS/Bonjour discovery, SSDP/UPnP scanning, MAC vendor lookup, and comprehensive service identification.
-            </description>
-            <releaseNotes>https://github.com/${{ github.repository }}/releases/tag/${{ steps.version.outputs.VERSION }}</releaseNotes>
-          </metadata>
-          <files>
-            <file src="tools\**" target="tools" />
-          </files>
-        </package>
-        "@ | Out-File -Encoding utf8 network-mapper.nuspec
-
-        # Create tools directory and install script
-        mkdir tools
-
-        @"
-        `$ErrorActionPreference = 'Stop'
-        `$packageName = 'network-mapper'
-        `$url64 = 'https://github.com/${{ github.repository }}/releases/download/${{ steps.version.outputs.VERSION }}/network-mapper-windows-amd64.exe'
-        `$checksum64 = (Invoke-WebRequest -Uri "https://github.com/${{ github.repository }}/releases/download/${{ steps.version.outputs.VERSION }}/network-mapper-windows-amd64.exe.sha256").Content.Split(' ')[0]
-
-        `$packageArgs = @{
-          packageName   = `$packageName
-          url64bit      = `$url64
-          checksum64    = `$checksum64
-          checksumType64= 'sha256'
-          fileType      = 'exe'
-          silentArgs    = '/S'
-          validExitCodes= @(0)
+        # Get release notes
+        if ("${{ github.event_name }}" -eq "release") {
+          $releaseNotes = @"
+        ${{ github.event.release.body }}
+        "@
+        } else {
+          $releaseNotes = "Version $versionClean release. See https://github.com/NickBorgers/util/releases/tag/$version for details."
         }
 
-        Install-ChocolateyPackage @packageArgs
-        "@ | Out-File -Encoding utf8 tools\chocolateyinstall.ps1
+        # Download checksum for Windows binary
+        $releaseUrl = "https://github.com/NickBorgers/util/releases/download/$version"
+        $checksumUrl = "$releaseUrl/network-mapper-windows-amd64.exe.zip.sha256"
 
-    - name: Test Chocolatey package
+        $checksumContent = Invoke-WebRequest -Uri $checksumUrl -UseBasicParsing
+        $checksum = ($checksumContent.Content -split ' ')[0]
+
+        Write-Output "CHECKSUM=$checksum" >> $env:GITHUB_ENV
+        Write-Output "RELEASE_NOTES=$releaseNotes" >> $env:GITHUB_ENV
+
+    - name: Update nuspec file
+      shell: pwsh
+      working-directory: network-mapper/chocolatey
       run: |
-        cd chocolatey
-        choco pack
-        choco install network-mapper -s . -y
+        $nuspecContent = Get-Content -Path "network-mapper.nuspec" -Raw
+        $nuspecContent = $nuspecContent -replace '\$version\$', $env:VERSION
+        $nuspecContent = $nuspecContent -replace '\$releasenotes\$', $env:RELEASE_NOTES
+        Set-Content -Path "network-mapper.nuspec" -Value $nuspecContent
 
-    - name: Upload to Chocolatey (if API key available)
-      if: env.CHOCOLATEY_API_KEY != ''
+    - name: Update install script
+      shell: pwsh
+      working-directory: network-mapper/chocolatey/tools
       run: |
-        cd chocolatey
-        choco push network-mapper.${{ steps.version.outputs.VERSION_NUMBER }}.nupkg -s https://push.chocolatey.org/ -k $env:CHOCOLATEY_API_KEY
-      env:
-        CHOCOLATEY_API_KEY: ${{ secrets.CHOCOLATEY_API_KEY }}
+        $scriptContent = Get-Content -Path "chocolateyInstall.ps1" -Raw
+        $scriptContent = $scriptContent -replace '\$version\$', $env:VERSION
+        $scriptContent = $scriptContent -replace '\$checksum\$', $env:CHECKSUM
+        Set-Content -Path "chocolateyInstall.ps1" -Value $scriptContent
 
-  debian-packages:
-    name: Build Debian Packages
+    - name: Pack Chocolatey package
+      shell: pwsh
+      working-directory: network-mapper/chocolatey
+      run: |
+        choco pack network-mapper.nuspec
+
+    - name: Push to Chocolatey
+      if: github.event_name == 'release' && !github.event.release.prerelease
+      shell: pwsh
+      working-directory: network-mapper/chocolatey
+      run: |
+        choco push network-mapper.$env:VERSION.nupkg --source https://push.chocolatey.org/ --api-key ${{ secrets.CHOCOLATEY_API_KEY }}
+
+  update-readme:
+    name: Update README with Package Manager Instructions
     runs-on: ubuntu-latest
-    if: github.event_name == 'release' || github.event_name == 'workflow_dispatch'
-    strategy:
-      matrix:
-        arch: [amd64, arm64]
+    needs: [update-homebrew-tap, publish-chocolatey]
+    if: github.event_name == 'release' && !github.event.release.prerelease
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-
-    - name: Extract version
-      id: version
-      run: |
-        if [ "${{ github.event_name }}" = "release" ]; then
-          VERSION=${GITHUB_REF#refs/tags/}
-        else
-          VERSION="${{ github.event.inputs.version }}"
-        fi
-        echo "VERSION=${VERSION}" >> $GITHUB_OUTPUT
-        echo "VERSION_NUMBER=${VERSION#v}" >> $GITHUB_OUTPUT
-
-    - name: Create Debian package
-      run: |
-        # Create package structure
-        PKG_NAME="network-mapper_${{ steps.version.outputs.VERSION_NUMBER }}_${{ matrix.arch }}"
-        mkdir -p ${PKG_NAME}/DEBIAN
-        mkdir -p ${PKG_NAME}/usr/bin
-        mkdir -p ${PKG_NAME}/usr/share/man/man1
-        mkdir -p ${PKG_NAME}/usr/share/doc/network-mapper
-
-        # Download binary
-        if [ "${{ matrix.arch }}" = "amd64" ]; then
-          BINARY_NAME="network-mapper-linux-amd64"
-        else
-          BINARY_NAME="network-mapper-linux-arm64"
-        fi
-
-        curl -L -o ${PKG_NAME}/usr/bin/network-mapper \
-          "https://github.com/${{ github.repository }}/releases/download/${{ steps.version.outputs.VERSION }}/${BINARY_NAME}"
-        chmod +x ${PKG_NAME}/usr/bin/network-mapper
-
-        # Create control file
-        cat > ${PKG_NAME}/DEBIAN/control << EOF
-        Package: network-mapper
-        Version: ${{ steps.version.outputs.VERSION_NUMBER }}
-        Section: net
-        Priority: optional
-        Architecture: ${{ matrix.arch }}
-        Maintainer: ${{ github.repository_owner }} <noreply@github.com>
-        Description: Cross-platform network discovery and visualization tool
-         Network Mapper is a CLI tool that scans your local network, discovers
-         devices, and presents a beautiful pictographic representation of the
-         network topology. Features include mDNS/Bonjour discovery, SSDP/UPnP
-         scanning, MAC vendor lookup, and comprehensive service identification.
-        Homepage: https://github.com/${{ github.repository }}
-        Depends: iputils-ping, net-tools, iproute2
-        EOF
-
-        # Create man page
-        cat > ${PKG_NAME}/usr/share/man/man1/network-mapper.1 << EOF
-        .TH NETWORK-MAPPER 1 "$(date +'%B %Y')" "network-mapper ${{ steps.version.outputs.VERSION_NUMBER }}" "User Commands"
-        .SH NAME
-        network-mapper \- Cross-platform network discovery and visualization tool
-        .SH SYNOPSIS
-        .B network-mapper
-        [\fIOPTION\fR]...
-        .SH DESCRIPTION
-        Network Mapper is a CLI tool that scans your local network, discovers devices, and presents a beautiful pictographic representation of the network topology.
-        .SH OPTIONS
-        .TP
-        \fB\-\-no\-services\fR
-        Disable advanced service discovery (mDNS, SSDP, etc.)
-        .TP
-        \fB\-\-timeout\fR \fIint\fR
-        Service discovery timeout in seconds (default 5)
-        .TP
-        \fB\-\-verbose\fR
-        Enable verbose output
-        .TP
-        \fB\-h\fR, \fB\-\-help\fR
-        help for network-mapper
-        .TP
-        \fB\-v\fR, \fB\-\-version\fR
-        version for network-mapper
-        .SH AUTHOR
-        Written by ${{ github.repository_owner }}.
-        .SH REPORTING BUGS
-        Report bugs to: https://github.com/${{ github.repository }}/issues
-        .SH COPYRIGHT
-        This is free software; see the source for copying conditions.
-        EOF
-
-        gzip ${PKG_NAME}/usr/share/man/man1/network-mapper.1
-
-        # Copy documentation
-        cp network-mapper/README.md ${PKG_NAME}/usr/share/doc/network-mapper/
-        cp LICENSE ${PKG_NAME}/usr/share/doc/network-mapper/ 2>/dev/null || true
-
-        # Build package
-        dpkg-deb --build ${PKG_NAME}
-
-    - name: Upload Debian package
-      uses: softprops/action-gh-release@v2
       with:
-        tag_name: ${{ steps.version.outputs.VERSION }}
-        files: network-mapper_${{ steps.version.outputs.VERSION_NUMBER }}_${{ matrix.arch }}.deb
+        token: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Update README
+      run: |
+        VERSION="${{ github.event.release.tag_name }}"
+        VERSION_CLEAN="${VERSION#v}"
+
+        # Update Homebrew section
+        sed -i 's|# Coming soon|# Install via Homebrew|' network-mapper/README.md
+        sed -i 's|brew install nickborgers/tap/network-mapper|brew tap nickborgers/tap\nbrew install network-mapper|' network-mapper/README.md
+
+        # Update Chocolatey section
+        sed -i 's|# Coming soon|# Install via Chocolatey|' network-mapper/README.md
+        sed -i 's|choco install network-mapper|choco install network-mapper --version=${VERSION_CLEAN}|' network-mapper/README.md
+
+    - name: Commit README updates
+      run: |
+        git config user.name "GitHub Actions"
+        git config user.email "actions@github.com"
+        git add network-mapper/README.md
+        git commit -m "docs: Update package manager installation instructions for ${VERSION}" || echo "No changes to commit"
+        git push
