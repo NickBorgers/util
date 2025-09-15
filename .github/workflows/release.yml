@@ -82,7 +82,8 @@ jobs:
 
         Verify the download with the provided checksums:
         \`\`\`bash
-        sha256sum -c checksums.txt
+        # Download both binary and checksum, then verify
+        sha256sum -c network-mapper-linux-amd64.sha256
         \`\`\`
         EOF
 
@@ -178,26 +179,6 @@ jobs:
           network-mapper/build/${{ env.BINARY_NAME }}.sha256
           network-mapper/build/${{ env.ARCHIVE_NAME }}.sha256
 
-  upload-checksums:
-    name: Upload Combined Checksums
-    runs-on: ubuntu-latest
-    needs: [create-release, build-and-upload]
-    permissions:
-      contents: write
-    steps:
-    - name: Download all artifacts
-      uses: actions/download-artifact@v4
-
-    - name: Combine checksums
-      run: |
-        find . -name "*.sha256" -exec cat {} \; > checksums.txt
-        sort checksums.txt -o checksums.txt
-
-    - name: Upload Combined Checksums
-      uses: softprops/action-gh-release@v2
-      with:
-        tag_name: ${{ github.ref_name }}
-        files: checksums.txt
 
   docker-build:
     name: Build and Push Docker Image
