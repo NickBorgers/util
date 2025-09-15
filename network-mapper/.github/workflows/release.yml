@@ -1,0 +1,256 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+env:
+  GO_VERSION: '1.21'
+
+jobs:
+  create-release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    outputs:
+      upload_url: ${{ steps.create_release.outputs.upload_url }}
+      release_id: ${{ steps.create_release.outputs.id }}
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Generate changelog
+      id: changelog
+      run: |
+        # Get the tag name
+        TAG_NAME=${GITHUB_REF#refs/tags/}
+        echo "TAG_NAME=$TAG_NAME" >> $GITHUB_ENV
+
+        # Generate changelog from commits since last tag
+        PREVIOUS_TAG=$(git describe --abbrev=0 --tags ${TAG_NAME}^ 2>/dev/null || echo "")
+        if [ -n "$PREVIOUS_TAG" ]; then
+          CHANGELOG=$(git log --pretty=format:"- %s (%h)" ${PREVIOUS_TAG}..${TAG_NAME})
+        else
+          CHANGELOG=$(git log --pretty=format:"- %s (%h)" ${TAG_NAME})
+        fi
+
+        # Create release notes
+        cat > release_notes.md << EOF
+        # Network Mapper ${TAG_NAME}
+
+        ## What's Changed
+        ${CHANGELOG}
+
+        ## Installation
+
+        Download the appropriate binary for your platform:
+
+        - **Linux (x64)**: \`network-mapper-linux-amd64\`
+        - **Linux (ARM64)**: \`network-mapper-linux-arm64\`
+        - **macOS (Intel)**: \`network-mapper-darwin-amd64\`
+        - **macOS (Apple Silicon)**: \`network-mapper-darwin-arm64\`
+        - **Windows (x64)**: \`network-mapper-windows-amd64.exe\`
+
+        Make the binary executable and run:
+        \`\`\`bash
+        chmod +x network-mapper-*
+        ./network-mapper-* --help
+        \`\`\`
+
+        ## Features
+
+        - 🌐 Cross-platform network discovery (Linux, macOS, Windows)
+        - 📡 Advanced service discovery (mDNS/Bonjour, SSDP/UPnP)
+        - 🏭 MAC vendor identification using IEEE OUI database
+        - 💾 DHCP lease table analysis
+        - 🧠 Smart device classification and fingerprinting
+        - 🎨 Beautiful CLI visualization with ASCII art
+
+        ## Verification
+
+        Verify the download with the provided checksums:
+        \`\`\`bash
+        sha256sum -c checksums.txt
+        \`\`\`
+        EOF
+
+    - name: Create Release
+      id: create_release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ env.TAG_NAME }}
+        release_name: Network Mapper ${{ env.TAG_NAME }}
+        body_path: release_notes.md
+        draft: false
+        prerelease: ${{ contains(env.TAG_NAME, '-') }}
+
+  build-and-upload:
+    name: Build and Upload
+    runs-on: ubuntu-latest
+    needs: create-release
+    strategy:
+      matrix:
+        goos: [linux, windows, darwin]
+        goarch: [amd64, arm64]
+        exclude:
+          - goos: windows
+            goarch: arm64
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: ${{ env.GO_VERSION }}
+
+    - name: Cache Go modules
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.cache/go-build
+          ~/go/pkg/mod
+        key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+        restore-keys: |
+          ${{ runner.os }}-go-
+
+    - name: Download dependencies
+      run: go mod download
+
+    - name: Build binary
+      env:
+        GOOS: ${{ matrix.goos }}
+        GOARCH: ${{ matrix.goarch }}
+      run: |
+        mkdir -p build
+        BINARY_NAME=network-mapper-${{ matrix.goos }}-${{ matrix.goarch }}
+        if [ "${{ matrix.goos }}" = "windows" ]; then
+          BINARY_NAME="${BINARY_NAME}.exe"
+        fi
+
+        # Extract version from tag
+        VERSION=${GITHUB_REF#refs/tags/}
+        go build -ldflags "-X main.version=${VERSION} -s -w" -o build/${BINARY_NAME} .
+
+        # Create compressed archive
+        cd build
+        if [ "${{ matrix.goos }}" = "windows" ]; then
+          zip ${BINARY_NAME}.zip ${BINARY_NAME}
+          ARCHIVE_NAME=${BINARY_NAME}.zip
+        else
+          tar -czf ${BINARY_NAME}.tar.gz ${BINARY_NAME}
+          ARCHIVE_NAME=${BINARY_NAME}.tar.gz
+        fi
+
+        # Generate checksums
+        sha256sum ${BINARY_NAME} > ${BINARY_NAME}.sha256
+        sha256sum ${ARCHIVE_NAME} > ${ARCHIVE_NAME}.sha256
+
+        echo "BINARY_NAME=${BINARY_NAME}" >> $GITHUB_ENV
+        echo "ARCHIVE_NAME=${ARCHIVE_NAME}" >> $GITHUB_ENV
+
+    - name: Upload Binary
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ needs.create-release.outputs.upload_url }}
+        asset_path: build/${{ env.BINARY_NAME }}
+        asset_name: ${{ env.BINARY_NAME }}
+        asset_content_type: application/octet-stream
+
+    - name: Upload Archive
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ needs.create-release.outputs.upload_url }}
+        asset_path: build/${{ env.ARCHIVE_NAME }}
+        asset_name: ${{ env.ARCHIVE_NAME }}
+        asset_content_type: application/octet-stream
+
+    - name: Upload Binary Checksum
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ needs.create-release.outputs.upload_url }}
+        asset_path: build/${{ env.BINARY_NAME }}.sha256
+        asset_name: ${{ env.BINARY_NAME }}.sha256
+        asset_content_type: text/plain
+
+    - name: Upload Archive Checksum
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ needs.create-release.outputs.upload_url }}
+        asset_path: build/${{ env.ARCHIVE_NAME }}.sha256
+        asset_name: ${{ env.ARCHIVE_NAME }}.sha256
+        asset_content_type: text/plain
+
+  upload-checksums:
+    name: Upload Combined Checksums
+    runs-on: ubuntu-latest
+    needs: [create-release, build-and-upload]
+    steps:
+    - name: Download all artifacts
+      uses: actions/download-artifact@v3
+
+    - name: Combine checksums
+      run: |
+        find . -name "*.sha256" -exec cat {} \; > checksums.txt
+        sort checksums.txt -o checksums.txt
+
+    - name: Upload Combined Checksums
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ needs.create-release.outputs.upload_url }}
+        asset_path: checksums.txt
+        asset_name: checksums.txt
+        asset_content_type: text/plain
+
+  docker-build:
+    name: Build and Push Docker Image
+    runs-on: ubuntu-latest
+    needs: create-release
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Log in to GitHub Container Registry
+      uses: docker/login-action@v3
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Extract metadata
+      id: meta
+      uses: docker/metadata-action@v5
+      with:
+        images: ghcr.io/${{ github.repository }}
+        tags: |
+          type=ref,event=tag
+          type=semver,pattern={{version}}
+          type=semver,pattern={{major}}.{{minor}}
+          type=semver,pattern={{major}}
+
+    - name: Build and push Docker image
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        platforms: linux/amd64,linux/arm64
+        push: true
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max

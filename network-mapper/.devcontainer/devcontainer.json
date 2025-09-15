@@ -1,0 +1,24 @@
+{
+  "name": "Network Mapper",
+  "image": "mcr.microsoft.com/devcontainers/go:1.21",
+  "features": {
+    "ghcr.io/devcontainers/features/common-utils:2": {
+      "installZsh": true,
+      "configureZshAsDefaultShell": true,
+      "installOhMyZsh": true
+    }
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "golang.go",
+        "ms-vscode.vscode-json"
+      ]
+    }
+  },
+  "postCreateCommand": "go mod tidy && go mod download && mkdir -p build",
+  "forwardPorts": [],
+  "portsAttributes": {},
+  "mounts": [],
+  "remoteUser": "vscode"
+}
