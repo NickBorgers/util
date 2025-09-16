@@ -12,7 +12,17 @@ Setup:
     * You can literally just open [profile](profile) and paste into your relevant file; you don't need anything else from this repo
 
 ## Inventory
-The only things I actually have in here right now are image and video conversion tools. This is becuase I often need to share content in various ways that are made easier with some conversion.
+
+### 🌐 Network Mapper
+A comprehensive cross-platform network discovery and visualization tool. This is the primary utility in this repository.
+
+**📁 Location**: [`network-mapper/`](network-mapper/)
+**📖 Documentation**: See [`network-mapper/README.md`](network-mapper/README.md)
+
+Features include intelligent subnet discovery, device identification, service detection (mDNS/Bonjour, SSDP/UPnP), and beautiful CLI visualization. Available for Linux, macOS, and Windows with multiple installation methods (Homebrew, Chocolatey, Docker).
+
+### 🎬 Media Conversion Tools
+Image and video conversion utilities for common format conversions and optimizations.
 ### heic_to_jpeg
 I use Apple products so photos are often taken in HEIC, but a lot of tools and folks can only consume non-Apple formats. This just converts an image with a oneliner.
 ### reduce_framerate
