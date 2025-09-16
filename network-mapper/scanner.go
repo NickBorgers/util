@@ -582,22 +582,9 @@ func (ns *NetworkScanner) logUnknownDevices() {
 		return
 	}
 
-	// Create research data structure
-	researchData := struct {
-		Timestamp      string   `json:"timestamp"`
-		ScanMode       string   `json:"scan_mode"`
-		UnknownDevices []Device `json:"unknown_devices"`
-		TotalDevices   int      `json:"total_devices"`
-	}{
-		Timestamp:      time.Now().Format("2006-01-02T15:04:05Z07:00"),
-		ScanMode:       ns.scanMode.String(),
-		UnknownDevices: unknownDevices,
-		TotalDevices:   len(ns.devices),
-	}
-
-	// Save to research log file (append mode for accumulation)
-	// The background research agent can process this file periodically
-	// TODO: Could also send to a central research database/API
+	// TODO: Implement structured data collection for research agent
+	// This could write to a structured log file (JSON/YAML) that the
+	// background research agent can process later
 	if ns.verbose {
 		fmt.Printf("📊 Found %d unknown devices for future research\n", len(unknownDevices))
 		fmt.Println("💾 Research data ready for background agent processing")
