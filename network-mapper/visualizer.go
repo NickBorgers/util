@@ -21,9 +21,27 @@ func (ns *NetworkScanner) drawNetworkSegment(iface NetworkInterface, segmentNum 
 	fmt.Printf("\n🌐 Network Segment %d: %s\n", segmentNum, iface.Name)
 	fmt.Printf("   IP: %s | Subnet: %s\n", iface.IP.String(), iface.Subnet.String())
 
+	// Check for broadcast services
+	broadcastServices := ns.getBroadcastServicesForInterface(iface)
+	if len(broadcastServices) > 0 {
+		fmt.Println("   📡 Broadcast Services:")
+		for _, service := range broadcastServices {
+			protocol := service.Protocol
+			if protocol == "" {
+				protocol = "tcp"
+			}
+			fmt.Printf("   │   • %s:%d (%s) via %s\n", service.Name, service.Port, protocol, service.Source)
+		}
+		fmt.Println("   │")
+	}
+
 	devices := ns.getDevicesForInterface(iface)
 	if len(devices) == 0 {
-		fmt.Println("   └── (No devices discovered)")
+		if len(broadcastServices) == 0 {
+			fmt.Println("   └── (No devices discovered)")
+		} else {
+			fmt.Println("   └── (No individual devices discovered)")
+		}
 		return
 	}
 
@@ -98,11 +116,45 @@ func (ns *NetworkScanner) drawNetworkSegment(iface NetworkInterface, segmentNum 
 func (ns *NetworkScanner) getDevicesForInterface(iface NetworkInterface) []Device {
 	var devices []Device
 	for _, device := range ns.devices {
-		if iface.Subnet.Contains(device.IP) {
+		if iface.Subnet.Contains(device.IP) && !ns.isBroadcastIP(device.IP, iface.Subnet) {
 			devices = append(devices, device)
 		}
 	}
 	return devices
+}
+
+// isBroadcastIP checks if an IP address is the broadcast address for the given subnet
+func (ns *NetworkScanner) isBroadcastIP(ip net.IP, subnet *net.IPNet) bool {
+	if subnet == nil {
+		return false
+	}
+
+	subnetIP := subnet.IP.To4()
+	mask := subnet.Mask
+	testIP := ip.To4()
+
+	if subnetIP == nil || mask == nil || testIP == nil {
+		return false
+	}
+
+	// Calculate broadcast address
+	broadcast := make(net.IP, len(subnetIP))
+	for i := range subnetIP {
+		broadcast[i] = subnetIP[i] | ^mask[i]
+	}
+
+	return testIP.Equal(broadcast)
+}
+
+// getBroadcastServicesForInterface returns services discovered on the broadcast IP
+func (ns *NetworkScanner) getBroadcastServicesForInterface(iface NetworkInterface) []Service {
+	var services []Service
+	for _, device := range ns.devices {
+		if iface.Subnet.Contains(device.IP) && ns.isBroadcastIP(device.IP, iface.Subnet) {
+			services = append(services, device.Services...)
+		}
+	}
+	return services
 }
 
 func (ns *NetworkScanner) getDeviceIcon(device Device) string {

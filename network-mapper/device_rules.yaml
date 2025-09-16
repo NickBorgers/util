@@ -19,8 +19,11 @@ rules:
       any_of:
         - hostname_contains: ["sonos"]
         - service_name_contains: ["sonos"]
+        - service_type_contains: ["_sonos._tcp", "_sonos-"]
         - mac_vendor_contains: ["sonos"]
-        - service_type_contains: ["_sonos-"]
+        - all_of:
+          - service_name_contains: ["rincon"]
+          - service_type_contains: ["_sonos"]
 
   - name: "Rachio Sprinkler Controllers"
     priority: 10
@@ -29,9 +32,24 @@ rules:
     description: "Rachio smart sprinkler controllers"
     conditions:
       any_of:
-        - hostname_contains: ["rachio"]
+        - hostname_contains: ["rachio", "wiced-hap"]
         - service_name_contains: ["rachio"]
         - mac_vendor_contains: ["rachio"]
+        - all_of:
+          - hostname_contains: ["wiced"]
+          - service_type_contains: ["_hap._tcp"]
+
+  - name: "HomePod/AirPods"
+    priority: 14
+    device_type: "HomePod/AirPods"
+    icon: "🎵"
+    description: "Apple HomePod speakers and AirPods"
+    conditions:
+      any_of:
+        - service_name_contains: ["homepodsensor", "homepod sensor"]
+        - all_of:
+          - service_type_contains: ["_airplay"]
+          - hostname_contains: ["homepod", "airpods"]
 
   - name: "Apple TV Devices"
     priority: 15
@@ -41,10 +59,9 @@ rules:
     conditions:
       all_of:
         - service_type_contains: ["_airplay", "_raop"]
-        - any_of:
-          - mac_vendor_contains: ["apple"]
-          - hostname_contains: ["appletv", "apple-tv"]
-          - service_name_contains: ["apple tv"]
+        - service_type_contains: ["_companion-link"]
+        - not_conditions:
+          - service_name_contains: ["homepodsensor", "homepod sensor"]
 
   - name: "Chromecast Devices"
     priority: 15
@@ -58,16 +75,41 @@ rules:
         - mac_vendor_contains: ["google"]
 
   # IoT and Smart Home Devices
+  - name: "Lutron Caseta Bridge"
+    priority: 17
+    device_type: "Smart Lighting Hub"
+    icon: "💡"
+    description: "Lutron Caseta Smart Bridge lighting controller"
+    conditions:
+      any_of:
+        - hostname_contains: ["lutron"]
+        - service_name_contains: ["smart bridge", "caseta", "lutron"]
+        - all_of:
+          - service_type_contains: ["_hap._tcp"]
+          - service_name_contains: ["bridge"]
+
+  - name: "Home Assistant"
+    priority: 18
+    device_type: "Home Assistant"
+    icon: "🏠"
+    description: "Home Assistant home automation hub"
+    conditions:
+      any_of:
+        - hostname_contains: ["homeassistant", "home-assistant", "hassio", "hass"]
+        - service_name_contains: ["hass bridge", "home assistant", "homeassistant"]
+        - service_type_contains: ["_hass", "_homeassistant"]
+
   - name: "Philips Hue Bridge"
-    priority: 20
-    device_type: "Smart Hub"
+    priority: 16
+    device_type: "Smart Lighting Hub"
     icon: "💡"
     description: "Philips Hue smart lighting bridge"
     conditions:
       any_of:
+        - service_name_contains: ["philips hue", "hue bridge"]
+        - service_type_contains: ["_hue._tcp"]
         - hostname_contains: ["philips-hue", "hue-bridge"]
         - mac_vendor_contains: ["philips"]
-        - service_name_contains: ["hue"]
 
   - name: "Amazon Echo/Alexa"
     priority: 20
