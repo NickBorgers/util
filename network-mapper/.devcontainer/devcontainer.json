@@ -1,5 +1,5 @@
 {
-  "name": "Util Repository",
+  "name": "Network Mapper",
   "image": "mcr.microsoft.com/devcontainers/go:1.21",
   "features": {
     "ghcr.io/devcontainers/features/common-utils:2": {
@@ -17,8 +17,9 @@
       ]
     }
   },
-  "workspaceFolder": "/workspaces/util",
-  "postCreateCommand": "cd network-mapper && go mod tidy && go mod download && mkdir -p build",
+  "workspaceFolder": "/workspaces/network-mapper",
+  "workspaceMount": "source=${localWorkspaceFolder},target=/workspaces/network-mapper,type=bind",
+  "postCreateCommand": "go mod tidy && go mod download && mkdir -p build",
   "forwardPorts": [],
   "portsAttributes": {},
   "mounts": [],

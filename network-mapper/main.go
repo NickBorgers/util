@@ -7,7 +7,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var version = "2.3.0"
+var version = "2.4.0"
 
 var (
 	disableServiceDiscovery bool

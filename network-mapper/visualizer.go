@@ -39,7 +39,15 @@ func (ns *NetworkScanner) drawNetworkSegment(iface NetworkInterface, segmentNum 
 	}
 
 	devices := ns.getDevicesForInterface(iface)
-	if len(devices) == 0 {
+	routableSubnets := ns.getRoutableSubnetsForInterface(iface)
+
+	// Count total items: direct devices + routable subnet headers + routable subnet devices
+	totalItems := len(devices) + len(routableSubnets)
+	for _, subnetDevices := range routableSubnets {
+		totalItems += len(subnetDevices)
+	}
+
+	if totalItems == 0 {
 		if len(broadcastServicesByHost) == 0 {
 			fmt.Println("   └── (No devices discovered)")
 		} else {
@@ -58,8 +66,12 @@ func (ns *NetworkScanner) drawNetworkSegment(iface NetworkInterface, segmentNum 
 		fmt.Println("   │  │")
 	}
 
-	for i, device := range devices {
-		isLast := i == len(devices)-1
+	currentItem := 0
+
+	// Show direct devices first
+	for _, device := range devices {
+		currentItem++
+		isLast := currentItem == totalItems
 		connector := "├─"
 		continuation := "│  "
 		if isLast {
@@ -114,6 +126,109 @@ func (ns *NetworkScanner) drawNetworkSegment(iface NetworkInterface, segmentNum 
 			}
 		}
 	}
+
+	// Show routable subnets
+	if len(routableSubnets) > 0 {
+		// Sort subnet keys for consistent output
+		var subnetKeys []string
+		for subnet := range routableSubnets {
+			subnetKeys = append(subnetKeys, subnet)
+		}
+		sort.Strings(subnetKeys)
+
+		for _, subnet := range subnetKeys {
+			subnetDevices := routableSubnets[subnet]
+			if len(subnetDevices) == 0 {
+				continue
+			}
+
+			// Sort devices in subnet
+			sort.Slice(subnetDevices, func(i, j int) bool {
+				return subnetDevices[i].IP.String() < subnetDevices[j].IP.String()
+			})
+
+			// Show routable subnet header
+			currentItem++
+			isLastSubnet := (currentItem + len(subnetDevices)) == totalItems
+			subnetConnector := "├─"
+			if isLastSubnet {
+				subnetConnector = "└─"
+			}
+
+			fmt.Printf("   %s🔍 DISCOVERED Subnet: %s (%d device%s) [via routing table]\n",
+				subnetConnector, subnet, len(subnetDevices),
+				map[bool]string{true: "", false: "s"}[len(subnetDevices) == 1])
+
+			// Show devices in this routable subnet
+			for i, device := range subnetDevices {
+				currentItem++
+				isLast := currentItem == totalItems
+				deviceConnector := "│  ├─"
+				deviceContinuation := "│  │  "
+
+				if i == len(subnetDevices)-1 {
+					deviceConnector = "│  └─"
+					deviceContinuation = "│     "
+				}
+				if isLast {
+					if i == len(subnetDevices)-1 {
+						deviceConnector = "   └─"
+						deviceContinuation = "      "
+					} else {
+						deviceConnector = "   ├─"
+						deviceContinuation = "   │  "
+					}
+				}
+
+				icon := ns.getDeviceIcon(device)
+
+				// Use hostname as primary identifier if available, with IP as secondary
+				primaryName := device.IP.String()
+				secondaryInfo := ""
+
+				if device.Hostname != "" && device.Hostname != "unknown" {
+					primaryName = device.Hostname
+					secondaryInfo = fmt.Sprintf("(%s)", device.IP.String())
+				}
+
+				fmt.Printf("   %s%s %s", deviceConnector, icon, primaryName)
+
+				if secondaryInfo != "" {
+					fmt.Printf(" %s", secondaryInfo)
+				}
+
+				details := ns.getDeviceDetails(device)
+				if details != "" {
+					fmt.Printf(" %s", details)
+				}
+				fmt.Println()
+
+				if len(device.Ports) > 0 {
+					portStr := ns.formatPorts(device.Ports)
+					fmt.Printf("   %s   🔌 Ports: %s\n", deviceContinuation, portStr)
+				}
+
+				if len(device.Services) > 0 {
+					serviceStr := ns.formatServices(device.Services)
+					fmt.Printf("   %s   📡 Services: %s\n", deviceContinuation, serviceStr)
+				}
+
+				if device.MAC != "unknown" && device.MAC != "" {
+					macStr := device.MAC
+					if device.MACVendor != "" {
+						macStr = fmt.Sprintf("%s (%s)", device.MAC, device.MACVendor)
+					}
+					fmt.Printf("   %s   🏷️  MAC: %s\n", deviceContinuation, macStr)
+				}
+
+				if len(device.UPnPInfo) > 0 {
+					if server, ok := device.UPnPInfo["server"]; ok && server != "" {
+						fmt.Printf("   %s   🌐 UPnP: %s\n", deviceContinuation, server)
+					}
+				}
+			}
+		}
+	}
 }
 
 func (ns *NetworkScanner) getDevicesForInterface(iface NetworkInterface) []Device {
@@ -124,6 +239,98 @@ func (ns *NetworkScanner) getDevicesForInterface(iface NetworkInterface) []Devic
 		}
 	}
 	return devices
+}
+
+// getRoutableSubnetsForInterface returns devices that are accessible through this interface
+// but not directly in its subnet, grouped by their network prefix
+func (ns *NetworkScanner) getRoutableSubnetsForInterface(iface NetworkInterface) map[string][]Device {
+	routableSubnets := make(map[string][]Device)
+
+	// Find devices that aren't in any direct interface subnet
+	for _, device := range ns.devices {
+		if device.IP == nil {
+			continue
+		}
+
+		// Skip if this device is in any direct interface subnet
+		inDirectSubnet := false
+		for _, checkIface := range ns.interfaces {
+			if checkIface.Subnet != nil && checkIface.Subnet.Contains(device.IP) {
+				inDirectSubnet = true
+				break
+			}
+		}
+
+		if inDirectSubnet {
+			continue
+		}
+
+		// For devices not in direct subnets, determine if they're routable through this interface
+		// For home networks, typically the interface with a gateway can reach other subnets
+		if iface.Gateway != nil && ns.isRoutableThrough(device.IP, iface) {
+			// Group by /24 network to identify subnet patterns
+			networkPrefix := ns.getNetworkPrefix(device.IP, 24)
+			if networkPrefix != "" {
+				routableSubnets[networkPrefix] = append(routableSubnets[networkPrefix], device)
+			}
+		}
+	}
+
+	return routableSubnets
+}
+
+// isRoutableThrough determines if a device IP is likely routable through the given interface
+func (ns *NetworkScanner) isRoutableThrough(deviceIP net.IP, iface NetworkInterface) bool {
+	if deviceIP == nil {
+		return false
+	}
+
+	// Create a /32 subnet for the device IP to check routing
+	var deviceSubnet *net.IPNet
+	if deviceIP.To4() != nil {
+		deviceSubnet = &net.IPNet{IP: deviceIP, Mask: net.CIDRMask(32, 32)}
+	} else {
+		deviceSubnet = &net.IPNet{IP: deviceIP, Mask: net.CIDRMask(128, 128)}
+	}
+
+	// Use the new route table consultation
+	bestInterface := ns.findBestRouteForSubnet(deviceSubnet)
+	return bestInterface != nil && bestInterface.Name == iface.Name
+}
+
+// getNetworkPrefix returns the network prefix (e.g., "10.212.10.0/24") for an IP
+func (ns *NetworkScanner) getNetworkPrefix(ip net.IP, prefixLength int) string {
+	if ip == nil {
+		return ""
+	}
+
+	ip4 := ip.To4()
+	if ip4 == nil {
+		return ""
+	}
+
+	// Create a mask for the prefix length
+	mask := net.CIDRMask(prefixLength, 32)
+	network := ip4.Mask(mask)
+
+	return fmt.Sprintf("%s/%d", network.String(), prefixLength)
+}
+
+// isPrivateIP checks if an IP address is in private ranges
+func (ns *NetworkScanner) isPrivateIP(ip net.IP) bool {
+	if ip == nil {
+		return false
+	}
+
+	ip4 := ip.To4()
+	if ip4 == nil {
+		return false
+	}
+
+	// RFC 1918 private ranges
+	return ip4[0] == 10 ||
+		   (ip4[0] == 172 && ip4[1] >= 16 && ip4[1] <= 31) ||
+		   (ip4[0] == 192 && ip4[1] == 168)
 }
 
 // isBroadcastIP checks if an IP address is the broadcast address for the given subnet
