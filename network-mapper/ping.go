@@ -99,51 +99,6 @@ func (ns *NetworkScanner) scanCommonPorts(ip net.IP) []int {
 	return openPorts
 }
 
-func (ns *NetworkScanner) identifyDeviceType(ip net.IP, ports []int) string {
-	if len(ports) == 0 {
-		return "Unknown"
-	}
-
-	hasSSH := contains(ports, 22)
-	hasHTTP := contains(ports, 80) || contains(ports, 443) || contains(ports, 8080)
-	hasRDP := contains(ports, 3389)
-	hasSMB := contains(ports, 135) || contains(ports, 139)
-	hasVNC := contains(ports, 5900)
-	hasPrinter := contains(ports, 631) || contains(ports, 9100)
-	hasDNS := contains(ports, 53)
-	hasDHCP := contains(ports, 67)
-	hasSNMP := contains(ports, 161)
-
-	if hasPrinter {
-		return "Printer"
-	}
-	if hasDNS && hasDHCP {
-		return "Router/Gateway"
-	}
-	if hasDNS || hasDHCP || hasSNMP {
-		return "Network Device"
-	}
-	if hasRDP && hasSMB {
-		return "Windows PC"
-	}
-	if hasSSH && hasHTTP {
-		return "Linux Server"
-	}
-	if hasSSH {
-		return "Linux/Unix"
-	}
-	if hasHTTP {
-		return "Web Server"
-	}
-	if hasVNC {
-		return "Remote Desktop"
-	}
-	if hasSMB {
-		return "File Server"
-	}
-
-	return "Network Device"
-}
 
 func (ns *NetworkScanner) enhanceDeviceTypeWithServices(device *Device) {
 	if len(device.Services) == 0 {

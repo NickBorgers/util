@@ -4,8 +4,9 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -59,7 +60,7 @@ func (agent *DeviceResearchAgent) UpdateFromRepository() error {
 		return fmt.Errorf("failed to fetch rules: HTTP %d", resp.StatusCode)
 	}
 
-	remoteData, err := ioutil.ReadAll(resp.Body)
+	remoteData, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return fmt.Errorf("failed to read remote rules: %w", err)
 	}
@@ -110,7 +111,7 @@ func (agent *DeviceResearchAgent) shouldUpdate(remoteData []byte) bool {
 // applyUpdate saves the new rules and updates the detector
 func (agent *DeviceResearchAgent) applyUpdate(data []byte, config *DeviceRulesConfig) error {
 	// Save updated rules to local file
-	if err := ioutil.WriteFile(agent.localConfigPath, data, 0644); err != nil {
+	if err := os.WriteFile(agent.localConfigPath, data, 0644); err != nil {
 		return fmt.Errorf("failed to save updated rules: %w", err)
 	}
 
@@ -261,7 +262,7 @@ func (agent *DeviceResearchAgent) generateRuleYAML(candidate ResearchCandidate, 
 	yaml.WriteString(fmt.Sprintf("  - name: \"%s\"\n", ruleName))
 	yaml.WriteString(fmt.Sprintf("    priority: %d\n", priority))
 	yaml.WriteString(fmt.Sprintf("    device_type: \"%s\"\n", candidate.DeviceType))
-	yaml.WriteString(fmt.Sprintf("    icon: \"🤖\"  # Auto-generated rule\n"))
+	yaml.WriteString("    icon: \"🤖\"  # Auto-generated rule\n")
 	yaml.WriteString(fmt.Sprintf("    description: \"Auto-detected %s (confidence: %.1f%%)\"\n",
 		candidate.DeviceType, candidate.Confidence*100))
 	yaml.WriteString("    conditions:\n")

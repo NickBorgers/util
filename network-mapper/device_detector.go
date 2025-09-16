@@ -3,7 +3,6 @@ package main
 import (
 	_ "embed"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"sort"
@@ -89,14 +88,14 @@ func (dd *DeviceDetector) loadConfig() error {
 	// Priority order: custom config path -> local file -> embedded
 	if dd.configPath != "" {
 		// Use custom config path if provided
-		yamlData, err = ioutil.ReadFile(dd.configPath)
+		yamlData, err = os.ReadFile(dd.configPath)
 		if err != nil {
 			return fmt.Errorf("failed to read custom config at %s: %w", dd.configPath, err)
 		}
 		source = dd.configPath
 	} else if _, err := os.Stat("device_rules.yaml"); err == nil {
 		// Use local device_rules.yaml if it exists
-		yamlData, err = ioutil.ReadFile("device_rules.yaml")
+		yamlData, err = os.ReadFile("device_rules.yaml")
 		if err != nil {
 			return fmt.Errorf("failed to read local device_rules.yaml: %w", err)
 		}
@@ -257,7 +256,7 @@ func (dd *DeviceDetector) ExportEmbeddedConfig(outputPath string) error {
 	}
 
 	// Write embedded config to file
-	if err := ioutil.WriteFile(outputPath, embeddedRulesYAML, 0644); err != nil {
+	if err := os.WriteFile(outputPath, embeddedRulesYAML, 0644); err != nil {
 		return fmt.Errorf("failed to write config to %s: %w", outputPath, err)
 	}
 
