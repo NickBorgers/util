@@ -6,6 +6,7 @@ import (
 	"io"
 	"log"
 	"net"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -131,12 +132,28 @@ func (sd *ServiceDiscovery) printProgressLine(serviceStatus map[string]bool) {
 
 func (sd *ServiceDiscovery) discoverMDNS(timeout time.Duration) {
 	// Suppress mDNS library logging unless in verbose mode
+	// The hashicorp/mdns library may log to both stdout/stderr and the default logger
+	originalStderr := os.Stderr
 	originalLogger := log.Writer()
+	originalFlags := log.Flags()
+
 	if !sd.verbose {
-		log.SetOutput(io.Discard) // Suppress mDNS library logs
+		// Redirect stderr to discard mDNS error messages
+		devNull, err := os.OpenFile(os.DevNull, os.O_WRONLY, 0)
+		if err == nil {
+			os.Stderr = devNull
+			defer devNull.Close()
+		}
+		// Also disable the default logger
+		log.SetOutput(io.Discard)
+		log.SetFlags(0)
 	}
+
 	defer func() {
-		log.SetOutput(originalLogger) // Restore original logger
+		// Restore original settings
+		os.Stderr = originalStderr
+		log.SetOutput(originalLogger)
+		log.SetFlags(originalFlags)
 	}()
 
 	// Reduced output - only show in verbose mode
