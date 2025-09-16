@@ -393,8 +393,8 @@ func (ns *NetworkScanner) scanRangeWithProgress(rangeIndex int, scanRange ScanRa
 	endIP := ns.getLastIP(scanRange.Network)
 	totalIPs := ns.countIPsInRange(startIP, endIP)
 
-	// Start range tracking
-	ns.progressTracker.StartRange(rangeIndex, scanRange.Description, totalIPs)
+	// Start range tracking with CIDR information
+	ns.progressTracker.StartRangeWithCIDR(rangeIndex, scanRange.Description, scanRange.Network.String(), totalIPs)
 
 	if totalIPs > 10000 && ns.verbose {
 		fmt.Printf("⚠️  Large range detected (%d IPs). Consider using --scan-mode quick for faster scanning.\n", totalIPs)
@@ -493,7 +493,7 @@ func (ns *NetworkScanner) scanRangeWithProgress(rangeIndex int, scanRange ScanRa
 
 	// Complete range tracking
 	devicesFound := len(ns.devices) - devicesFoundStart
-	ns.progressTracker.CompleteRange(rangeIndex, scanRange.Description, devicesFound)
+	ns.progressTracker.CompleteRangeWithCIDR(rangeIndex, scanRange.Description, scanRange.Network.String(), devicesFound)
 }
 
 // Helper methods for IP range scanning

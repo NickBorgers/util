@@ -37,18 +37,31 @@ func NewScanProgress(totalRanges int, totalIPs uint32, verbose bool) *ScanProgre
 }
 
 func (sp *ScanProgress) StartRange(rangeIndex int, rangeName string, rangeIPs uint32) {
+	sp.StartRangeWithCIDR(rangeIndex, rangeName, "", rangeIPs)
+}
+
+func (sp *ScanProgress) StartRangeWithCIDR(rangeIndex int, rangeName, cidr string, rangeIPs uint32) {
 	sp.mu.Lock()
 	defer sp.mu.Unlock()
 
 	sp.rangeStartTimes[rangeIndex] = time.Now()
 
 	if sp.verbose {
-		fmt.Printf("🎯 [%d/%d] Starting scan of %s (%d IPs)\n",
-			rangeIndex+1, sp.totalRanges, rangeName, rangeIPs)
+		if cidr != "" {
+			fmt.Printf("🔍 [%d/%d] Scanning CIDR: %s (%s, %d IPs)\n",
+				rangeIndex+1, sp.totalRanges, cidr, rangeName, rangeIPs)
+		} else {
+			fmt.Printf("🎯 [%d/%d] Starting scan of %s (%d IPs)\n",
+				rangeIndex+1, sp.totalRanges, rangeName, rangeIPs)
+		}
 	}
 }
 
 func (sp *ScanProgress) CompleteRange(rangeIndex int, rangeName string, devicesFound int) {
+	sp.CompleteRangeWithCIDR(rangeIndex, rangeName, "", devicesFound)
+}
+
+func (sp *ScanProgress) CompleteRangeWithCIDR(rangeIndex int, rangeName, cidr string, devicesFound int) {
 	sp.mu.Lock()
 	defer sp.mu.Unlock()
 
@@ -57,8 +70,13 @@ func (sp *ScanProgress) CompleteRange(rangeIndex int, rangeName string, devicesF
 	if startTime, exists := sp.rangeStartTimes[rangeIndex]; exists {
 		duration := time.Since(startTime)
 		if sp.verbose {
-			fmt.Printf("✅ [%d/%d] Completed %s in %v (found %d devices)\n",
-				rangeIndex+1, sp.totalRanges, rangeName, duration.Round(time.Second), devicesFound)
+			if cidr != "" {
+				fmt.Printf("✅ [%d/%d] Completed CIDR: %s in %v (found %d devices)\n",
+					rangeIndex+1, sp.totalRanges, cidr, duration.Round(time.Second), devicesFound)
+			} else {
+				fmt.Printf("✅ [%d/%d] Completed %s in %v (found %d devices)\n",
+					rangeIndex+1, sp.totalRanges, rangeName, duration.Round(time.Second), devicesFound)
+			}
 		}
 		delete(sp.rangeStartTimes, rangeIndex)
 	}
