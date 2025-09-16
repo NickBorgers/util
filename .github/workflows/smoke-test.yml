@@ -42,7 +42,11 @@ jobs:
     - name: Build binary
       working-directory: network-mapper
       run: |
-        go build -o network-mapper .
+        if [[ "${{ runner.os }}" == "Windows" ]]; then
+          go build -o network-mapper.exe .
+        else
+          go build -o network-mapper .
+        fi
 
     - name: Run basic functionality tests
       working-directory: network-mapper
@@ -125,10 +129,16 @@ jobs:
     - name: Test device rules loading
       working-directory: network-mapper
       run: |
-        go build -o network-mapper .
+        if [[ "${{ runner.os }}" == "Windows" ]]; then
+          go build -o network-mapper.exe .
+          BINARY="./network-mapper.exe"
+        else
+          go build -o network-mapper .
+          BINARY="./network-mapper"
+        fi
 
         echo "Testing device rules export..."
-        ./network-mapper --export-device-rules test-rules.yaml
+        $BINARY --export-device-rules test-rules.yaml
 
         if [[ ! -f test-rules.yaml ]]; then
           echo "ERROR: Device rules export failed"
@@ -194,7 +204,13 @@ jobs:
     - name: Run performance benchmark
       working-directory: network-mapper
       run: |
-        go build -o network-mapper .
+        if [[ "${{ runner.os }}" == "Windows" ]]; then
+          go build -o network-mapper.exe .
+          BINARY="./network-mapper.exe"
+        else
+          go build -o network-mapper .
+          BINARY="./network-mapper"
+        fi
 
         echo "Running performance benchmark..."
         start_time=$(date +%s)
@@ -211,9 +227,9 @@ jobs:
         fi
 
         if [[ -n "$TIMEOUT_CMD" ]]; then
-          $TIMEOUT_CMD 60s ./network-mapper --scan-mode quick --no-dns --no-services > benchmark_output.txt
+          $TIMEOUT_CMD 60s $BINARY --scan-mode quick --no-dns --no-services > benchmark_output.txt
         else
-          ./network-mapper --scan-mode quick --no-dns --no-services > benchmark_output.txt &
+          $BINARY --scan-mode quick --no-dns --no-services > benchmark_output.txt &
           SCAN_PID=$!
           sleep 60
           kill $SCAN_PID 2>/dev/null || true
