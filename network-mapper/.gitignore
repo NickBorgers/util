@@ -46,4 +46,4 @@ Thumbs.db
 
 # Environment files
 .env
-.env.local
+.env.localnetwork-mapper

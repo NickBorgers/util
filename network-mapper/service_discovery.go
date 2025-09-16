@@ -3,6 +3,8 @@ package main
 import (
 	"context"
 	"fmt"
+	"io"
+	"log"
 	"net"
 	"strings"
 	"sync"
@@ -58,6 +60,15 @@ func (sd *ServiceDiscovery) DiscoverServices(interfaces []NetworkInterface, time
 }
 
 func (sd *ServiceDiscovery) discoverMDNS(timeout time.Duration) {
+	// Suppress mDNS library logging unless in verbose mode
+	originalLogger := log.Writer()
+	if !sd.verbose {
+		log.SetOutput(io.Discard) // Suppress mDNS library logs
+	}
+	defer func() {
+		log.SetOutput(originalLogger) // Restore original logger
+	}()
+
 	// Reduced output - only show in verbose mode
 	if sd.verbose {
 		fmt.Println("   📡 Scanning mDNS/Bonjour services...")

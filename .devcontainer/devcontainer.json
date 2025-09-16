@@ -1,12 +1,13 @@
 {
-  "name": "Network Mapper",
+  "name": "Util Repository",
   "image": "mcr.microsoft.com/devcontainers/go:1.21",
   "features": {
     "ghcr.io/devcontainers/features/common-utils:2": {
       "installZsh": true,
       "configureZshAsDefaultShell": true,
       "installOhMyZsh": true
-    }
+    },
+    "ghcr.io/devcontainers/features/github-cli:1": {}
   },
   "customizations": {
     "vscode": {
@@ -16,7 +17,8 @@
       ]
     }
   },
-  "postCreateCommand": "go mod tidy && go mod download && mkdir -p build",
+  "workspaceFolder": "/workspaces/util",
+  "postCreateCommand": "cd network-mapper && go mod tidy && go mod download && mkdir -p build",
   "forwardPorts": [],
   "portsAttributes": {},
   "mounts": [],
