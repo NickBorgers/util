@@ -23,22 +23,24 @@ func (ns *NetworkScanner) drawNetworkSegment(iface NetworkInterface, segmentNum 
 	fmt.Printf("   IP: %s | Subnet: %s\n", iface.IP.String(), iface.Subnet.String())
 
 	// Check for broadcast services
-	broadcastServices := ns.getBroadcastServicesForInterface(iface)
-	if len(broadcastServices) > 0 {
+	broadcastServicesByHost := ns.getBroadcastServicesByHost(iface)
+	if len(broadcastServicesByHost) > 0 {
 		fmt.Println("   📡 Broadcast Services:")
-		for _, service := range broadcastServices {
-			protocol := service.Protocol
-			if protocol == "" {
-				protocol = "tcp"
+		for hostIP, services := range broadcastServicesByHost {
+			for _, service := range services {
+				protocol := service.Protocol
+				if protocol == "" {
+					protocol = "tcp"
+				}
+				fmt.Printf("   │   • %s:%d (%s) via %s from %s\n", service.Name, service.Port, protocol, service.Source, hostIP)
 			}
-			fmt.Printf("   │   • %s:%d (%s) via %s\n", service.Name, service.Port, protocol, service.Source)
 		}
 		fmt.Println("   │")
 	}
 
 	devices := ns.getDevicesForInterface(iface)
 	if len(devices) == 0 {
-		if len(broadcastServices) == 0 {
+		if len(broadcastServicesByHost) == 0 {
 			fmt.Println("   └── (No devices discovered)")
 		} else {
 			fmt.Println("   └── (No individual devices discovered)")
@@ -147,15 +149,32 @@ func (ns *NetworkScanner) isBroadcastIP(ip net.IP, subnet *net.IPNet) bool {
 	return testIP.Equal(broadcast)
 }
 
-// getBroadcastServicesForInterface returns services discovered on the broadcast IP
-func (ns *NetworkScanner) getBroadcastServicesForInterface(iface NetworkInterface) []Service {
-	var services []Service
+// getBroadcastServicesByHost returns services discovered grouped by host IP
+func (ns *NetworkScanner) getBroadcastServicesByHost(iface NetworkInterface) map[string][]Service {
+	servicesByHost := make(map[string][]Service)
+
 	for _, device := range ns.devices {
-		if iface.Subnet.Contains(device.IP) && ns.isBroadcastIP(device.IP, iface.Subnet) {
-			services = append(services, device.Services...)
+		// Include all devices in the subnet that have services from broadcast discovery
+		if iface.Subnet.Contains(device.IP) {
+			var broadcastServices []Service
+			for _, service := range device.Services {
+				// Include services discovered via broadcast methods
+				if service.Source == "probe" || service.Source == "ssdp" || service.Source == "igmp" {
+					broadcastServices = append(broadcastServices, service)
+				}
+			}
+
+			if len(broadcastServices) > 0 {
+				hostIP := device.IP.String()
+				if device.Hostname != "" && device.Hostname != "unknown" {
+					hostIP = fmt.Sprintf("%s (%s)", device.Hostname, device.IP.String())
+				}
+				servicesByHost[hostIP] = broadcastServices
+			}
 		}
 	}
-	return services
+
+	return servicesByHost
 }
 
 func (ns *NetworkScanner) getDeviceIcon(device Device) string {
