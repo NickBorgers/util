@@ -35,12 +35,15 @@ class NetworkMapper < Formula
       - On macOS/Linux: Run with 'sudo' if needed for network interface access
       - Some features like ARP scanning require root access
 
-      To run a quick scan:
-        network-mapper --scan-mode quick
+      To start with intelligent discovery (default, recommended):
+        network-mapper
 
-      To use intelligent discovery with different thoroughness:
-        network-mapper --thoroughness 1  # Minimal
-        network-mapper --thoroughness 5  # Exhaustive
+      To adjust thoroughness for intelligent discovery:
+        network-mapper --thoroughness 1  # Minimal, faster
+        network-mapper --thoroughness 5  # Exhaustive, thorough
+
+      To run a quick brute-force scan (interface subnets only):
+        network-mapper --scan-mode quick
 
       For help:
         network-mapper --help
