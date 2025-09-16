@@ -13,6 +13,7 @@
     <packageSourceUrl>https://github.com/NickBorgers/util/tree/main/network-mapper/chocolatey</packageSourceUrl>
     <docsUrl>https://github.com/NickBorgers/util/blob/main/network-mapper/README.md</docsUrl>
     <bugTrackerUrl>https://github.com/NickBorgers/util/issues</bugTrackerUrl>
+    <iconUrl>https://raw.githubusercontent.com/NickBorgers/util/main/network-mapper/icon.png</iconUrl>
     <tags>network discovery scanner visualization topology cli cross-platform mdns upnp security audit</tags>
     <summary>A cross-platform CLI tool for network discovery and visualization</summary>
     <description><![CDATA[

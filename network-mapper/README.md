@@ -3,8 +3,12 @@
 [![Build Status](https://github.com/NickBorgers/util/workflows/Build%20and%20Test/badge.svg)](https://github.com/NickBorgers/util/actions)
 [![Release](https://github.com/NickBorgers/util/workflows/Release/badge.svg)](https://github.com/NickBorgers/util/releases)
 [![Docker](https://img.shields.io/badge/docker-available-blue)](https://github.com/NickBorgers/util/pkgs/container/network-mapper)
+[![Homebrew](https://img.shields.io/badge/homebrew-available-orange)](https://github.com/NickBorgers/homebrew-tap)
+[![Chocolatey](https://img.shields.io/badge/chocolatey-available-brown)](https://chocolatey.org/packages/network-mapper)
 [![Go Report Card](https://goreportcard.com/badge/github.com/NickBorgers/util)](https://goreportcard.com/report/github.com/NickBorgers/util)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
+**Quick Install:** `brew install nickborgers/tap/network-mapper` | `choco install network-mapper` | `docker run --rm --network host ghcr.io/nickborgers/network-mapper:latest`
 
 A cross-platform CLI tool that scans your local network, discovers devices, and presents a beautiful pictographic representation of the network topology.
 
@@ -44,7 +48,52 @@ A cross-platform CLI tool that scans your local network, discovers devices, and 
 
 ## Installation
 
-### Download Pre-built Binaries
+Choose your preferred installation method:
+
+### 🍺 Homebrew (macOS/Linux)
+
+The easiest way to install on macOS and Linux:
+
+```bash
+# Add the tap and install
+brew tap nickborgers/tap
+brew install network-mapper
+
+# Or install directly
+brew install nickborgers/tap/network-mapper
+
+# Upgrade to latest version
+brew upgrade network-mapper
+```
+
+### 🍫 Chocolatey (Windows)
+
+For Windows users with Chocolatey:
+
+```powershell
+# Install
+choco install network-mapper
+
+# Upgrade to latest version
+choco upgrade network-mapper
+```
+
+### 🐳 Docker
+
+Run directly with Docker (cross-platform):
+
+```bash
+# Pull from GitHub Container Registry
+docker pull ghcr.io/nickborgers/network-mapper:latest
+
+# Run with host network access
+docker run --rm --network host ghcr.io/nickborgers/network-mapper:latest
+
+# Quick scan without service discovery
+docker run --rm --network host ghcr.io/nickborgers/network-mapper:latest --scan-mode quick
+```
+
+### 📦 Pre-built Binaries
 
 Download the latest release for your platform from the [GitHub Releases](https://github.com/NickBorgers/util/releases) page:
 
@@ -58,20 +107,6 @@ Make the binary executable and run:
 ```bash
 chmod +x network-mapper-*
 ./network-mapper-* --help
-```
-
-### Docker
-
-Run directly with Docker:
-```bash
-# Pull from GitHub Container Registry
-docker pull ghcr.io/nickborgers/network-mapper:latest
-
-# Run with host network access
-docker run --rm --network host ghcr.io/nickborgers/network-mapper:latest
-
-# Quick scan without service discovery
-docker run --rm --network host ghcr.io/nickborgers/network-mapper:latest --no-services
 ```
 
 ### Build from Source
@@ -111,25 +146,7 @@ go build -o network-mapper
 
 ### Package Managers
 
-#### Homebrew (macOS/Linux)
-
-```bash
-# Coming soon
-brew install nickborgers/tap/network-mapper
-```
-
-#### Chocolatey (Windows)
-
-```bash
-# Coming soon
-choco install network-mapper
-```
-
-#### APT/YUM Packages
-
-```bash
-# Coming soon - .deb and .rpm packages
-```
+See [Installation](#installation) section above for complete package manager setup.
 
 ## Usage
 
