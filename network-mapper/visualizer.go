@@ -143,6 +143,16 @@ func (ns *NetworkScanner) getDeviceIcon(device Device) string {
 		return "🥧"
 	case "Intel NUC/Server":
 		return "💻"
+	case "Sonos Speaker":
+		return "🔊"
+	case "AirPlay Speaker":
+		return "🔊"
+	case "Sprinkler Controller":
+		return "💧"
+	case "Google/Nest Device":
+		return "🔵"
+	case "Amazon Device":
+		return "📢"
 	default:
 		return "❓"
 	}

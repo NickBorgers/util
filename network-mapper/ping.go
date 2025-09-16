@@ -156,10 +156,21 @@ func (ns *NetworkScanner) enhanceDeviceTypeWithServices(device *Device) {
 	hasPrinting := false
 	hasMediaServer := false
 	hasAppleServices := false
+	hasSonos := false
+	hasRachio := false
 
 	for _, service := range device.Services {
 		serviceType := strings.ToLower(service.Type)
 		serviceName := strings.ToLower(service.Name)
+		hostname := strings.ToLower(device.Hostname)
+
+		// Check for specific device brands first
+		if strings.Contains(serviceName, "sonos") || strings.Contains(hostname, "sonos") {
+			hasSonos = true
+		}
+		if strings.Contains(serviceName, "rachio") || strings.Contains(hostname, "rachio") {
+			hasRachio = true
+		}
 
 		if strings.Contains(serviceType, "airplay") || strings.Contains(serviceName, "airplay") {
 			hasAirPlay = true
@@ -184,28 +195,48 @@ func (ns *NetworkScanner) enhanceDeviceTypeWithServices(device *Device) {
 
 	originalType := device.DeviceType
 
-	if hasAirPlay && hasAppleServices {
+	// Prioritize specific device brand detection
+	if hasSonos {
+		device.DeviceType = "Sonos Speaker"
+	} else if hasRachio {
+		device.DeviceType = "Sprinkler Controller"
+	} else if hasAirPlay && hasAppleServices {
 		device.DeviceType = "Apple TV/AirPlay"
 	} else if hasGooglecast {
 		device.DeviceType = "Chromecast/Google Device"
-	} else if hasHomeKit {
+	} else if hasHomeKit && !hasAirPlay {
+		// Only classify as generic HomeKit if it's not a specific brand
 		device.DeviceType = "HomeKit Device"
-	} else if hasPrinting {
+	} else if hasPrinting && !hasSonos {
+		// Don't classify Sonos as printer even if it has some printing-like service
 		device.DeviceType = "Network Printer"
 	} else if hasMediaServer {
 		device.DeviceType = "Media Server"
+	} else if hasAirPlay && !hasAppleServices {
+		// AirPlay device that's not Apple (like Sonos)
+		device.DeviceType = "AirPlay Speaker"
 	} else if hasAppleServices && device.MACVendor != "" && strings.Contains(device.MACVendor, "Apple") {
 		device.DeviceType = "Apple Device"
 	}
 
 	if device.DeviceType == originalType && device.MACVendor != "" {
 		vendor := strings.ToLower(device.MACVendor)
-		if strings.Contains(vendor, "apple") && device.DeviceType == "Network Device" {
+		hostname := strings.ToLower(device.Hostname)
+
+		if strings.Contains(vendor, "sonos") || strings.Contains(hostname, "sonos") {
+			device.DeviceType = "Sonos Speaker"
+		} else if strings.Contains(vendor, "rachio") || strings.Contains(hostname, "rachio") {
+			device.DeviceType = "Sprinkler Controller"
+		} else if strings.Contains(vendor, "apple") && device.DeviceType == "Network Device" {
 			device.DeviceType = "Apple Device"
 		} else if strings.Contains(vendor, "raspberry") {
 			device.DeviceType = "Raspberry Pi"
 		} else if strings.Contains(vendor, "intel") && contains(device.Ports, 22) {
 			device.DeviceType = "Intel NUC/Server"
+		} else if strings.Contains(vendor, "google") || strings.Contains(vendor, "nest") {
+			device.DeviceType = "Google/Nest Device"
+		} else if strings.Contains(vendor, "amazon") || strings.Contains(hostname, "echo") || strings.Contains(hostname, "alexa") {
+			device.DeviceType = "Amazon Device"
 		}
 	}
 }
