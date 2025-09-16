@@ -145,84 +145,56 @@ func (id *IntelligentDiscovery) generateAdjacentSubnets(interfaces []NetworkInte
 
 // generateCommonSubnets creates candidates for common network ranges
 func (id *IntelligentDiscovery) generateCommonSubnets(interfaces []NetworkInterface) {
-	// For each interface, generate common subnet variations
+	// Get truly common subnets across different networks (not variations of current network)
+	commonSubnets := id.getTrulyCommonSubnets()
+
+	// Skip subnets that are already covered by interface subnets
+	interfaceNetworks := make(map[string]bool)
 	for _, iface := range interfaces {
-		ip := iface.IP.To4()
-		if ip == nil {
+		if iface.Subnet != nil {
+			interfaceNetworks[iface.Subnet.String()] = true
+		}
+	}
+
+	// Probe common subnets for gateway responsiveness
+	for _, subnetStr := range commonSubnets {
+		_, subnet, err := net.ParseCIDR(subnetStr)
+		if err != nil {
 			continue
 		}
 
-		// Generate common /24 subnets in the same /16 range
-		for thirdOctet := 0; thirdOctet <= 255; thirdOctet += 1 {
-			// Skip the current interface subnet
-			if thirdOctet == int(ip[2]) {
-				continue
-			}
+		// Skip if this subnet is already covered by an interface
+		if interfaceNetworks[subnet.String()] {
+			continue
+		}
 
-			// Thoroughness affects which ranges we include
-			if !id.isCommonThirdOctetForThoroughness(thirdOctet) {
-				continue
-			}
-
-			subnetIP := net.IPv4(ip[0], ip[1], byte(thirdOctet), 0)
-			subnet := &net.IPNet{
-				IP:   subnetIP,
-				Mask: net.CIDRMask(24, 32),
-			}
-
+		// Probe gateway IPs for this subnet to see if it's active
+		gatewayIP := id.probeSubnetGateways(subnet)
+		if gatewayIP != nil {
 			candidate := SubnetCandidate{
 				Network:   subnet,
-				Priority:  60, // Medium priority
+				Priority:  70, // Higher priority for proven active subnets
+				Source:    "common",
+				GatewayIP: gatewayIP,
+				IsActive:  true,
+			}
+			id.candidates = append(id.candidates, candidate)
+
+			if id.verbose {
+				fmt.Printf("   ✓ Found active common subnet %s (gateway: %s)\n", subnet.String(), gatewayIP.String())
+			}
+		} else {
+			// Add as lower priority candidate even if no gateway responds
+			candidate := SubnetCandidate{
+				Network:   subnet,
+				Priority:  40, // Lower priority for unproven subnets
 				Source:    "common",
 				GatewayIP: id.guessGatewayIP(subnet),
+				IsActive:  false,
 			}
 			id.candidates = append(id.candidates, candidate)
 		}
 	}
-}
-
-// isCommonThirdOctetForThoroughness returns true for commonly used third octets based on thoroughness
-func (id *IntelligentDiscovery) isCommonThirdOctetForThoroughness(octet int) bool {
-	// Define ranges by thoroughness level
-	switch id.thoroughness {
-	case 1: // Minimal - only most common
-		common := []int{0, 1}
-		return id.containsInt(common, octet)
-	case 2: // Light
-		common := []int{0, 1, 10, 100}
-		return id.containsInt(common, octet)
-	case 3: // Default
-		common := []int{0, 1, 10, 20, 30, 50, 100, 168, 254}
-		return id.containsInt(common, octet)
-	case 4: // Thorough
-		common := []int{0, 1, 2, 5, 10, 11, 15, 20, 25, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 150, 168, 200, 250, 254}
-		return id.containsInt(common, octet)
-	case 5: // Exhaustive - try many more ranges
-		// For level 5, check every 10th number plus commons
-		if octet%10 == 0 || octet%10 == 1 || octet%10 == 5 {
-			return true
-		}
-		common := []int{0, 1, 2, 5, 10, 11, 15, 20, 25, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 150, 168, 200, 250, 254}
-		return id.containsInt(common, octet)
-	default:
-		return id.isCommonThirdOctet(octet)
-	}
-}
-
-// Helper function for old behavior
-func (id *IntelligentDiscovery) isCommonThirdOctet(octet int) bool {
-	common := []int{0, 1, 10, 20, 30, 50, 100, 168, 200, 254}
-	return id.containsInt(common, octet)
-}
-
-// containsInt checks if slice contains integer
-func (id *IntelligentDiscovery) containsInt(slice []int, val int) bool {
-	for _, item := range slice {
-		if item == val {
-			return true
-		}
-	}
-	return false
 }
 
 // getAdjacentSubnets returns subnets adjacent to the given subnet
@@ -300,7 +272,7 @@ func (id *IntelligentDiscovery) probeGatewayIPs() {
 			gatewayIPs := id.getCommonGatewayIPs(candidate.Network)
 
 			for _, gwIP := range gatewayIPs {
-				if id.pingHost(gwIP.String()) {
+				if id.pingIP(gwIP, 1*time.Second) {
 					id.mu.Lock()
 					candidate.IsActive = true
 					candidate.GatewayIP = gwIP
@@ -342,11 +314,98 @@ func (id *IntelligentDiscovery) getCommonGatewayIPs(subnet *net.IPNet) []net.IP 
 	return gateways
 }
 
-// pingHost checks if a host responds to ping (reuse existing implementation)
-func (id *IntelligentDiscovery) pingHost(host string) bool {
-	// We'll reference the existing pingHost method from NetworkScanner
-	// For now, we'll implement a simple version
-	return pingHostQuick(host, id.timeout)
+// getTrulyCommonSubnets returns common subnet ranges across different networks
+func (id *IntelligentDiscovery) getTrulyCommonSubnets() []string {
+	// Base common subnets for all thoroughness levels
+	baseCommon := []string{
+		// Most common home network defaults
+		"192.168.1.0/24", // Most common router default
+		"192.168.0.0/24", // Second most common
+		"10.0.0.0/24",    // Common alternative
+		"10.0.1.0/24",    // Common alternative
+	}
+
+	// Additional subnets based on thoroughness level
+	switch id.thoroughness {
+	case 1: // Minimal - only most common home networks
+		return baseCommon[:2] // Only 192.168.1.0/24 and 192.168.0.0/24
+
+	case 2: // Light - common home + basic alternatives
+		return append(baseCommon, []string{
+			"192.168.2.0/24",
+			"10.1.0.0/24",
+		}...)
+
+	case 3: // Default - home + common corporate
+		return append(baseCommon, []string{
+			"192.168.2.0/24",
+			"192.168.10.0/24",
+			"10.1.0.0/24",
+			"10.10.0.0/24",
+			"172.16.0.0/24",
+		}...)
+
+	case 4: // Thorough - include more corporate VLANs
+		return append(baseCommon, []string{
+			"192.168.2.0/24",
+			"192.168.10.0/24",
+			"192.168.11.0/24",
+			"192.168.20.0/24",
+			"10.1.0.0/24",
+			"10.2.0.0/24",
+			"10.10.0.0/24",
+			"10.20.0.0/24",
+			"10.30.0.0/24",
+			"172.16.0.0/24",
+			"172.16.1.0/24",
+			"172.17.0.0/24",
+		}...)
+
+	case 5: // Exhaustive - many common patterns
+		return append(baseCommon, []string{
+			"192.168.2.0/24",
+			"192.168.10.0/24",
+			"192.168.11.0/24",
+			"192.168.20.0/24",
+			"192.168.50.0/24",
+			"192.168.100.0/24",
+			"10.1.0.0/24",
+			"10.2.0.0/24",
+			"10.5.0.0/24",
+			"10.10.0.0/24",
+			"10.11.0.0/24",
+			"10.20.0.0/24",
+			"10.30.0.0/24",
+			"10.40.0.0/24",
+			"10.50.0.0/24",
+			"10.100.0.0/24",
+			"172.16.0.0/24",
+			"172.16.1.0/24",
+			"172.17.0.0/24",
+			"172.18.0.0/24",
+			"172.20.0.0/24",
+		}...)
+
+	default:
+		return baseCommon
+	}
+}
+
+// probeSubnetGateways probes common gateway IPs in a subnet to see if any respond
+func (id *IntelligentDiscovery) probeSubnetGateways(subnet *net.IPNet) net.IP {
+	gatewayIPs := id.getCommonGatewayIPs(subnet)
+
+	for _, gatewayIP := range gatewayIPs {
+		if id.pingIP(gatewayIP, 1*time.Second) {
+			return gatewayIP
+		}
+	}
+	return nil
+}
+
+// pingIP checks if an IP address responds to ping
+func (id *IntelligentDiscovery) pingIP(ip net.IP, timeout time.Duration) bool {
+	return pingHostQuick(ip.String(), timeout)
 }
 
 // sortCandidates sorts candidates by priority and activity
