@@ -41,6 +41,7 @@ jobs:
 
     - name: Build binary
       working-directory: network-mapper
+      shell: bash
       run: |
         if [[ "${{ runner.os }}" == "Windows" ]]; then
           go build -o network-mapper.exe .
@@ -50,6 +51,7 @@ jobs:
 
     - name: Run basic functionality tests
       working-directory: network-mapper
+      shell: bash
       run: |
         # Make executable on Unix systems
         if [[ "${{ runner.os }}" != "Windows" ]]; then
@@ -128,6 +130,7 @@ jobs:
 
     - name: Test device rules loading
       working-directory: network-mapper
+      shell: bash
       run: |
         if [[ "${{ runner.os }}" == "Windows" ]]; then
           go build -o network-mapper.exe .
@@ -203,6 +206,7 @@ jobs:
 
     - name: Run performance benchmark
       working-directory: network-mapper
+      shell: bash
       run: |
         if [[ "${{ runner.os }}" == "Windows" ]]; then
           go build -o network-mapper.exe .
