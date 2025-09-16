@@ -316,22 +316,6 @@ func (ns *NetworkScanner) getNetworkPrefix(ip net.IP, prefixLength int) string {
 	return fmt.Sprintf("%s/%d", network.String(), prefixLength)
 }
 
-// isPrivateIP checks if an IP address is in private ranges
-func (ns *NetworkScanner) isPrivateIP(ip net.IP) bool {
-	if ip == nil {
-		return false
-	}
-
-	ip4 := ip.To4()
-	if ip4 == nil {
-		return false
-	}
-
-	// RFC 1918 private ranges
-	return ip4[0] == 10 ||
-		   (ip4[0] == 172 && ip4[1] >= 16 && ip4[1] <= 31) ||
-		   (ip4[0] == 192 && ip4[1] == 168)
-}
 
 // isBroadcastIP checks if an IP address is the broadcast address for the given subnet
 func (ns *NetworkScanner) isBroadcastIP(ip net.IP, subnet *net.IPNet) bool {
