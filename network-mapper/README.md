@@ -401,6 +401,15 @@ The project uses GitHub Actions for automated building, testing, and releases:
   - Docker images published to GitHub Container Registry
   - Multi-platform support with compressed archives
 
+#### Package Manager Automation
+- **Homebrew**: Automatically updates [homebrew-tap](https://github.com/NickBorgers/homebrew-tap) formula
+- **Chocolatey**: Publishes to [Chocolatey Community Repository](https://community.chocolatey.org/packages/network-mapper)
+- **Triggered on**: Release publication (fully automated)
+- **Updates**: Checksums, download URLs, and version numbers across all package managers
+- **Secrets Required**:
+  - `HOMEBREW_TAP_TOKEN`: GitHub token with write access to homebrew-tap repository
+  - `CHOCOLATEY_API_KEY`: API key for publishing to Chocolatey community repository
+
 #### Security & Quality
 - **Security Scanning**: Gosec for vulnerability detection
 - **Dependency Scanning**: Nancy for known vulnerabilities
