@@ -99,7 +99,6 @@ func (ns *NetworkScanner) scanCommonPorts(ip net.IP) []int {
 	return openPorts
 }
 
-
 func (ns *NetworkScanner) enhanceDeviceTypeWithServices(device *Device) {
 	if len(device.Services) == 0 {
 		return

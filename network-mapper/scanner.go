@@ -589,4 +589,3 @@ func (ns *NetworkScanner) logUnknownDevices() {
 		fmt.Println("💾 Research data ready for background agent processing")
 	}
 }
-
