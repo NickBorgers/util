@@ -118,18 +118,15 @@ func (sd *ServiceDiscovery) printProgressLine(serviceStatus map[string]bool) {
 
 	// Clear the line and show progress
 	progressLine := fmt.Sprintf("   [%d/4] %s", completedCount, strings.Join(status, " | "))
-	fmt.Printf("\r%s%s", progressLine, strings.Repeat(" ", max(0, 80-len(progressLine))))
+	padding := 80 - len(progressLine)
+	if padding < 0 {
+		padding = 0
+	}
+	fmt.Printf("\r%s%s", progressLine, strings.Repeat(" ", padding))
 
 	if completedCount == 4 {
 		fmt.Println() // New line when complete
 	}
-}
-
-func max(a, b int) int {
-	if a > b {
-		return a
-	}
-	return b
 }
 
 func (sd *ServiceDiscovery) discoverMDNS(timeout time.Duration) {
