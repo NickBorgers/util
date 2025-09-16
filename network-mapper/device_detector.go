@@ -26,20 +26,20 @@ type DeviceRule struct {
 
 // Conditions define when a rule matches
 type Conditions struct {
-	AllOf        []Condition `yaml:"all_of,omitempty"`
-	AnyOf        []Condition `yaml:"any_of,omitempty"`
+	AllOf         []Condition `yaml:"all_of,omitempty"`
+	AnyOf         []Condition `yaml:"any_of,omitempty"`
 	NotConditions []Condition `yaml:"not_conditions,omitempty"`
 }
 
 // Condition represents a single matching condition
 type Condition struct {
-	HostnameContains     []string `yaml:"hostname_contains,omitempty"`
-	ServiceNameContains  []string `yaml:"service_name_contains,omitempty"`
-	ServiceTypeContains  []string `yaml:"service_type_contains,omitempty"`
-	MACVendorContains    []string `yaml:"mac_vendor_contains,omitempty"`
-	OpenPorts            []int    `yaml:"open_ports,omitempty"`
-	HostnameMatches      []string `yaml:"hostname_matches,omitempty"`
-	ServiceNameMatches   []string `yaml:"service_name_matches,omitempty"`
+	HostnameContains    []string `yaml:"hostname_contains,omitempty"`
+	ServiceNameContains []string `yaml:"service_name_contains,omitempty"`
+	ServiceTypeContains []string `yaml:"service_type_contains,omitempty"`
+	MACVendorContains   []string `yaml:"mac_vendor_contains,omitempty"`
+	OpenPorts           []int    `yaml:"open_ports,omitempty"`
+	HostnameMatches     []string `yaml:"hostname_matches,omitempty"`
+	ServiceNameMatches  []string `yaml:"service_name_matches,omitempty"`
 }
 
 // DeviceRulesConfig represents the entire YAML configuration
@@ -52,16 +52,16 @@ type DeviceRulesConfig struct {
 
 // AgentConfig contains configuration for the background agent
 type AgentConfig struct {
-	UpdateInterval       string   `yaml:"update_interval"`
-	ConfidenceThreshold  float64  `yaml:"confidence_threshold"`
-	MaxRulesPerUpdate    int      `yaml:"max_rules_per_update"`
-	ResearchSources      []string `yaml:"research_sources"`
+	UpdateInterval      string   `yaml:"update_interval"`
+	ConfidenceThreshold float64  `yaml:"confidence_threshold"`
+	MaxRulesPerUpdate   int      `yaml:"max_rules_per_update"`
+	ResearchSources     []string `yaml:"research_sources"`
 }
 
 // DeviceDetector handles YAML-based device detection
 type DeviceDetector struct {
-	config    *DeviceRulesConfig
-	verbose   bool
+	config     *DeviceRulesConfig
+	verbose    bool
 	configPath string
 }
 

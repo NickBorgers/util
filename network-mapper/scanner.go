@@ -104,7 +104,6 @@ func (ns *NetworkScanner) SetDeviceRulesPath(path string) {
 	}
 }
 
-
 func (ns *NetworkScanner) Run() {
 	fmt.Printf("🌐 Network Mapper v1.0 - %s\n", runtime.GOOS)
 	fmt.Println("==========================================")
@@ -446,7 +445,7 @@ func (ns *NetworkScanner) scanRangeWithProgress(rangeIndex int, scanRange ScanRa
 					IP:         make(net.IP, len(ip)),
 					MAC:        ns.getMACAddress(ip),
 					MACVendor:  "",
-					Hostname:   "", // Will be populated in bulk DNS lookup
+					Hostname:   "",        // Will be populated in bulk DNS lookup
 					DeviceType: "Unknown", // Will be set by device detector later
 					IsGateway:  isGateway,
 					Ports:      ports,
