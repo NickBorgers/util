@@ -7,7 +7,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var version = "2.2.0"
+var version = "2.3.0"
 
 var (
 	disableServiceDiscovery bool
@@ -16,6 +16,9 @@ var (
 	verbose                 bool
 	scanMode                string
 	thoroughness            int
+	deviceRulesPath         string
+	exportDeviceRules       string
+	updateDeviceRules       bool
 )
 
 var rootCmd = &cobra.Command{
@@ -29,9 +32,39 @@ It works across macOS, Linux, and Windows platforms.
 Features include mDNS/Bonjour discovery, SSDP/UPnP scanning, MAC vendor lookup,
 DHCP lease analysis, and comprehensive service identification.`,
 	Run: func(cmd *cobra.Command, args []string) {
+		// Handle export device rules flag
+		if exportDeviceRules != "" {
+			detector, err := NewDeviceDetector(verbose, "")
+			if err != nil {
+				fmt.Printf("❌ Error initializing device detector: %v\n", err)
+				os.Exit(1)
+			}
+			if err := detector.ExportEmbeddedConfig(exportDeviceRules); err != nil {
+				fmt.Printf("❌ Error exporting device rules: %v\n", err)
+				os.Exit(1)
+			}
+			return
+		}
+
+		// Handle update device rules flag
+		if updateDeviceRules {
+			detector, err := NewDeviceDetector(verbose, deviceRulesPath)
+			if err != nil {
+				fmt.Printf("❌ Error initializing device detector: %v\n", err)
+				os.Exit(1)
+			}
+			agent := NewDeviceResearchAgent(detector, verbose)
+			if err := agent.UpdateFromRepository(); err != nil {
+				fmt.Printf("❌ Error updating device rules: %v\n", err)
+				os.Exit(1)
+			}
+			return
+		}
+
 		scanner := NewNetworkScanner()
 		scanner.SetOptions(disableServiceDiscovery, disableDNSLookup, scanTimeout, verbose)
 		scanner.SetThoroughness(thoroughness)
+		scanner.SetDeviceRulesPath(deviceRulesPath)
 
 		// Parse and set scan mode
 		var mode ScanMode
@@ -68,6 +101,9 @@ func init() {
 	rootCmd.Flags().BoolVar(&verbose, "verbose", false, "Enable verbose output")
 	rootCmd.Flags().StringVar(&scanMode, "scan-mode", "intelligent", "Scan mode: intelligent, quick, brute-expanded, brute-comprehensive, brute-firewall")
 	rootCmd.Flags().IntVar(&thoroughness, "thoroughness", 3, "Thoroughness level for intelligent mode (1-5, higher=more thorough)")
+	rootCmd.Flags().StringVar(&deviceRulesPath, "device-rules", "", "Path to custom device detection rules YAML file")
+	rootCmd.Flags().StringVar(&exportDeviceRules, "export-device-rules", "", "Export embedded device rules to specified file and exit")
+	rootCmd.Flags().BoolVar(&updateDeviceRules, "update-device-rules", false, "Update device detection rules from repository and exit")
 }
 
 func main() {

@@ -1,0 +1,247 @@
+# Network Mapper Device Detection Rules
+# This file contains prioritized rules for device classification
+# Rules are evaluated in order - first match wins
+
+version: "1.0"
+updated: "2025-09-16"
+
+# Rule priorities: 1 (highest) to 100 (lowest)
+# Rules with lower numbers are evaluated first
+
+rules:
+  # Brand-specific device detection (highest priority)
+  - name: "Sonos Speakers"
+    priority: 10
+    device_type: "Sonos Speaker"
+    icon: "🔊"
+    description: "Sonos wireless speakers and sound systems"
+    conditions:
+      any_of:
+        - hostname_contains: ["sonos"]
+        - service_name_contains: ["sonos"]
+        - mac_vendor_contains: ["sonos"]
+        - service_type_contains: ["_sonos-"]
+
+  - name: "Rachio Sprinkler Controllers"
+    priority: 10
+    device_type: "Sprinkler Controller"
+    icon: "💧"
+    description: "Rachio smart sprinkler controllers"
+    conditions:
+      any_of:
+        - hostname_contains: ["rachio"]
+        - service_name_contains: ["rachio"]
+        - mac_vendor_contains: ["rachio"]
+
+  - name: "Apple TV Devices"
+    priority: 15
+    device_type: "Apple TV/AirPlay"
+    icon: "📺"
+    description: "Apple TV and AirPlay devices"
+    conditions:
+      all_of:
+        - service_type_contains: ["_airplay", "_raop"]
+        - any_of:
+          - mac_vendor_contains: ["apple"]
+          - hostname_contains: ["appletv", "apple-tv"]
+          - service_name_contains: ["apple tv"]
+
+  - name: "Chromecast Devices"
+    priority: 15
+    device_type: "Chromecast/Google Device"
+    icon: "📺"
+    description: "Google Chromecast and Cast-enabled devices"
+    conditions:
+      any_of:
+        - service_type_contains: ["_googlecast"]
+        - hostname_contains: ["chromecast"]
+        - mac_vendor_contains: ["google"]
+
+  # IoT and Smart Home Devices
+  - name: "Philips Hue Bridge"
+    priority: 20
+    device_type: "Smart Hub"
+    icon: "💡"
+    description: "Philips Hue smart lighting bridge"
+    conditions:
+      any_of:
+        - hostname_contains: ["philips-hue", "hue-bridge"]
+        - mac_vendor_contains: ["philips"]
+        - service_name_contains: ["hue"]
+
+  - name: "Amazon Echo/Alexa"
+    priority: 20
+    device_type: "Smart Speaker"
+    icon: "📢"
+    description: "Amazon Echo, Alexa, and Ring devices"
+    conditions:
+      any_of:
+        - hostname_contains: ["echo", "alexa", "ring"]
+        - mac_vendor_contains: ["amazon"]
+        - service_name_contains: ["alexa", "echo"]
+
+  - name: "Google Nest Devices"
+    priority: 20
+    device_type: "Smart Home Device"
+    icon: "🔵"
+    description: "Google Nest thermostats, cameras, and hubs"
+    conditions:
+      any_of:
+        - hostname_contains: ["nest", "google-nest"]
+        - mac_vendor_contains: ["nest labs", "google"]
+        - service_name_contains: ["nest"]
+
+  - name: "Ring Doorbell/Camera"
+    priority: 20
+    device_type: "Security Camera"
+    icon: "📹"
+    description: "Ring video doorbells and security cameras"
+    conditions:
+      any_of:
+        - hostname_contains: ["ring"]
+        - service_name_contains: ["ring"]
+
+  # Generic HomeKit Devices (lower priority than brand-specific)
+  - name: "HomeKit Accessories"
+    priority: 30
+    device_type: "HomeKit Device"
+    icon: "🏡"
+    description: "Apple HomeKit compatible devices"
+    conditions:
+      any_of:
+        - service_type_contains: ["_hap._tcp", "_homekit"]
+        - service_name_contains: ["homekit"]
+
+  # Network Infrastructure
+  - name: "Ubiquiti Network Equipment"
+    priority: 25
+    device_type: "Network Equipment"
+    icon: "📡"
+    description: "Ubiquiti routers, switches, and access points"
+    conditions:
+      any_of:
+        - hostname_contains: ["unifi", "ubnt", "ubiquiti"]
+        - mac_vendor_contains: ["ubiquiti"]
+
+  - name: "Synology NAS"
+    priority: 25
+    device_type: "NAS/Storage"
+    icon: "💾"
+    description: "Synology Network Attached Storage"
+    conditions:
+      any_of:
+        - hostname_contains: ["synology", "diskstation"]
+        - mac_vendor_contains: ["synology"]
+        - service_type_contains: ["_synology"]
+
+  - name: "QNAP NAS"
+    priority: 25
+    device_type: "NAS/Storage"
+    icon: "💾"
+    description: "QNAP Network Attached Storage"
+    conditions:
+      any_of:
+        - hostname_contains: ["qnap"]
+        - mac_vendor_contains: ["qnap"]
+
+  # Computer Systems
+  - name: "Raspberry Pi"
+    priority: 30
+    device_type: "Raspberry Pi"
+    icon: "🥧"
+    description: "Raspberry Pi single-board computers"
+    conditions:
+      any_of:
+        - hostname_contains: ["raspberry", "raspberrypi", "rpi"]
+        - mac_vendor_contains: ["raspberry pi"]
+
+  - name: "Intel NUC"
+    priority: 30
+    device_type: "Mini PC"
+    icon: "💻"
+    description: "Intel NUC and similar mini PCs"
+    conditions:
+      all_of:
+        - mac_vendor_contains: ["intel"]
+        - open_ports: [22]  # SSH typically indicates a server/computer
+
+  # Generic Service-Based Detection (lower priority)
+  - name: "AirPlay Speakers"
+    priority: 40
+    device_type: "AirPlay Speaker"
+    icon: "🔊"
+    description: "Non-Apple AirPlay compatible speakers"
+    conditions:
+      all_of:
+        - service_type_contains: ["_airplay", "_raop"]
+        - not_conditions:
+          - mac_vendor_contains: ["apple"]
+
+  - name: "Network Printers"
+    priority: 40
+    device_type: "Network Printer"
+    icon: "🖨️"
+    description: "Network-connected printers and print servers"
+    conditions:
+      any_of:
+        - service_type_contains: ["_ipp", "_printer", "_print"]
+        - open_ports: [631, 9100]  # IPP and JetDirect ports
+        - hostname_contains: ["printer", "print"]
+
+  - name: "Media Servers"
+    priority: 40
+    device_type: "Media Server"
+    icon: "🎵"
+    description: "DLNA media servers and streamers"
+    conditions:
+      any_of:
+        - service_type_contains: ["_mediaserver", "_mediarenderer", "_dlna"]
+        - hostname_contains: ["media", "plex", "kodi"]
+
+  # Generic Infrastructure (lowest priority)
+  - name: "Web Servers"
+    priority: 50
+    device_type: "Web Server"
+    icon: "🌍"
+    description: "Web servers and HTTP services"
+    conditions:
+      any_of:
+        - open_ports: [80, 443, 8080, 8443]
+
+  - name: "Linux/Unix Systems"
+    priority: 50
+    device_type: "Linux/Unix"
+    icon: "🖥️"
+    description: "Linux and Unix systems"
+    conditions:
+      any_of:
+        - open_ports: [22]  # SSH
+
+  - name: "Windows Systems"
+    priority: 50
+    device_type: "Windows PC"
+    icon: "🖥️"
+    description: "Windows computers and servers"
+    conditions:
+      all_of:
+        - open_ports: [3389, 135, 139, 445]  # RDP and SMB
+
+  - name: "File Servers"
+    priority: 50
+    device_type: "File Server"
+    icon: "📁"
+    description: "SMB/CIFS file servers"
+    conditions:
+      any_of:
+        - open_ports: [135, 139, 445]  # SMB ports
+
+# Metadata for background agent
+agent_config:
+  update_interval: "24h"
+  confidence_threshold: 0.8
+  max_rules_per_update: 10
+  research_sources:
+    - "MAC vendor databases"
+    - "mDNS service registries"
+    - "IoT device catalogs"
+    - "Network equipment databases"

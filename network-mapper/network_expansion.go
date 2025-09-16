@@ -25,6 +25,23 @@ const (
 	ScanModeFirewallTest                  // Brute-force targeted firewall testing ranges
 )
 
+func (s ScanMode) String() string {
+	switch s {
+	case ScanModeIntelligent:
+		return "intelligent"
+	case ScanModeQuick:
+		return "quick"
+	case ScanModeExpanded:
+		return "brute-expanded"
+	case ScanModeComprehensive:
+		return "brute-comprehensive"
+	case ScanModeFirewallTest:
+		return "brute-firewall"
+	default:
+		return "unknown"
+	}
+}
+
 type NetworkExpansion struct {
 	mode    ScanMode
 	verbose bool

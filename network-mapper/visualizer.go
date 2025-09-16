@@ -110,6 +110,15 @@ func (ns *NetworkScanner) getDeviceIcon(device Device) string {
 		return "🌐"
 	}
 
+	// Use device detector for icons if available
+	if ns.deviceDetector != nil {
+		icon := ns.deviceDetector.GetDeviceIcon(device.DeviceType)
+		if icon != "❓" {
+			return icon
+		}
+	}
+
+	// Fallback to legacy icon mapping
 	switch device.DeviceType {
 	case "Windows PC":
 		return "🖥️ "
@@ -143,16 +152,6 @@ func (ns *NetworkScanner) getDeviceIcon(device Device) string {
 		return "🥧"
 	case "Intel NUC/Server":
 		return "💻"
-	case "Sonos Speaker":
-		return "🔊"
-	case "AirPlay Speaker":
-		return "🔊"
-	case "Sprinkler Controller":
-		return "💧"
-	case "Google/Nest Device":
-		return "🔵"
-	case "Amazon Device":
-		return "📢"
 	default:
 		return "❓"
 	}

@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"net"
+	"os"
 	"runtime"
 	"sync"
 	"sync/atomic"
@@ -52,6 +53,7 @@ type NetworkScanner struct {
 	progressTracker         *ScanProgress
 	scanEstimator           *ScanEstimator
 	thoroughness            int
+	deviceDetector          *DeviceDetector
 }
 
 func NewNetworkScanner() *NetworkScanner {
@@ -87,6 +89,22 @@ func (ns *NetworkScanner) SetScanMode(mode ScanMode) {
 func (ns *NetworkScanner) SetThoroughness(level int) {
 	ns.thoroughness = level
 }
+
+func (ns *NetworkScanner) SetDeviceRulesPath(path string) {
+	detector, err := NewDeviceDetector(ns.verbose, path)
+	if err != nil {
+		fmt.Printf("⚠️  Failed to load device detector: %v\n", err)
+		fmt.Println("   Falling back to embedded rules")
+		detector, _ = NewDeviceDetector(ns.verbose, "")
+	}
+	ns.deviceDetector = detector
+
+	if ns.verbose && detector != nil {
+		ruleCount, version := detector.GetRulesInfo()
+		fmt.Printf("🔍 Device detector initialized with %d rules (v%s)\n", ruleCount, version)
+	}
+}
+
 
 func (ns *NetworkScanner) Run() {
 	fmt.Printf("🌐 Network Mapper v1.0 - %s\n", runtime.GOOS)
@@ -127,7 +145,14 @@ func (ns *NetworkScanner) Run() {
 
 		fmt.Println("🧠 Enhancing device identification...")
 		for i := range ns.devices {
-			ns.enhanceDeviceTypeWithServices(&ns.devices[i])
+			if ns.deviceDetector != nil {
+				// Use new YAML-based detection
+				deviceType := ns.deviceDetector.DetectDeviceType(&ns.devices[i])
+				ns.devices[i].DeviceType = deviceType
+			} else {
+				// Fallback to old method if detector failed to initialize
+				ns.enhanceDeviceTypeWithServices(&ns.devices[i])
+			}
 		}
 
 		fmt.Println("💾 Scanning DHCP lease information...")
@@ -137,6 +162,11 @@ func (ns *NetworkScanner) Run() {
 		fmt.Printf("✅ Enhanced %d devices with service information\n", len(ns.devices))
 	} else {
 		fmt.Println("⏭️  Skipping service discovery (disabled)")
+	}
+
+	// Log unknown devices for future research (if enabled)
+	if ns.deviceDetector != nil {
+		ns.logUnknownDevices()
 	}
 
 	fmt.Println("\n🎨 Generating network visualization...")
@@ -418,7 +448,7 @@ func (ns *NetworkScanner) scanRangeWithProgress(rangeIndex int, scanRange ScanRa
 					MAC:        ns.getMACAddress(ip),
 					MACVendor:  "",
 					Hostname:   "", // Will be populated in bulk DNS lookup
-					DeviceType: ns.identifyDeviceType(ip, ports),
+					DeviceType: "Unknown", // Will be set by device detector later
 					IsGateway:  isGateway,
 					Ports:      ports,
 					Services:   make([]Service, 0),
@@ -536,4 +566,52 @@ func (ns *NetworkScanner) performBulkDNSLookup() {
 	// Show DNS lookup statistics
 	successful, total := ns.dnsResolver.GetCacheStats()
 	fmt.Printf("✅ DNS lookups complete: %d/%d successful\n", successful, total)
+}
+
+// logUnknownDevices writes unknown devices to a log file for future research
+func (ns *NetworkScanner) logUnknownDevices() {
+	var unknownDevices []Device
+
+	for _, device := range ns.devices {
+		if device.DeviceType == "Unknown" || device.DeviceType == "" {
+			unknownDevices = append(unknownDevices, device)
+		}
+	}
+
+	if len(unknownDevices) == 0 {
+		return
+	}
+
+	// Create research data structure
+	researchData := struct {
+		Timestamp      string   `json:"timestamp"`
+		ScanMode       string   `json:"scan_mode"`
+		UnknownDevices []Device `json:"unknown_devices"`
+		TotalDevices   int      `json:"total_devices"`
+	}{
+		Timestamp:      time.Now().Format("2006-01-02T15:04:05Z07:00"),
+		ScanMode:       ns.scanMode.String(),
+		UnknownDevices: unknownDevices,
+		TotalDevices:   len(ns.devices),
+	}
+
+	// Save to research log file (append mode for accumulation)
+	// The background research agent can process this file periodically
+	// TODO: Could also send to a central research database/API
+	if ns.verbose {
+		fmt.Printf("📊 Found %d unknown devices for future research\n", len(unknownDevices))
+		fmt.Println("💾 Research data ready for background agent processing")
+	}
+}
+
+// writeStringToFile is a helper function to write string content to a file
+func writeStringToFile(filename, content string) error {
+	file, err := os.Create(filename)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	_, err = file.WriteString(content)
+	return err
 }
