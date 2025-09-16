@@ -29,6 +29,16 @@ jobs:
       with:
         go-version: ${{ env.GO_VERSION }}
 
+    - name: Cache Go modules
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cache/go-build
+          ~/go/pkg/mod
+        key: ${{ runner.os }}-go-${{ hashFiles('network-mapper/go.sum') }}
+        restore-keys: |
+          ${{ runner.os }}-go-
+
     - name: Build binary
       working-directory: network-mapper
       run: |
@@ -89,6 +99,16 @@ jobs:
       with:
         go-version: ${{ env.GO_VERSION }}
 
+    - name: Cache Go modules
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cache/go-build
+          ~/go/pkg/mod
+        key: ${{ runner.os }}-go-${{ hashFiles('network-mapper/go.sum') }}
+        restore-keys: |
+          ${{ runner.os }}-go-
+
     - name: Test device rules loading
       working-directory: network-mapper
       run: |
@@ -103,11 +123,35 @@ jobs:
         fi
 
         echo "Testing device rules validation..."
-        # Check YAML syntax
-        go run -c "package main; import ('gopkg.in/yaml.v3'; 'os'); func main() { data, _ := os.ReadFile('test-rules.yaml'); var v interface{}; yaml.Unmarshal(data, &v) }" || {
-          echo "ERROR: Exported device rules have invalid YAML syntax"
-          exit 1
+        # Check YAML syntax with a simple Go program
+        cat > yaml_check.go << 'EOF'
+        package main
+
+        import (
+          "fmt"
+          "os"
+          "gopkg.in/yaml.v3"
+        )
+
+        func main() {
+          data, err := os.ReadFile("test-rules.yaml")
+          if err != nil {
+            fmt.Printf("Error reading file: %v\n", err)
+            os.Exit(1)
+          }
+
+          var v interface{}
+          err = yaml.Unmarshal(data, &v)
+          if err != nil {
+            fmt.Printf("Error parsing YAML: %v\n", err)
+            os.Exit(1)
+          }
+
+          fmt.Println("YAML syntax is valid")
         }
+        EOF
+
+        go run yaml_check.go
 
         echo "✅ Device rules validation passed"
 
@@ -123,6 +167,16 @@ jobs:
       uses: actions/setup-go@v4
       with:
         go-version: ${{ env.GO_VERSION }}
+
+    - name: Cache Go modules
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cache/go-build
+          ~/go/pkg/mod
+        key: ${{ runner.os }}-go-${{ hashFiles('network-mapper/go.sum') }}
+        restore-keys: |
+          ${{ runner.os }}-go-
 
     - name: Run performance benchmark
       working-directory: network-mapper
