@@ -316,7 +316,6 @@ func (ns *NetworkScanner) getNetworkPrefix(ip net.IP, prefixLength int) string {
 	return fmt.Sprintf("%s/%d", network.String(), prefixLength)
 }
 
-
 // isBroadcastIP checks if an IP address is the broadcast address for the given subnet
 func (ns *NetworkScanner) isBroadcastIP(ip net.IP, subnet *net.IPNet) bool {
 	if subnet == nil {

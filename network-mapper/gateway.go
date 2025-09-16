@@ -276,7 +276,7 @@ func (ns *NetworkScanner) parseDarwinRoute(line string) (RouteEntry, error) {
 	// Interface is typically in one of the later columns
 	for i := 2; i < len(parts); i++ {
 		if strings.HasPrefix(parts[i], "en") || strings.HasPrefix(parts[i], "eth") ||
-		   strings.HasPrefix(parts[i], "wlan") || strings.HasPrefix(parts[i], "lo") {
+			strings.HasPrefix(parts[i], "wlan") || strings.HasPrefix(parts[i], "lo") {
 			route.Interface = parts[i]
 			break
 		}
@@ -316,7 +316,7 @@ func (ns *NetworkScanner) getRouteTableWindows() ([]RouteEntry, error) {
 
 		// Skip header lines
 		if strings.Contains(line, "Network Destination") ||
-		   strings.Contains(line, "=======") {
+			strings.Contains(line, "=======") {
 			continue
 		}
 
@@ -411,7 +411,7 @@ func (ns *NetworkScanner) findBestRouteForSubnet(subnet *net.IPNet) *NetworkInte
 			}
 			// Match by gateway
 			if bestRoute.Gateway != nil && iface.Gateway != nil &&
-			   bestRoute.Gateway.Equal(iface.Gateway) {
+				bestRoute.Gateway.Equal(iface.Gateway) {
 				return iface
 			}
 		}
