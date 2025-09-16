@@ -156,49 +156,145 @@ See [Installation](#installation) section above for complete package manager set
 ./network-mapper
 ```
 
-### Advanced Scanning Options
+### Scan Modes & Intelligent Discovery
 
-The tool supports multiple scan modes for different use cases:
+Network-mapper uses sophisticated subnet discovery to find devices beyond your immediate network. The tool supports multiple scan modes:
 
 ```bash
-# Quick scan (interface subnets only) - fastest
+# Intelligent scan (default) - smart subnet discovery
+./network-mapper --scan-mode intelligent --thoroughness 3
+
+# Quick scan - interface subnets only
 ./network-mapper --scan-mode quick
 
-# Normal scan (intelligent RFC1918 expansion) - default
-./network-mapper --scan-mode normal
-
-# Comprehensive scan (full RFC1918 ranges) - thorough
-./network-mapper --scan-mode comprehensive
-
-# Firewall test scan (security-focused ranges) - for security testing
-./network-mapper --scan-mode firewall-test
+# Brute force scans - comprehensive but slower
+./network-mapper --scan-mode brute-expanded      # Common private ranges
+./network-mapper --scan-mode brute-comprehensive # Full RFC1918 ranges
+./network-mapper --scan-mode brute-firewall      # Security testing ranges
 ```
 
-### Scan Mode Details
+#### Scan Mode Details
 
-- **Quick Mode**: Only scans the immediate subnet based on your interface's netmask
-- **Normal Mode**: Intelligently expands to broader RFC1918 ranges (e.g., /16 for 10.x networks)
-- **Comprehensive Mode**: Scans entire RFC1918 private address spaces
-- **Firewall Test Mode**: Targets common internal network ranges for security testing
+- **`intelligent`** (default): 4-phase intelligent subnet discovery using network heuristics
+- **`quick`**: Only scans interface subnets - fastest option
+- **`brute-expanded`**: Scans common private network ranges systematically
+- **`brute-comprehensive`**: Exhaustive scan of all RFC1918 private ranges
+- **`brute-firewall`**: Security-focused scan targeting common network segments
 
-### Progress Tracking & Performance
+#### Thoroughness Levels (Intelligent Mode Only)
 
-The tool now provides detailed progress tracking with time estimates:
+Control the breadth of intelligent discovery with `--thoroughness 1-5`:
 
 ```bash
-# Shows estimated completion time and real-time progress
-./network-mapper --scan-mode comprehensive
+# Minimal discovery - only most common subnets
+./network-mapper --thoroughness 1
 
-# Verbose output with detailed range information
-./network-mapper --verbose --scan-mode firewall-test
+# Light discovery - few common ranges
+./network-mapper --thoroughness 2
 
-# Example output with progress tracking:
-📊 Scan mode: Comprehensive scan (full RFC1918 ranges)
-🎯 Expanded to 3 scan range(s) covering 1,048,576 IP addresses
-⏱️  Estimated scan time: ~5.8 hours
+# Default discovery - balanced approach
+./network-mapper --thoroughness 3
 
-📊 Progress: [████████░░░░░░░░░░░░] 42.3% (443,821/1,048,576 IPs) (ETA: 3h 22m) - Active: 98 scans
+# Thorough discovery - extensive subnet candidates
+./network-mapper --thoroughness 4
+
+# Exhaustive discovery - maximum subnet coverage
+./network-mapper --thoroughness 5
 ```
+
+**Thoroughness Level Details:**
+- **Level 1**: Tests `.0.0` and `.1.0` subnets only (2-3 candidates)
+- **Level 2**: Adds `.10.0` and `.100.0` subnets (4-6 candidates)
+- **Level 3**: Common admin subnets: `.0`, `.1`, `.10`, `.20`, `.30`, `.50`, `.100`, `.168`, `.254` (9-12 candidates)
+- **Level 4**: Extended ranges including `.2`, `.5`, `.11`, `.15`, `.25`, `.40`, etc. (20-30 candidates)
+- **Level 5**: Every 10th subnet + all level 4 ranges (40-60 candidates)
+
+### Intelligent Discovery Process
+
+When you see "🔍 Probing 19 subnet candidates for activity...", here's what's happening:
+
+#### Phase 1: Interface Subnets (Priority 100)
+- Adds all network interface subnets as high-priority candidates
+- For large subnets (>/24), creates targeted /24 around interface IP
+- Example: Interface on `10.212.10.5/16` → candidate `10.212.10.0/24`
+
+#### Phase 2: Adjacent Subnets (Priority 80)
+- Generates numerically adjacent subnets to interface networks
+- For `/24` networks: checks previous/next third octet
+- Example: From `10.212.10.0/24` → tests `10.212.9.0/24` and `10.212.11.0/24`
+
+#### Phase 3: Common Subnet Patterns (Priority 60)
+- Creates candidates based on common network administration patterns
+- Uses thoroughness level to determine which third octets to test
+- Example: In `10.212.x.0/24` range, tests common `x` values like `0`, `1`, `10`, `50`, `100`, `254`
+
+#### Phase 4: Gateway Probing
+- Tests common gateway IPs in each candidate subnet: `.1`, `.254`, `.10`, `.100`, `.50`
+- Uses ICMP ping to verify gateway accessibility
+- Marks subnets as active when gateway responds
+- Example output: `✅ Found active gateway 10.212.254.1 in subnet 10.212.254.0/24`
+
+### Route Table Integration
+
+Network-mapper consults your system's routing table to accurately determine which interface should handle discovered subnets:
+
+- **Linux**: Uses `ip route show` command
+- **macOS**: Uses `netstat -rn -f inet` command
+- **Windows**: Uses `route print` command
+
+Discovered subnets are displayed with the correct interface based on actual routing rules, not just heuristics.
+
+### Practical Examples & Usage Scenarios
+
+#### Home Network Security Audit
+```bash
+# Quick overview of your immediate network
+./network-mapper --scan-mode quick
+
+# Thorough discovery of all network segments
+./network-mapper --scan-mode intelligent --thoroughness 4 --verbose
+
+# Example output when multiple VLANs are discovered:
+🔍 Probing 19 subnet candidates for activity...
+✅ Found active gateway 10.212.0.1 in subnet 10.212.0.0/24      # Main network
+✅ Found active gateway 10.212.10.1 in subnet 10.212.10.0/24    # IoT VLAN
+✅ Found active gateway 10.212.50.1 in subnet 10.212.50.0/24    # Guest network
+✅ Found active gateway 10.212.100.1 in subnet 10.212.100.0/24  # Work VLAN
+✅ Found active gateway 10.212.254.1 in subnet 10.212.254.0/24  # Admin network
+```
+
+#### Enterprise Network Discovery
+```bash
+# Conservative scan for large corporate networks
+./network-mapper --scan-mode intelligent --thoroughness 2
+
+# Security assessment with firewall testing
+./network-mapper --scan-mode brute-firewall --verbose
+```
+
+#### Troubleshooting Network Issues
+```bash
+# Fast scan to identify connectivity issues
+./network-mapper --scan-mode quick --no-services
+
+# Detailed scan with verbose output for debugging
+./network-mapper --verbose --timeout 10
+```
+
+#### Understanding Your Network Topology
+When network-mapper finds multiple subnets, it means:
+
+- **🏠 Home Networks**: You likely have VLANs for IoT devices, guest access, or network segmentation
+- **🏢 Corporate**: Different departments, security zones, or VLAN configurations
+- **🔍 Security**: Previously unknown network segments that need investigation
+
+**Common subnet patterns discovered:**
+- `.0.0/24` - Main/default network
+- `.1.0/24` - Management network
+- `.10.0/24` - IoT/smart home devices
+- `.50.0/24` - Guest network
+- `.100.0/24` - Work/office network
+- `.254.0/24` - Administrative/infrastructure
 
 ### Other Options
 
@@ -207,7 +303,7 @@ The tool now provides detailed progress tracking with time estimates:
 ./network-mapper --no-dns --no-services --scan-mode quick
 
 # Custom timeout for slower networks
-./network-mapper --timeout 10 --scan-mode normal
+./network-mapper --timeout 10 --scan-mode intelligent
 ```
 
 The tool will automatically:
