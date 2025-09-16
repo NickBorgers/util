@@ -42,10 +42,10 @@ jobs:
         gh release download v${{ env.VERSION }} --pattern "*.tar.gz.sha256" --dir /tmp/checksums
 
         # Extract checksums
-        DARWIN_ARM64_SHA=$(grep "network-mapper-darwin-arm64.tar.gz" /tmp/checksums/*.sha256 | cut -d' ' -f1)
-        DARWIN_AMD64_SHA=$(grep "network-mapper-darwin-amd64.tar.gz" /tmp/checksums/*.sha256 | cut -d' ' -f1)
-        LINUX_ARM64_SHA=$(grep "network-mapper-linux-arm64.tar.gz" /tmp/checksums/*.sha256 | cut -d' ' -f1)
-        LINUX_AMD64_SHA=$(grep "network-mapper-linux-amd64.tar.gz" /tmp/checksums/*.sha256 | cut -d' ' -f1)
+        DARWIN_ARM64_SHA=$(cat /tmp/checksums/network-mapper-darwin-arm64.tar.gz.sha256 | cut -d' ' -f1)
+        DARWIN_AMD64_SHA=$(cat /tmp/checksums/network-mapper-darwin-amd64.tar.gz.sha256 | cut -d' ' -f1)
+        LINUX_ARM64_SHA=$(cat /tmp/checksums/network-mapper-linux-arm64.tar.gz.sha256 | cut -d' ' -f1)
+        LINUX_AMD64_SHA=$(cat /tmp/checksums/network-mapper-linux-amd64.tar.gz.sha256 | cut -d' ' -f1)
 
         echo "DARWIN_ARM64_SHA=$DARWIN_ARM64_SHA" >> $GITHUB_ENV
         echo "DARWIN_AMD64_SHA=$DARWIN_AMD64_SHA" >> $GITHUB_ENV
@@ -241,10 +241,10 @@ jobs:
         gh release download v${{ env.VERSION }} --pattern "*.sha256" --dir /tmp/checksums
 
         # Extract all checksums
-        DARWIN_ARM64_SHA=$(grep "network-mapper-darwin-arm64.tar.gz" /tmp/checksums/*.sha256 | cut -d' ' -f1)
-        DARWIN_AMD64_SHA=$(grep "network-mapper-darwin-amd64.tar.gz" /tmp/checksums/*.sha256 | cut -d' ' -f1)
-        LINUX_ARM64_SHA=$(grep "network-mapper-linux-arm64.tar.gz" /tmp/checksums/*.sha256 | cut -d' ' -f1)
-        LINUX_AMD64_SHA=$(grep "network-mapper-linux-amd64.tar.gz" /tmp/checksums/*.sha256 | cut -d' ' -f1)
+        DARWIN_ARM64_SHA=$(cat /tmp/checksums/network-mapper-darwin-arm64.tar.gz.sha256 | cut -d' ' -f1)
+        DARWIN_AMD64_SHA=$(cat /tmp/checksums/network-mapper-darwin-amd64.tar.gz.sha256 | cut -d' ' -f1)
+        LINUX_ARM64_SHA=$(cat /tmp/checksums/network-mapper-linux-arm64.tar.gz.sha256 | cut -d' ' -f1)
+        LINUX_AMD64_SHA=$(cat /tmp/checksums/network-mapper-linux-amd64.tar.gz.sha256 | cut -d' ' -f1)
         WINDOWS_SHA=$(cat /tmp/checksums/*windows-amd64.exe.zip.sha256 | cut -d' ' -f1)
 
         echo "DARWIN_ARM64_SHA=$DARWIN_ARM64_SHA" >> $GITHUB_ENV
