@@ -35,28 +35,101 @@ func (sd *ServiceDiscovery) DiscoverServices(interfaces []NetworkInterface, time
 
 	fmt.Println("🔍 Discovering network services...")
 
+	// Progress tracking
+	services := []string{"mDNS/Bonjour", "SSDP/UPnP", "Multicast Groups", "Common Services"}
+	completed := make(chan string, 4)
+
+	// Start progress reporter
+	done := make(chan bool)
+	go sd.reportProgress(services, completed, done)
+
 	wg.Add(4)
 	go func() {
 		defer wg.Done()
 		sd.discoverMDNS(timeout)
+		completed <- "mDNS/Bonjour"
 	}()
 
 	go func() {
 		defer wg.Done()
 		sd.discoverSSDP(interfaces, timeout)
+		completed <- "SSDP/UPnP"
 	}()
 
 	go func() {
 		defer wg.Done()
 		sd.discoverMulticastGroups(interfaces)
+		completed <- "Multicast Groups"
 	}()
 
 	go func() {
 		defer wg.Done()
 		sd.discoverCommonServices(interfaces)
+		completed <- "Common Services"
 	}()
 
 	wg.Wait()
+	done <- true
+}
+
+func (sd *ServiceDiscovery) reportProgress(services []string, completed <-chan string, done <-chan bool) {
+	serviceStatus := make(map[string]bool)
+	for _, service := range services {
+		serviceStatus[service] = false
+	}
+
+	// Show initial status
+	sd.printProgressLine(serviceStatus)
+
+	for {
+		select {
+		case service := <-completed:
+			serviceStatus[service] = true
+			sd.printProgressLine(serviceStatus)
+		case <-done:
+			// Final status - all completed
+			fmt.Print("\r   ✅ All service discovery complete" + strings.Repeat(" ", 20) + "\n")
+			return
+		}
+	}
+}
+
+func (sd *ServiceDiscovery) printProgressLine(serviceStatus map[string]bool) {
+	var status []string
+	completedCount := 0
+
+	// Use shorter names for better display
+	serviceNames := map[string]string{
+		"mDNS/Bonjour":     "mDNS",
+		"SSDP/UPnP":        "SSDP",
+		"Multicast Groups": "Multicast",
+		"Common Services":  "Services",
+	}
+
+	for _, service := range []string{"mDNS/Bonjour", "SSDP/UPnP", "Multicast Groups", "Common Services"} {
+		shortName := serviceNames[service]
+		if serviceStatus[service] {
+			status = append(status, "✅ "+shortName)
+			completedCount++
+		} else {
+			status = append(status, "⏳ "+shortName)
+		}
+	}
+
+	// Clear the line and show progress
+	progressLine := fmt.Sprintf("   [%d/4] %s", completedCount, strings.Join(status, " | "))
+	fmt.Printf("\r%s%s", progressLine, strings.Repeat(" ", max(0, 80-len(progressLine))))
+
+	if completedCount == 4 {
+		fmt.Println() // New line when complete
+	}
+}
+
+func max(a, b int) int {
+	if a > b {
+		return a
+	}
+	return b
 }
 
 func (sd *ServiceDiscovery) discoverMDNS(timeout time.Duration) {
