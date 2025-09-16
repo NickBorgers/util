@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"net"
-	"os"
 	"runtime"
 	"sync"
 	"sync/atomic"
