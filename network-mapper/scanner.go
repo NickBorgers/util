@@ -268,6 +268,40 @@ func (ns *NetworkScanner) scanDevicesIntelligent() {
 	// Discover active subnets using heuristics
 	activeSubnets := intelligentDiscovery.DiscoverActiveSubnets(ns.interfaces)
 
+	// Add discovered gateways as devices
+	for _, subnet := range activeSubnets {
+		if subnet.GatewayIP != nil && !subnet.GatewayIP.IsUnspecified() {
+			// Check if this gateway IP is already known as a device
+			ns.mu.Lock()
+			found := false
+			for _, device := range ns.devices {
+				if device.IP.Equal(subnet.GatewayIP) {
+					found = true
+					break
+				}
+			}
+
+			if !found {
+				device := Device{
+					IP:        make(net.IP, len(subnet.GatewayIP)),
+					Hostname:  "",
+					IsGateway: true,
+					Ports:     make([]int, 0),
+					Services:  make([]Service, 0),
+					UPnPInfo:  make(map[string]string),
+				}
+				copy(device.IP, subnet.GatewayIP)
+
+				ns.devices = append(ns.devices, device)
+
+				if ns.verbose {
+					fmt.Printf("   ✓ Added discovered gateway %s as device\n", subnet.GatewayIP.String())
+				}
+			}
+			ns.mu.Unlock()
+		}
+	}
+
 	// Convert to scan ranges
 	var scanRanges []ScanRange
 	var totalIPs uint32
