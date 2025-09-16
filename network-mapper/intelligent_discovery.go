@@ -62,18 +62,29 @@ func (id *IntelligentDiscovery) DiscoverActiveSubnets(interfaces []NetworkInterf
 	// Phase 6: Filter to only active subnets or high-priority ones
 	activeSubnets := id.getActiveSubnets()
 
+	// Always show discovery results for intelligent mode (increased output)
+	fmt.Printf("🎯 Intelligent discovery found %d active subnets from %d candidates\n",
+		len(activeSubnets), len(id.candidates))
+
+	// Show more detail when using intelligent discovery
+	maxShow := 8 // Increased from 5
 	if id.verbose {
-		fmt.Printf("🎯 Intelligent discovery found %d active subnets from %d candidates\n",
-			len(activeSubnets), len(id.candidates))
-		for i, subnet := range activeSubnets {
-			if i < 5 { // Show first 5
+		maxShow = len(activeSubnets) // Show all in verbose mode
+	}
+
+	for i, subnet := range activeSubnets {
+		if i < maxShow {
+			if id.verbose {
 				fmt.Printf("   [%d] %s (Priority: %d, Source: %s, Active: %v)\n",
 					i+1, subnet.Network.String(), subnet.Priority, subnet.Source, subnet.IsActive)
+			} else {
+				fmt.Printf("   [%d] %s (Source: %s)\n",
+					i+1, subnet.Network.String(), subnet.Source)
 			}
 		}
-		if len(activeSubnets) > 5 {
-			fmt.Printf("   ... and %d more\n", len(activeSubnets)-5)
-		}
+	}
+	if len(activeSubnets) > maxShow {
+		fmt.Printf("   ... and %d more (use --verbose for details)\n", len(activeSubnets)-maxShow)
 	}
 
 	return activeSubnets

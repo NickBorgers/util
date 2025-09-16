@@ -134,7 +134,7 @@ func (ns *NetworkScanner) Run() {
 		mvl := NewMACVendorLookup()
 		mvl.Initialize()
 
-		sd := NewServiceDiscovery()
+		sd := NewServiceDiscoveryWithVerbose(ns.verbose)
 		sd.DiscoverServices(ns.interfaces, ns.scanTimeout)
 
 		fmt.Println("\n🔗 Merging service information...")
@@ -286,13 +286,21 @@ func (ns *NetworkScanner) scanDevicesIntelligent() {
 		rangeIPs := ns.countIPsInRange(startIP, endIP)
 		totalIPs += rangeIPs
 
-		if i < 5 && ns.verbose {
+		// Show more details for intelligent scanning (increased output)
+		maxShow := 5
+		if !ns.verbose {
+			maxShow = 8 // Show more in non-verbose mode for intelligent scanning
+		}
+
+		if i < maxShow || ns.verbose {
 			fmt.Printf("🎯 Will scan: %s (%d IPs, %s)\n",
 				subnet.Network.String(), rangeIPs, subnet.Source)
 		}
 	}
 
-	if len(activeSubnets) > 5 && ns.verbose {
+	if len(activeSubnets) > 8 && !ns.verbose {
+		fmt.Printf("   ... and %d more subnets (use --verbose to see all)\n", len(activeSubnets)-8)
+	} else if len(activeSubnets) > 5 && ns.verbose {
 		fmt.Printf("   ... and %d more subnets\n", len(activeSubnets)-5)
 	}
 
@@ -596,10 +604,10 @@ func (ns *NetworkScanner) printScanRanges(scanRanges []ScanRange) {
 	fmt.Printf("📡 Target ranges:\n")
 	for i, sr := range scanRanges {
 		rangeIPs := ns.countIPsInRange(sr.Network.IP, ns.getLastIP(sr.Network))
-		if i < 3 || ns.verbose { // Show first 3 ranges, or all if verbose
+		if i < 5 || ns.verbose { // Show first 5 ranges in non-verbose, all if verbose
 			fmt.Printf("   • %s (%d IPs) - %s\n", sr.Network.String(), rangeIPs, sr.Description)
-		} else if i == 3 && !ns.verbose {
-			fmt.Printf("   • ... and %d more ranges (use --verbose to see all)\n", len(scanRanges)-3)
+		} else if i == 5 && !ns.verbose {
+			fmt.Printf("   • ... and %d more ranges (use --verbose to see all)\n", len(scanRanges)-5)
 			break
 		}
 	}

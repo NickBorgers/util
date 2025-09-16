@@ -14,11 +14,17 @@ import (
 type ServiceDiscovery struct {
 	devices map[string]*Device
 	mu      sync.RWMutex
+	verbose bool
 }
 
 func NewServiceDiscovery() *ServiceDiscovery {
+	return NewServiceDiscoveryWithVerbose(false)
+}
+
+func NewServiceDiscoveryWithVerbose(verbose bool) *ServiceDiscovery {
 	return &ServiceDiscovery{
 		devices: make(map[string]*Device),
+		verbose: verbose,
 	}
 }
 
@@ -52,7 +58,10 @@ func (sd *ServiceDiscovery) DiscoverServices(interfaces []NetworkInterface, time
 }
 
 func (sd *ServiceDiscovery) discoverMDNS(timeout time.Duration) {
-	fmt.Println("   📡 Scanning mDNS/Bonjour services...")
+	// Reduced output - only show in verbose mode
+	if sd.verbose {
+		fmt.Println("   📡 Scanning mDNS/Bonjour services...")
+	}
 
 	serviceTypes := []string{
 		"_http._tcp",
@@ -166,7 +175,9 @@ func (sd *ServiceDiscovery) processMDNSEntry(entry *mdns.ServiceEntry, serviceTy
 }
 
 func (sd *ServiceDiscovery) discoverSSDP(interfaces []NetworkInterface, timeout time.Duration) {
-	fmt.Println("   🔌 Scanning SSDP/UPnP devices...")
+	if sd.verbose {
+		fmt.Println("   🔌 Scanning SSDP/UPnP devices...")
+	}
 
 	ssdpTargets := []string{
 		"upnp:rootdevice",
@@ -254,7 +265,9 @@ func (sd *ServiceDiscovery) processSSDP(response string, ip net.IP) {
 }
 
 func (sd *ServiceDiscovery) discoverMulticastGroups(interfaces []NetworkInterface) {
-	fmt.Println("   📻 Scanning multicast groups...")
+	if sd.verbose {
+		fmt.Println("   📻 Scanning multicast groups...")
+	}
 
 	commonGroups := []string{
 		"224.0.0.1",       // All Systems
@@ -324,7 +337,9 @@ func (sd *ServiceDiscovery) checkMulticastGroup(group string, interfaces []Netwo
 }
 
 func (sd *ServiceDiscovery) discoverCommonServices(interfaces []NetworkInterface) {
-	fmt.Println("   🎯 Probing common service ports...")
+	if sd.verbose {
+		fmt.Println("   🎯 Probing common service ports...")
+	}
 
 	serviceProbes := map[int]string{
 		21:   "FTP",
