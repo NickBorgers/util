@@ -223,5 +223,23 @@ jobs:
         cache-from: type=gha
         cache-to: type=gha,mode=max
 
-  # Package manager updates are triggered automatically via the 'release.published' event
-  # in the update-packages.yml workflow, so no manual triggering is needed here.
+  trigger-package-updates:
+    name: Trigger Package Manager Updates
+    runs-on: ubuntu-latest
+    needs: [create-release, build-and-upload, docker-build]
+    permissions:
+      actions: write
+      contents: read
+    steps:
+    - name: Extract version from tag
+      run: |
+        VERSION=${GITHUB_REF#refs/tags/v}
+        echo "VERSION=$VERSION" >> $GITHUB_ENV
+
+    - name: Trigger package manager update workflow
+      run: |
+        gh workflow run update-packages.yml \
+          --repo ${{ github.repository }} \
+          --field version=${{ env.VERSION }}
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
