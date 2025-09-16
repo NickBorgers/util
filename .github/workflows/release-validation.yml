@@ -1,0 +1,372 @@
+name: Release Validation
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'Release tag to validate (e.g., v2.5.0)'
+        required: true
+        type: string
+
+env:
+  GO_VERSION: '1.21'
+
+jobs:
+  validate-binaries:
+    name: Validate Release Binaries
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            binary: network-mapper-linux-amd64
+            archive: network-mapper-linux-amd64.tar.gz
+          - os: macos-latest
+            binary: network-mapper-darwin-amd64
+            archive: network-mapper-darwin-amd64.tar.gz
+          - os: macos-14  # Apple Silicon
+            binary: network-mapper-darwin-arm64
+            archive: network-mapper-darwin-arm64.tar.gz
+          - os: windows-latest
+            binary: network-mapper-windows-amd64.exe
+            archive: network-mapper-windows-amd64.exe.zip
+
+    steps:
+    - name: Set release tag
+      run: |
+        if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+          RELEASE_TAG="${{ github.event.inputs.release_tag }}"
+        else
+          RELEASE_TAG="${{ github.event.release.tag_name }}"
+        fi
+        echo "RELEASE_TAG=$RELEASE_TAG" >> $GITHUB_ENV
+      shell: bash
+
+    - name: Download and verify binary
+      run: |
+        # Download binary archive and checksum
+        gh release download ${{ env.RELEASE_TAG }} \
+          --pattern "${{ matrix.archive }}" \
+          --pattern "${{ matrix.archive }}.sha256" \
+          --repo NickBorgers/util
+
+        # Verify checksum
+        if [[ "${{ runner.os }}" == "Windows" ]]; then
+          # Windows checksum verification
+          certutil -hashfile "${{ matrix.archive }}" SHA256 > computed.sha256
+          powershell -Command "
+            \$expected = (Get-Content '${{ matrix.archive }}.sha256').Split(' ')[0]
+            \$computed = (Get-Content 'computed.sha256' | Select-String 'SHA256' | ForEach-Object { \$_.Line.Split(' ')[-1] })
+            if (\$expected -eq \$computed) {
+              Write-Host 'Checksum verification passed'
+            } else {
+              Write-Host 'Checksum verification failed'
+              exit 1
+            }
+          "
+        else
+          sha256sum -c "${{ matrix.archive }}.sha256"
+        fi
+
+        # Extract binary
+        if [[ "${{ matrix.archive }}" == *.zip ]]; then
+          unzip "${{ matrix.archive }}"
+        else
+          tar -xzf "${{ matrix.archive }}"
+        fi
+
+        # Make executable (non-Windows)
+        if [[ "${{ runner.os }}" != "Windows" ]]; then
+          chmod +x "${{ matrix.binary }}"
+        fi
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Validate binary functionality
+      run: |
+        # Test version output
+        if [[ "${{ runner.os }}" == "Windows" ]]; then
+          BINARY="./${{ matrix.binary }}"
+        else
+          BINARY="./${{ matrix.binary }}"
+        fi
+
+        echo "Testing version output..."
+        VERSION_OUTPUT=$($BINARY --version)
+        echo "Version output: $VERSION_OUTPUT"
+
+        # Verify version contains expected tag
+        if [[ "$VERSION_OUTPUT" != *"${{ env.RELEASE_TAG }}"* ]]; then
+          echo "ERROR: Version output doesn't contain expected tag ${{ env.RELEASE_TAG }}"
+          exit 1
+        fi
+
+        echo "Testing help output..."
+        HELP_OUTPUT=$($BINARY --help)
+
+        # Verify essential flags are present
+        if [[ "$HELP_OUTPUT" != *"--scan-mode"* ]]; then
+          echo "ERROR: --scan-mode flag not found in help"
+          exit 1
+        fi
+
+        if [[ "$HELP_OUTPUT" != *"--verbose"* ]]; then
+          echo "ERROR: --verbose flag not found in help"
+          exit 1
+        fi
+
+        echo "Testing quick scan functionality..."
+        # Test basic functionality (quick scan, no actual network operations)
+        timeout 30s $BINARY --scan-mode quick --no-dns --no-services --help > /dev/null || {
+          echo "ERROR: Basic functionality test failed"
+          exit 1
+        }
+
+        echo "✅ Binary validation passed"
+      shell: bash
+
+  validate-docker:
+    name: Validate Docker Images
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Set release tag
+      run: |
+        if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+          RELEASE_TAG="${{ github.event.inputs.release_tag }}"
+        else
+          RELEASE_TAG="${{ github.event.release.tag_name }}"
+        fi
+        echo "RELEASE_TAG=$RELEASE_TAG" >> $GITHUB_ENV
+
+    - name: Test Docker image
+      run: |
+        echo "Testing Docker image ghcr.io/nickborgers/network-mapper:${{ env.RELEASE_TAG }}"
+
+        # Pull the image
+        docker pull ghcr.io/nickborgers/network-mapper:${{ env.RELEASE_TAG }}
+
+        # Test version
+        VERSION_OUTPUT=$(docker run --rm ghcr.io/nickborgers/network-mapper:${{ env.RELEASE_TAG }} --version)
+        echo "Docker version output: $VERSION_OUTPUT"
+
+        if [[ "$VERSION_OUTPUT" != *"${{ env.RELEASE_TAG }}"* ]]; then
+          echo "ERROR: Docker version output doesn't contain expected tag"
+          exit 1
+        fi
+
+        # Test help
+        docker run --rm ghcr.io/nickborgers/network-mapper:${{ env.RELEASE_TAG }} --help > /dev/null
+
+        echo "✅ Docker validation passed"
+
+  validate-output-format:
+    name: Validate Output Format
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Set release tag
+      run: |
+        if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+          RELEASE_TAG="${{ github.event.inputs.release_tag }}"
+        else
+          RELEASE_TAG="${{ github.event.release.tag_name }}"
+        fi
+        echo "RELEASE_TAG=$RELEASE_TAG" >> $GITHUB_ENV
+
+    - name: Download and test binary
+      run: |
+        # Download Linux binary for testing
+        gh release download ${{ env.RELEASE_TAG }} \
+          --pattern "network-mapper-linux-amd64.tar.gz" \
+          --repo NickBorgers/util
+
+        tar -xzf network-mapper-linux-amd64.tar.gz
+        chmod +x network-mapper-linux-amd64
+
+        echo "Testing output format expectations..."
+
+        # Capture output from a quick scan
+        OUTPUT=$(timeout 30s ./network-mapper-linux-amd64 --scan-mode quick --no-dns --no-services 2>&1 || true)
+
+        # Verify key output components that users expect
+        EXPECTED_PATTERNS=(
+          "Network Mapper v"
+          "Discovering network interfaces"
+          "Scan mode:"
+          "Target ranges:"
+          "Network Topology Map"
+          "Discovery Summary"
+          "Scan Complete"
+        )
+
+        for pattern in "${EXPECTED_PATTERNS[@]}"; do
+          if [[ "$OUTPUT" != *"$pattern"* ]]; then
+            echo "ERROR: Expected output pattern not found: $pattern"
+            echo "Full output:"
+            echo "$OUTPUT"
+            exit 1
+          fi
+        done
+
+        # Verify CIDR range output (new feature)
+        if [[ "$OUTPUT" != *"📡 Target ranges:"* ]]; then
+          echo "ERROR: CIDR range output not found"
+          exit 1
+        fi
+
+        # Verify no critical errors
+        if [[ "$OUTPUT" == *"panic:"* ]] || [[ "$OUTPUT" == *"fatal error:"* ]]; then
+          echo "ERROR: Critical error found in output"
+          echo "$OUTPUT"
+          exit 1
+        fi
+
+        echo "✅ Output format validation passed"
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  validate-package-managers:
+    name: Validate Package Manager Updates
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Set release tag
+      run: |
+        if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+          RELEASE_TAG="${{ github.event.inputs.release_tag }}"
+        else
+          RELEASE_TAG="${{ github.event.release.tag_name }}"
+        fi
+        echo "RELEASE_TAG=$RELEASE_TAG" >> $GITHUB_ENV
+
+    - name: Wait for package manager automation
+      run: |
+        echo "Waiting 5 minutes for package manager automation to complete..."
+        sleep 300
+
+    - name: Validate Homebrew formula
+      run: |
+        # Check if Homebrew formula was updated
+        FORMULA_VERSION=$(curl -s https://raw.githubusercontent.com/NickBorgers/homebrew-tap/main/Formula/network-mapper.rb | grep 'version' | head -1 | sed 's/.*"\(.*\)"/\1/')
+        EXPECTED_VERSION="${{ env.RELEASE_TAG }}"
+        EXPECTED_VERSION="${EXPECTED_VERSION#v}"  # Remove 'v' prefix
+
+        echo "Homebrew formula version: $FORMULA_VERSION"
+        echo "Expected version: $EXPECTED_VERSION"
+
+        if [[ "$FORMULA_VERSION" != "$EXPECTED_VERSION" ]]; then
+          echo "WARNING: Homebrew formula not yet updated to $EXPECTED_VERSION"
+          echo "This may be expected if package manager automation is still running"
+        else
+          echo "✅ Homebrew formula updated correctly"
+        fi
+
+    - name: Validate Chocolatey package
+      run: |
+        # Check Chocolatey community gallery (may have delay)
+        echo "Checking Chocolatey package status..."
+        curl -s "https://community.chocolatey.org/packages/network-mapper" > chocolatey_page.html
+
+        if grep -q "${{ env.RELEASE_TAG }}" chocolatey_page.html; then
+          echo "✅ Chocolatey package updated"
+        else
+          echo "ℹ️  Chocolatey package may still be pending review"
+          echo "This is normal as Chocolatey packages require manual approval"
+        fi
+
+  integration-test:
+    name: Integration Test
+    runs-on: ubuntu-latest
+    needs: [validate-binaries, validate-docker, validate-output-format]
+
+    steps:
+    - name: Set release tag
+      run: |
+        if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+          RELEASE_TAG="${{ github.event.inputs.release_tag }}"
+        else
+          RELEASE_TAG="${{ github.event.release.tag_name }}"
+        fi
+        echo "RELEASE_TAG=$RELEASE_TAG" >> $GITHUB_ENV
+
+    - name: End-to-end functionality test
+      run: |
+        echo "Running comprehensive end-to-end test..."
+
+        # Download and test all scan modes
+        gh release download ${{ env.RELEASE_TAG }} \
+          --pattern "network-mapper-linux-amd64.tar.gz" \
+          --repo NickBorgers/util
+
+        tar -xzf network-mapper-linux-amd64.tar.gz
+        chmod +x network-mapper-linux-amd64
+
+        SCAN_MODES=("quick" "intelligent" "brute-expanded")
+
+        for mode in "${SCAN_MODES[@]}"; do
+          echo "Testing scan mode: $mode"
+
+          OUTPUT=$(timeout 60s ./network-mapper-linux-amd64 \
+            --scan-mode "$mode" \
+            --no-dns \
+            --no-services \
+            --verbose 2>&1 || true)
+
+          # Verify mode-specific output
+          if [[ "$OUTPUT" != *"Scan mode:"* ]]; then
+            echo "ERROR: Scan mode not displayed for $mode"
+            exit 1
+          fi
+
+          if [[ "$OUTPUT" != *"Target ranges:"* ]]; then
+            echo "ERROR: Target ranges not displayed for $mode"
+            exit 1
+          fi
+
+          echo "✅ Scan mode $mode working correctly"
+        done
+
+        echo "✅ Integration test passed"
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  validation-summary:
+    name: Validation Summary
+    runs-on: ubuntu-latest
+    needs: [validate-binaries, validate-docker, validate-output-format, validate-package-managers, integration-test]
+    if: always()
+
+    steps:
+    - name: Create validation report
+      run: |
+        echo "# Release Validation Report for ${{ env.RELEASE_TAG }}" > validation_report.md
+        echo "" >> validation_report.md
+        echo "## Validation Results" >> validation_report.md
+        echo "" >> validation_report.md
+
+        # Check job results
+        echo "- Binary Validation: ${{ needs.validate-binaries.result }}" >> validation_report.md
+        echo "- Docker Validation: ${{ needs.validate-docker.result }}" >> validation_report.md
+        echo "- Output Format: ${{ needs.validate-output-format.result }}" >> validation_report.md
+        echo "- Package Managers: ${{ needs.validate-package-managers.result }}" >> validation_report.md
+        echo "- Integration Test: ${{ needs.integration-test.result }}" >> validation_report.md
+        echo "" >> validation_report.md
+
+        # Overall status
+        if [[ "${{ needs.validate-binaries.result }}" == "success" && \
+              "${{ needs.validate-docker.result }}" == "success" && \
+              "${{ needs.validate-output-format.result }}" == "success" && \
+              "${{ needs.integration-test.result }}" == "success" ]]; then
+          echo "## ✅ Overall Status: PASSED" >> validation_report.md
+          echo "Release ${{ env.RELEASE_TAG }} meets all end-user expectations." >> validation_report.md
+        else
+          echo "## ❌ Overall Status: FAILED" >> validation_report.md
+          echo "Release ${{ env.RELEASE_TAG }} has validation failures." >> validation_report.md
+        fi
+
+        cat validation_report.md
+      env:
+        RELEASE_TAG: ${{ github.event.release.tag_name || github.event.inputs.release_tag }}

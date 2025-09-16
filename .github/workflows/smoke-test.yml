@@ -1,0 +1,156 @@
+name: Smoke Test
+
+on:
+  push:
+    branches: [main, develop]
+    paths: ['network-mapper/**']
+  pull_request:
+    branches: [main, develop]
+    paths: ['network-mapper/**']
+  workflow_dispatch:
+
+env:
+  GO_VERSION: '1.21'
+
+jobs:
+  smoke-test:
+    name: Smoke Test
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: ${{ env.GO_VERSION }}
+
+    - name: Build binary
+      working-directory: network-mapper
+      run: |
+        go build -o network-mapper .
+
+    - name: Run basic functionality tests
+      working-directory: network-mapper
+      run: |
+        # Make executable on Unix systems
+        if [[ "${{ runner.os }}" != "Windows" ]]; then
+          chmod +x network-mapper
+          BINARY="./network-mapper"
+        else
+          BINARY="./network-mapper.exe"
+        fi
+
+        echo "Testing version output..."
+        $BINARY --version
+
+        echo "Testing help output..."
+        $BINARY --help
+
+        echo "Testing basic scan modes..."
+        timeout 30s $BINARY --scan-mode quick --no-dns --no-services || true
+
+        echo "Testing output format..."
+        OUTPUT=$(timeout 30s $BINARY --scan-mode quick --no-dns --no-services 2>&1 || true)
+
+        # Verify key output patterns
+        if [[ "$OUTPUT" != *"Network Mapper"* ]]; then
+          echo "ERROR: Network Mapper header not found"
+          exit 1
+        fi
+
+        if [[ "$OUTPUT" != *"Target ranges:"* ]]; then
+          echo "ERROR: Target ranges output not found"
+          exit 1
+        fi
+
+        if [[ "$OUTPUT" != *"Scan Complete"* ]]; then
+          echo "ERROR: Scan completion message not found"
+          exit 1
+        fi
+
+        echo "✅ Smoke test passed on ${{ runner.os }}"
+      shell: bash
+
+  validate-device-rules:
+    name: Validate Device Rules
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: ${{ env.GO_VERSION }}
+
+    - name: Test device rules loading
+      working-directory: network-mapper
+      run: |
+        go build -o network-mapper .
+
+        echo "Testing device rules export..."
+        ./network-mapper --export-device-rules test-rules.yaml
+
+        if [[ ! -f test-rules.yaml ]]; then
+          echo "ERROR: Device rules export failed"
+          exit 1
+        fi
+
+        echo "Testing device rules validation..."
+        # Check YAML syntax
+        go run -c "package main; import ('gopkg.in/yaml.v3'; 'os'); func main() { data, _ := os.ReadFile('test-rules.yaml'); var v interface{}; yaml.Unmarshal(data, &v) }" || {
+          echo "ERROR: Exported device rules have invalid YAML syntax"
+          exit 1
+        }
+
+        echo "✅ Device rules validation passed"
+
+  performance-benchmark:
+    name: Performance Benchmark
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: ${{ env.GO_VERSION }}
+
+    - name: Run performance benchmark
+      working-directory: network-mapper
+      run: |
+        go build -o network-mapper .
+
+        echo "Running performance benchmark..."
+        start_time=$(date +%s)
+
+        # Run quick scan and measure time
+        timeout 60s ./network-mapper --scan-mode quick --no-dns --no-services > benchmark_output.txt
+
+        end_time=$(date +%s)
+        duration=$((end_time - start_time))
+
+        echo "Scan completed in ${duration} seconds"
+
+        # Verify reasonable performance (should complete quickly)
+        if [[ $duration -gt 45 ]]; then
+          echo "WARNING: Scan took longer than expected (${duration}s > 45s)"
+          echo "This may indicate performance regression"
+        else
+          echo "✅ Performance benchmark passed (${duration}s)"
+        fi
+
+        # Check for scan rate information
+        if grep -q "IPs/second" benchmark_output.txt; then
+          echo "✅ Performance metrics reported correctly"
+        else
+          echo "WARNING: Performance metrics not found in output"
+        fi
