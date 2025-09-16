@@ -302,6 +302,7 @@ func (ns *NetworkScanner) scanDevicesIntelligent() {
 	// Show scan information
 	fmt.Printf("📊 Scan mode: Intelligent discovery (%s)\n", ns.networkExpansion.GetScanModeDescription(ns.scanMode))
 	fmt.Printf("🎯 Discovered %d active subnets covering %d IP addresses\n", len(scanRanges), totalIPs)
+	ns.printScanRanges(scanRanges)
 
 	estimate := ns.scanEstimator.GetEstimateDescription(totalIPs, ns.scanMode)
 	fmt.Printf("⏱️  Estimated scan time: %s\n", estimate)
@@ -345,6 +346,7 @@ func (ns *NetworkScanner) scanDevicesTraditional() {
 	// Show scan information
 	fmt.Printf("📊 Scan mode: %s\n", ns.networkExpansion.GetScanModeDescription(ns.scanMode))
 	fmt.Printf("🎯 Expanded to %d scan range(s) covering %d IP addresses\n", len(scanRanges), totalIPs)
+	ns.printScanRanges(scanRanges)
 
 	estimate := ns.scanEstimator.GetEstimateDescription(totalIPs, ns.scanMode)
 	fmt.Printf("⏱️  Estimated scan time: %s\n", estimate)
@@ -586,5 +588,19 @@ func (ns *NetworkScanner) logUnknownDevices() {
 	if ns.verbose {
 		fmt.Printf("📊 Found %d unknown devices for future research\n", len(unknownDevices))
 		fmt.Println("💾 Research data ready for background agent processing")
+	}
+}
+
+// printScanRanges displays the CIDR ranges that will be scanned
+func (ns *NetworkScanner) printScanRanges(scanRanges []ScanRange) {
+	fmt.Printf("📡 Target ranges:\n")
+	for i, sr := range scanRanges {
+		rangeIPs := ns.countIPsInRange(sr.Network.IP, ns.getLastIP(sr.Network))
+		if i < 3 || ns.verbose { // Show first 3 ranges, or all if verbose
+			fmt.Printf("   • %s (%d IPs) - %s\n", sr.Network.String(), rangeIPs, sr.Description)
+		} else if i == 3 && !ns.verbose {
+			fmt.Printf("   • ... and %d more ranges (use --verbose to see all)\n", len(scanRanges)-3)
+			break
+		}
 	}
 }
