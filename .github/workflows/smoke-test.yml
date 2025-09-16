@@ -62,10 +62,23 @@ jobs:
         $BINARY --help
 
         echo "Testing basic scan modes..."
-        timeout 30s $BINARY --scan-mode quick --no-dns --no-services || true
+        # Use gtimeout on macOS, timeout on Linux/Windows
+        if [[ "${{ runner.os }}" == "macOS" ]]; then
+          # Install coreutils for gtimeout
+          brew install coreutils >/dev/null 2>&1 || true
+          TIMEOUT_CMD="gtimeout"
+        else
+          TIMEOUT_CMD="timeout"
+        fi
+
+        $TIMEOUT_CMD 30s $BINARY --scan-mode quick --no-dns --no-services || true
 
         echo "Testing output format..."
-        OUTPUT=$(timeout 30s $BINARY --scan-mode quick --no-dns --no-services 2>&1 || true)
+        OUTPUT=$($TIMEOUT_CMD 30s $BINARY --scan-mode quick --no-dns --no-services 2>&1 || true)
+
+        echo "=== DEBUG: Binary output ==="
+        echo "$OUTPUT"
+        echo "=== END DEBUG ==="
 
         # Verify key output patterns
         if [[ "$OUTPUT" != *"Network Mapper"* ]]; then
@@ -187,7 +200,25 @@ jobs:
         start_time=$(date +%s)
 
         # Run quick scan and measure time
-        timeout 60s ./network-mapper --scan-mode quick --no-dns --no-services > benchmark_output.txt
+        # Use gtimeout on macOS, timeout elsewhere
+        if command -v gtimeout >/dev/null 2>&1; then
+          TIMEOUT_CMD="gtimeout"
+        elif command -v timeout >/dev/null 2>&1; then
+          TIMEOUT_CMD="timeout"
+        else
+          echo "No timeout command available, skipping timeout"
+          TIMEOUT_CMD=""
+        fi
+
+        if [[ -n "$TIMEOUT_CMD" ]]; then
+          $TIMEOUT_CMD 60s ./network-mapper --scan-mode quick --no-dns --no-services > benchmark_output.txt
+        else
+          ./network-mapper --scan-mode quick --no-dns --no-services > benchmark_output.txt &
+          SCAN_PID=$!
+          sleep 60
+          kill $SCAN_PID 2>/dev/null || true
+          wait $SCAN_PID 2>/dev/null || true
+        fi
 
         end_time=$(date +%s)
         duration=$((end_time - start_time))
