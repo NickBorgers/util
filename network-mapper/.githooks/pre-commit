@@ -1,0 +1,83 @@
+#!/bin/bash
+
+# Pre-commit hook that runs the same checks as CI pipeline using devcontainer
+# This ensures code quality before commits reach the repository
+
+set -e
+
+echo "🔄 Running pre-commit checks using devcontainer..."
+
+# Get the root directory of the git repository
+REPO_ROOT=$(git rev-parse --show-toplevel)
+NETWORK_MAPPER_DIR="$REPO_ROOT/network-mapper"
+
+# Check if we're in the network-mapper directory or if changes affect network-mapper
+if [[ "$PWD" == *"network-mapper"* ]] || git diff --cached --name-only | grep -q "^network-mapper/"; then
+    echo "📦 Network-mapper changes detected, running checks..."
+
+    # Change to network-mapper directory
+    cd "$NETWORK_MAPPER_DIR"
+
+    # Check if devcontainer is available
+    if ! command -v devcontainer &> /dev/null; then
+        echo "❌ devcontainer CLI not found. Please install it:"
+        echo "   npm install -g @devcontainers/cli"
+        exit 1
+    fi
+
+    # Start devcontainer if not already running
+    echo "🚀 Starting devcontainer..."
+    devcontainer up --workspace-folder . > /dev/null 2>&1
+
+    # Function to run commands in devcontainer
+    run_in_container() {
+        devcontainer exec --workspace-folder . "$@"
+    }
+
+    echo "⬇️  Downloading dependencies..."
+    if ! run_in_container go mod download; then
+        echo "❌ Failed to download dependencies"
+        exit 1
+    fi
+
+    echo "🔍 Verifying dependencies..."
+    if ! run_in_container go mod verify; then
+        echo "❌ Failed to verify dependencies"
+        exit 1
+    fi
+
+    echo "🧪 Running tests..."
+    if ! run_in_container go test -v ./...; then
+        echo "❌ Tests failed"
+        exit 1
+    fi
+
+    echo "🔎 Running go vet..."
+    if ! run_in_container go vet ./...; then
+        echo "❌ go vet failed"
+        exit 1
+    fi
+
+    echo "📊 Installing and running staticcheck..."
+    if ! run_in_container sh -c "go install honnef.co/go/tools/cmd/staticcheck@v0.4.7 && staticcheck ./..."; then
+        echo "❌ staticcheck failed"
+        exit 1
+    fi
+
+    echo "📝 Checking code formatting..."
+    UNFORMATTED=$(run_in_container gofmt -s -l .)
+    if [ -n "$UNFORMATTED" ]; then
+        echo "❌ Code is not formatted properly. Please run:"
+        echo "   devcontainer exec --workspace-folder . gofmt -s -w ."
+        echo ""
+        echo "Unformatted files:"
+        echo "$UNFORMATTED"
+        exit 1
+    fi
+
+    echo "✅ All pre-commit checks passed!"
+else
+    echo "📝 No network-mapper changes detected, skipping checks"
+fi
+
+echo "🎉 Pre-commit hook completed successfully"

@@ -379,10 +379,31 @@ cd util/network-mapper
 devcontainer up --workspace-folder .
 devcontainer exec --workspace-folder . go run .
 
+# Install git hooks for quality checks (recommended)
+./.githooks/install.sh
+
 # Manual setup
 go mod download
 go run .
 ```
+
+### Git Hooks
+
+This project includes git hooks that run the same quality checks as the CI pipeline locally:
+
+```bash
+# Install git hooks
+./.githooks/install.sh
+
+# The pre-commit hook will now run automatically before each commit:
+# - go mod download & verify
+# - go test -v ./...
+# - go vet ./...
+# - staticcheck ./...
+# - gofmt formatting check
+```
+
+The hooks use the devcontainer to ensure consistency with CI. See [.githooks/README.md](.githooks/README.md) for details.
 
 ### CI/CD Pipeline
 
