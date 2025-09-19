@@ -531,7 +531,8 @@ func (sd *ServiceDiscovery) MergeWithDevices(devices []Device) []Device {
 
 	for ipStr, discoveredDevice := range sd.devices {
 		if existingDevice, exists := deviceMap[ipStr]; exists {
-			existingDevice.Services = append(existingDevice.Services, discoveredDevice.Services...)
+			// Deduplicate services before appending
+			existingDevice.Services = sd.deduplicateServices(existingDevice.Services, discoveredDevice.Services)
 			for k, v := range discoveredDevice.UPnPInfo {
 				if existingDevice.UPnPInfo == nil {
 					existingDevice.UPnPInfo = make(map[string]string)
@@ -552,4 +553,37 @@ func (sd *ServiceDiscovery) MergeWithDevices(devices []Device) []Device {
 	}
 
 	return result
+}
+
+// deduplicateServices merges two service slices, removing duplicates based on service signature
+func (sd *ServiceDiscovery) deduplicateServices(existing []Service, new []Service) []Service {
+	// Create a map to track unique services
+	serviceMap := make(map[string]Service)
+
+	// Add existing services to map using unique key
+	for _, service := range existing {
+		key := sd.getServiceKey(service)
+		serviceMap[key] = service
+	}
+
+	// Add new services, overwriting duplicates (new service takes precedence)
+	for _, service := range new {
+		key := sd.getServiceKey(service)
+		serviceMap[key] = service
+	}
+
+	// Convert map back to slice
+	result := make([]Service, 0, len(serviceMap))
+	for _, service := range serviceMap {
+		result = append(result, service)
+	}
+
+	return result
+}
+
+// getServiceKey creates a unique key for a service to identify duplicates
+func (sd *ServiceDiscovery) getServiceKey(service Service) string {
+	// Create unique key based on name, type, port, protocol, and source
+	// This allows different sources to be distinguished while deduplicating identical entries
+	return fmt.Sprintf("%s|%s|%d|%s|%s", service.Name, service.Type, service.Port, service.Protocol, service.Source)
 }
