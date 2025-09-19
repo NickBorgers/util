@@ -298,7 +298,7 @@ func (ns *NetworkScanner) isRoutableThrough(deviceIP net.IP, iface NetworkInterf
 	return bestInterface != nil && bestInterface.Name == iface.Name
 }
 
-// getNetworkPrefix returns the network prefix (e.g., "10.212.10.0/24") for an IP
+// getNetworkPrefix returns the network prefix (e.g., "192.168.1.0/24") for an IP
 func (ns *NetworkScanner) getNetworkPrefix(ip net.IP, prefixLength int) string {
 	if ip == nil {
 		return ""

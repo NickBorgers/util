@@ -1,1 +1,2 @@
 - Build and test network-mapper using the devcontainer configuration in its folder.
+- After you cut a release always confirm that the pipelines worked and the release was successful.

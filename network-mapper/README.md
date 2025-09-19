@@ -216,23 +216,23 @@ When you see "🔍 Probing 19 subnet candidates for activity...", here's what's 
 #### Phase 1: Interface Subnets (Priority 100)
 - Adds all network interface subnets as high-priority candidates
 - For large subnets (>/24), creates targeted /24 around interface IP
-- Example: Interface on `10.212.10.5/16` → candidate `10.212.10.0/24`
+- Example: Interface on `192.168.1.5/24` → candidate `192.168.1.0/24`
 
 #### Phase 2: Adjacent Subnets (Priority 80)
 - Generates numerically adjacent subnets to interface networks
 - For `/24` networks: checks previous/next third octet
-- Example: From `10.212.10.0/24` → tests `10.212.9.0/24` and `10.212.11.0/24`
+- Example: From `192.168.1.0/24` → tests `192.168.0.0/24` and `192.168.2.0/24`
 
 #### Phase 3: Common Subnet Patterns (Priority 60)
 - Creates candidates based on common network administration patterns
 - Uses thoroughness level to determine which third octets to test
-- Example: In `10.212.x.0/24` range, tests common `x` values like `0`, `1`, `10`, `50`, `100`, `254`
+- Example: In `192.168.x.0/24` range, tests common `x` values like `0`, `1`, `10`, `50`, `100`, `254`
 
 #### Phase 4: Gateway Probing
 - Tests common gateway IPs in each candidate subnet: `.1`, `.254`, `.10`, `.100`, `.50`
 - Uses ICMP ping to verify gateway accessibility
 - Marks subnets as active when gateway responds
-- Example output: `✅ Found active gateway 10.212.254.1 in subnet 10.212.254.0/24`
+- Example output: `✅ Found active gateway 192.168.254.1 in subnet 192.168.254.0/24`
 
 ### Route Table Integration
 
@@ -256,11 +256,11 @@ Discovered subnets are displayed with the correct interface based on actual rout
 
 # Example output when multiple VLANs are discovered:
 🔍 Probing 19 subnet candidates for activity...
-✅ Found active gateway 10.212.0.1 in subnet 10.212.0.0/24      # Main network
-✅ Found active gateway 10.212.10.1 in subnet 10.212.10.0/24    # IoT VLAN
-✅ Found active gateway 10.212.50.1 in subnet 10.212.50.0/24    # Guest network
-✅ Found active gateway 10.212.100.1 in subnet 10.212.100.0/24  # Work VLAN
-✅ Found active gateway 10.212.254.1 in subnet 10.212.254.0/24  # Admin network
+✅ Found active gateway 192.168.1.1 in subnet 192.168.1.0/24      # Main network
+✅ Found active gateway 192.168.10.1 in subnet 192.168.10.0/24   # IoT VLAN
+✅ Found active gateway 192.168.50.1 in subnet 192.168.50.0/24   # Guest network
+✅ Found active gateway 10.10.0.1 in subnet 10.10.0.0/24         # Work VLAN
+✅ Found active gateway 172.16.0.1 in subnet 172.16.0.0/24       # Admin network
 ```
 
 #### Enterprise Network Discovery
@@ -465,7 +465,7 @@ This mode helps identify:
 
 ### Example Use Cases
 
-1. **Home Network Security**: If your home network is `10.212.0.0/16` but your WiFi guest network is `10.212.100.0/23`, firewall-test mode will scan both ranges to verify isolation.
+1. **Home Network Security**: If your home network is `192.168.1.0/24` but your WiFi guest network is `192.168.50.0/24`, firewall-test mode will scan both ranges to verify isolation.
 
 2. **Corporate Network Audit**: Test whether development networks can access production subnets, or if guest WiFi is properly segmented.
 
