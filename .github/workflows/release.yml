@@ -150,7 +150,16 @@ jobs:
 
         # Extract version from tag
         VERSION=${GITHUB_REF#refs/tags/}
-        go build -ldflags "-X main.version=${VERSION} -s -w" -o build/${BINARY_NAME} .
+
+        # Use different build flags for Windows to avoid antivirus false positives
+        if [ "${{ matrix.goos }}" = "windows" ]; then
+          # For Windows: preserve debug symbols to avoid Wacatac.B!ml false positives
+          # The -s and -w flags are known triggers for Windows Defender ML detection
+          go build -ldflags "-X main.version=${VERSION}" -o build/${BINARY_NAME} .
+        else
+          # For other platforms: use optimized build with stripped symbols
+          go build -ldflags "-X main.version=${VERSION} -s -w" -o build/${BINARY_NAME} .
+        fi
 
         # Create compressed archive
         cd build
