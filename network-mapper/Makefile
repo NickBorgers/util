@@ -22,6 +22,8 @@ deps:
 
 build: deps
 	@echo "Building $(BINARY_NAME) for current platform..."
+	# Build with full debug symbols and source information for transparency
+	# This makes the binary fully debuggable and helps users understand how it works
 	go build -ldflags "-X main.version=$(VERSION)" -o $(BUILD_DIR)/$(BINARY_NAME) .
 
 build-all: clean deps
@@ -32,7 +34,7 @@ build-all: clean deps
 		GOARCH=$$(echo $$platform | cut -d'/' -f2); \
 		output_name=$(BINARY_NAME)-$$GOOS-$$GOARCH; \
 		if [ $$GOOS = "windows" ]; then output_name=$$output_name.exe; fi; \
-		echo "Building for $$GOOS/$$GOARCH..."; \
+		echo "Building for $$GOOS/$$GOARCH with full debug symbols..."; \
 		GOOS=$$GOOS GOARCH=$$GOARCH go build -ldflags "-X main.version=$(VERSION)" -o $(BUILD_DIR)/$$output_name .; \
 	done
 

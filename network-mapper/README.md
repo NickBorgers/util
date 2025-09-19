@@ -418,6 +418,27 @@ The tool can identify various device types using multiple detection methods:
 - **IEEE OUI Database**: Identifies device manufacturers from MAC addresses
 - **Multicast Monitoring**: Detects devices participating in multicast groups
 
+## Build Transparency & Antivirus Compatibility
+
+Network-mapper is built with **complete transparency** to help users understand exactly how the binary works and to minimize antivirus false positives.
+
+### Key Transparency Features
+
+- **🔍 Full debug symbols**: Windows binaries preserve all debugging information for complete transparency
+- **📖 Open source**: Every network operation is visible in the source code
+- **🛠️ Standard libraries**: Uses Go's standard `net` package in documented, legitimate ways
+- **🚫 Zero obfuscation**: No packing, compression, or symbol stripping that looks suspicious
+
+### Windows Defender Compatibility
+
+Our Windows builds specifically avoid the `-s -w` build flags that are known triggers for `Trojan:Script/Wacatac.B!ml` false positives. This approach:
+
+- Preserves full debug information for security analysis
+- Makes network operations completely transparent to ML algorithms
+- Allows developers to step through and verify network discovery logic
+
+For detailed debugging instructions and transparency documentation, see [`BUILD_TRANSPARENCY.md`](BUILD_TRANSPARENCY.md).
+
 ## Security Considerations & Firewall Testing
 
 ### Safe Scanning Practices
