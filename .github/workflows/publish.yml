@@ -69,3 +69,11 @@ jobs:
           platforms: linux/amd64,linux/arm64
           push: true
           tags: nickborgers/unraid-util:latest,nickborgers/unraid-util:${{ github.ref_name }}
+      - name: Build and push smart-crop-video
+        uses: docker/build-push-action@v5
+        with:
+          context: ./smart-crop-video/
+          file: ./smart-crop-video/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: nickborgers/smart-crop-video:latest,nickborgers/smart-crop-video:${{ github.ref_name }}
