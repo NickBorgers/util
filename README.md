@@ -1,40 +1,119 @@
 # Util
-This is my utility repo. The original motivation for this is that when I change jobs I lose the little utilities I've put together for myself and that's annoying. A former colleague, [Michael Jarvis](https://www.linkedin.com/in/michaeljarvis/) shared the idea of keeping one's shell environment in a public repository so that wherever you setup you bring your utils and environment with you. This repo doesn't go quite that far, but is a step in that direction.
 
+A collection of portable, self-contained utilities designed to persist across job changes and environment setups. Built with a Docker-first approach for zero local dependencies and maximum portability.
 
-## Installation
-Prerequisites:
-  * Docker needs to be installed and accessible as `docker`
+## Philosophy
 
-Setup:
-  * Add the entries in [profile](profile) to your shell profile, such as `.bashrc` or `.zshrc` or wherever you want.
-    * You can clone the repo and then run `cat profile >> .bashrc` or something like that
-    * You can literally just open [profile](profile) and paste into your relevant file; you don't need anything else from this repo
+- **Containerized Everything**: Every utility runs in an isolated Docker container
+- **Zero Local Dependencies**: No need to install ffmpeg, imagemagick, rclone, or other tools locally
+- **Platform Independence**: Works identically on macOS, Linux, and Windows wherever Docker runs
+- **Security by Isolation**: Older utilities use `--network=none` for security
 
-## Inventory
+Credits to [Michael Jarvis](https://www.linkedin.com/in/michaeljarvis/) for the original inspiration of portable shell environments.
 
-### 🌐 Network Mapper
-A comprehensive cross-platform network discovery and visualization tool. This is the primary utility in this repository.
+## Quick Start
 
-**📁 Location**: [`network-mapper/`](network-mapper/)
-**📖 Documentation**: See [`network-mapper/README.md`](network-mapper/README.md)
+### Prerequisites
+- Docker installed and accessible as `docker`
 
-Features include intelligent subnet discovery, device identification, service detection (mDNS/Bonjour, SSDP/UPnP), and beautiful CLI visualization. Available for Linux, macOS, and Windows with multiple installation methods (Homebrew, Chocolatey, Docker).
+### Installation
 
-### 🎬 Media Conversion Tools
-Image and video conversion utilities for common format conversions and optimizations.
-### heic_to_jpeg
-I use Apple products so photos are often taken in HEIC, but a lot of tools and folks can only consume non-Apple formats. This just converts an image with a oneliner.
-### reduce_framerate
-Given a .mov file (e.g. a Quicktime screen recording), simply reduce its size by reducing the framerate. Not suitable for everything, but most screen recordings I'm trying to sling to a colleague don't need full framerate and this is a very easy way to SIGNIFICANTLY reduce file size.
-### mov_to_gif
-Converts a given .mov file to an animated GIF, such as to include in a repository like the demo GIF.
-### update_pdf
-Upgrades a target PDF file to v1.4. I didn't even know this versioning existed but needed to upgrade some documents before a site would accept them as uploads and MacOS produced v1.3 files when I printed as PDF.
+**For Shell Utilities** (media conversion, helper functions):
+```bash
+# Option 1: Clone and append to your shell profile
+cat profile >> ~/.zshrc  # or ~/.bashrc
+
+# Option 2: Just copy-paste the profile contents
+# Open the profile file and paste into your shell config
+```
+
+**For Network Mapper** (recommended method):
+```bash
+# macOS
+brew install nickborgers/tap/network-mapper
+
+# Windows
+choco install network-mapper
+
+# Docker (any platform)
+docker run ghcr.io/nickborgers/network-mapper:latest
+
+# Or download binaries from GitHub Releases
+```
+
+## Utilities
+
+### 🌐 Network Mapper (Primary Utility)
+**Location**: [`network-mapper/`](network-mapper/) | **Full Docs**: [`network-mapper/README.md`](network-mapper/README.md)
+
+A professional Go-based network discovery tool that helps you understand your home network environment.
+
+**Features**:
+- Automatic subnet and gateway detection
+- Device identification and fingerprinting
+- Service discovery (mDNS/Bonjour, SSDP/UPnP)
+- MAC vendor identification
+- Beautiful CLI visualization
+- Cross-platform (Linux, macOS, Windows)
+
+**Installation**: See Quick Start above for Homebrew, Chocolatey, or Docker installation.
+
+---
+
+### 🎬 Media Conversion Tools (Shell Functions)
+
+After adding the `profile` to your shell config, these commands become available:
+
+- **`heic_to_jpeg <file>`** - Convert Apple HEIC photos to JPEG for compatibility
+- **`mov_to_gif <file>`** - Convert .mov videos to animated GIFs for documentation
+- **`reduce_framerate <file>`** - Reduce video file size by lowering framerate to 15fps (great for screen recordings)
+- **`stabilize_video <file> [zoom%]`** - Stabilize shaky videos using ffmpeg vidstab
+- **`update_pdf <file>`** - Upgrade PDF files to version 1.4 for compatibility
+
+---
+
+### 📦 Backup Services (Container-Based)
+
+- **`onedrive-backup`** - Continuous OneDrive backup to local storage using rclone (hourly with one-year retention)
+- **`backup-photos-to-gdrive`** - Continuous local photos backup to Google Drive with retry logic and validation
+
+See individual directories for Docker Compose configuration and setup details.
+
+---
+
+### 🔧 Helper Functions (Shell Functions)
+
+- **`get_docker_pids`** - Map Docker container IDs/names to host PIDs and UIDs for troubleshooting
+- **`network_blip`** - Log network diagnostics to `/tmp/network_blips.log` for debugging connectivity issues
+- **`unrar <file>`** - Extract RAR archives using Docker
 
 ## Demo
 ![demo.gif](demo.gif)
-## Security
-You're somewhat trusting [this Docker image proffered via DockerHub](https://hub.docker.com/repository/docker/nickborgers/mov-to-gif/general). It's built from this repo in a [GitHub Workflow](.github/workflows/publish.yml). My GitHub account is protected with FIDO/FIDO2 (only possible to establish a session with FIDO/FIDO2) and I don't store my SSH key in cleartext on any disk. GitHub has a DockerHub token and the DockerHub account password is stored only in an offline password database.
 
-Note that the Docker containers are given no network interface (`--network=none`), so I see no way the image could exfil your data even if it wanted to.
+## Why Docker for Everything?
+
+**Portability**: Tools like ffmpeg, imagemagick, and rclone work identically across all platforms without version conflicts or missing dependencies.
+
+**Security**: Simple utilities run with `--network=none`, preventing any possibility of data exfiltration even if images were compromised.
+
+**Zero Maintenance**: No need to manage tool installations or updates on your local machine. Just pull updated containers.
+
+**Isolation**: Each utility runs in its own environment without affecting your system or other tools.
+
+## Security
+
+**For Shell Utilities**: Docker images are built from this repository via [GitHub Actions](.github/workflows/publish.yml) and published to Docker Hub. The GitHub account is protected with FIDO2/WebAuthn hardware keys, and Docker Hub credentials are stored only in GitHub Secrets and offline password database.
+
+**Network Isolation**: Simple utilities use `--network=none` flag, making data exfiltration impossible even if images were compromised.
+
+**For Network Mapper**: See [`network-mapper/BUILD_TRANSPARENCY.md`](network-mapper/BUILD_TRANSPARENCY.md) for information on build process, code signing, and addressing antivirus false positives.
+
+## Contributing
+
+This is primarily a personal utilities repository, but if you find something useful or have improvements, feel free to open an issue or PR.
+
+## License
+
+This repository and all utilities within it are licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
+
+Note: The utilities wrap existing tools (ffmpeg, imagemagick, rclone, etc.) which have their own licenses. This MIT license applies to the wrapper code and configuration in this repository.
