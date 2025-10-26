@@ -2,7 +2,7 @@
 <package xmlns="http://schemas.microsoft.com/packaging/2015/06/nuspec.xsd">
   <metadata>
     <id>network-mapper</id>
-    <version>$version$</version>
+    <version>1.0.0-smart-crop</version>
     <title>Network Mapper</title>
     <authors>Nick Borgers</authors>
     <owners>Nick Borgers</owners>
@@ -74,7 +74,7 @@ network-mapper --scan-mode brute-comprehensive
 - The tool only scans RFC1918 private address spaces for safety
 - Uses non-intrusive scanning methods
 ]]></description>
-    <releaseNotes>$releasenotes$</releaseNotes>
+    <releaseNotes>Network Mapper 1.0.0-smart-crop - See GitHub releases for full changelog</releaseNotes>
     <copyright>2025 Nick Borgers</copyright>
     <language>en-US</language>
   </metadata>

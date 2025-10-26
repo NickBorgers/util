@@ -2,8 +2,8 @@ $ErrorActionPreference = 'Stop'
 
 $toolsDir = "$(Split-Path -parent $MyInvocation.MyCommand.Definition)"
 $packageName = 'network-mapper'
-$url = 'https://github.com/NickBorgers/util/releases/download/v$version$/network-mapper-windows-amd64.exe.zip'
-$checksum = '$checksum$'
+$url = 'https://github.com/NickBorgers/util/releases/download/v1.0.0-smart-crop/network-mapper-windows-amd64.exe.zip'
+$checksum = 'a5dcbcea6550a577b04dafb0cdc60037066da51e9cda61f1ba768957df7495a6'
 $checksumType = 'sha256'
 
 $packageArgs = @{
