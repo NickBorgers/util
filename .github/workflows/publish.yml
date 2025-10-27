@@ -28,7 +28,7 @@ jobs:
 
           # Determine which utilities to build based on tag prefix
           if [[ $TAG_NAME == network-mapper-v* ]] || [[ $TAG_NAME == v* ]]; then
-            echo "build_network_mapper=false" >> $GITHUB_OUTPUT
+            echo "build_network_mapper=true" >> $GITHUB_OUTPUT
           else
             echo "build_network_mapper=false" >> $GITHUB_OUTPUT
           fi

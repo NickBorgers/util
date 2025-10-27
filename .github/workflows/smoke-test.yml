@@ -3,10 +3,8 @@ name: Smoke Test
 on:
   push:
     branches: [main, develop]
-    paths: ['network-mapper/**']
   pull_request:
     branches: [main, develop]
-    paths: ['network-mapper/**']
   workflow_dispatch:
 
 env:
