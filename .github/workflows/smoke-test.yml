@@ -3,10 +3,14 @@ name: Smoke Test
 on:
   push:
     branches: [main, develop]
-    paths: ['network-mapper/**']
+    paths:
+      - 'network-mapper/**'
+      - '.github/workflows/smoke-test.yml'
   pull_request:
     branches: [main, develop]
-    paths: ['network-mapper/**']
+    paths:
+      - 'network-mapper/**'
+      - '.github/workflows/smoke-test.yml'
   workflow_dispatch:
 
 env:
