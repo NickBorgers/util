@@ -1,1 +1,8 @@
 ./network-mapper/network-mapper
+
+# Python virtual environments (match anywhere in repo)
+**/venv/
+**/.venv/
+**/env/
+**/.env/
+**/ENV/

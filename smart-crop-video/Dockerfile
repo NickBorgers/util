@@ -1,7 +1,9 @@
-FROM alpine:3.16.2
+FROM alpine:3.19
 
-RUN apk add --no-cache ffmpeg
+RUN apk add --no-cache \
+    ffmpeg \
+    python3
 
-COPY smart-crop-video.sh /usr/local/bin/smart-crop-video
+COPY smart-crop-video.py /usr/local/bin/smart-crop-video
 
 RUN chmod +x /usr/local/bin/smart-crop-video
