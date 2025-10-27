@@ -8,14 +8,14 @@ Social media platforms often require specific aspect ratios (square 1:1 for Inst
 
 ## Features
 
-- **Interactive crop selection**: Analyzes top 5 crop candidates and lets you choose the best one
-- **Preview JPEG files**: Generates preview images for each candidate crop position in your current directory
+- **Interactive crop selection**: Analyzes top 10 crop candidates and lets you choose the best one
+- **Web UI interface**: Ephemeral webserver provides visual preview and selection interface
+- **Text interface fallback**: All decisions can be made via command line without the web UI
+- **Preview JPEG files**: Generates preview images for each candidate crop position
 - **Intelligent motion detection**: Analyzes video to find regions with most visual activity
 - **Configurable aspect ratios**: Default 1:1 square, but supports any ratio (4:5, 9:16, etc.)
 - **High quality output**: Uses FFmpeg with CRF 19 and slow preset for optimal quality
-- **Network isolated**: Runs with `--network=none` Docker flag for security
 - **Simple one-liner**: Just point it at your video file
-- **ASCII art previews** (optional): Shows full frame with crop region highlighted in color (requires jp2a to be added to Docker image)
 
 ## Installation
 
@@ -65,13 +65,15 @@ The tool now provides an **interactive selection experience** to help you choose
 
 ### How it Works
 
-1. **Analysis Phase**: The tool analyzes a 5×5 grid (25 positions) across the entire video frame
-2. **Top Candidates**: Identifies the top 5 crop positions based on motion and visual complexity
-3. **Preview Generation**: Extracts a sample frame from the middle of your video
-4. **Visual Feedback**: Shows you:
-   - **ASCII art visualization** showing the full frame with crop region highlighted in red
-   - **Preview JPEG files** saved to your current directory as `{video_name}_crop_option_*.jpg`
-5. **User Choice**: You select which crop looks best (1-5), or press Enter for automatic selection
+1. **Webserver Launch**: Tool starts an ephemeral webserver and displays the URL
+2. **Analysis Phase**: Analyzes a 5×5 grid (25 positions) across the entire video frame
+3. **Top Candidates**: Identifies the top 10 crop positions based on multiple scoring strategies
+4. **Preview Generation**: Extracts a sample frame from the middle of your video
+5. **Visual Feedback**:
+   - **Web UI**: View all crop options with live previews at the displayed URL
+   - **Text Interface**: Lists all options with preview file paths
+6. **User Choice**: Select via web UI or text interface (1-10), or press Enter for automatic selection
+7. **Progress Tracking**: Both web UI and text interface show encoding progress
 
 ### Example Workflow
 
@@ -79,25 +81,31 @@ The tool now provides an **interactive selection experience** to help you choose
 smart_crop_video my_video.mp4
 
 # Output will show:
+# - Webserver URL (http://localhost:8765)
 # - Analysis progress for 25 positions
-# - Top 5 candidates with their scores
-# - ASCII art previews (if jp2a is available in the container)
+# - Top 10 candidates with their scores and strategies
 # - Preview file paths: my_video_crop_option_1.jpg, my_video_crop_option_2.jpg, etc.
-# - Interactive prompt: "Which crop looks best? [1-5]"
+# - Interactive prompt: "Which crop looks best? [1-10]"
+
+# Option 1: Open http://localhost:8765 in your browser to view all previews visually
+# Option 2: View the JPEG files in your image viewer
+# Option 3: Choose directly by typing a number
 
 # Choose option 3 by typing: 3
 # Or press Enter to use the highest-scoring option automatically
 # Preview files remain in your directory for reference
 ```
 
-### ASCII Art Visualization (Optional Feature)
+### Web UI Interface
 
-The script supports ASCII art visualization if `jp2a` is available in the Docker container. When enabled, you'll see beautiful ASCII art previews showing:
-- The **full video frame** rendered as ASCII art
-- The **crop region highlighted in red** so you can see exactly what will be kept
-- Each option's score for reference
+The tool starts an ephemeral webserver that provides:
+- **Live status updates**: See analysis progress in real-time
+- **Visual preview gallery**: View all 10 crop options side-by-side
+- **Click to select**: Choose your preferred crop with a single click
+- **Progress tracking**: Watch encoding progress after selection
+- **Automatic shutdown**: Server stops when the job completes
 
-**Note**: ASCII art is currently not included by default due to build complexity. The tool works great without it - you'll see the preview JPEG file paths and can open them in any image viewer. If you want ASCII art, you can modify the Dockerfile to add jp2a.
+**The web UI is completely optional** - you can make all decisions via the text interface if you prefer.
 
 ### Benefits
 
@@ -293,4 +301,9 @@ CROP_SCALE=0.6 smart_crop_video video3.mp4
 
 ## Security
 
-This utility runs with Docker's `--network=none` flag, ensuring the container has no network access and cannot exfiltrate data.
+This utility runs with Docker port mapping (`-p 8765:8765`) to enable the ephemeral webserver for the interactive UI. The webserver:
+- Only accessible on localhost at port 8765 (not accessible from other machines)
+- Automatically shuts down when the job completes
+- Only serves preview images from your current directory
+- Runs only during the video processing session
+- Uses a fixed port (8765) for predictability and cross-platform compatibility

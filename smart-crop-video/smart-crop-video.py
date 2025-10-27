@@ -4,6 +4,7 @@ Intelligently crops videos to specified aspect ratios by analyzing visual activi
 and motion to find the most interesting region.
 
 Uses multiple scoring strategies to generate candidate crops for user selection.
+Provides both web UI and text interface for selection.
 """
 
 import sys
@@ -11,10 +12,18 @@ import os
 import re
 import subprocess
 import argparse
+import threading
+import socket
+import time
 from pathlib import Path
-from typing import List, Tuple, Dict
+from typing import List, Tuple, Dict, Optional
 from dataclasses import dataclass
+from flask import Flask, jsonify, send_file, request
+import logging
 
+# Disable Flask development server warning
+log = logging.getLogger('werkzeug')
+log.setLevel(logging.ERROR)
 
 @dataclass
 class CropPosition:
@@ -34,6 +43,311 @@ class ScoredCandidate:
     y: int
     score: float
     strategy: str
+
+
+class AppState:
+    """Shared state between main thread and webserver"""
+    def __init__(self):
+        self.status = "initializing"
+        self.progress = 0
+        self.total_positions = 0
+        self.current_position = 0
+        self.message = "Starting analysis..."
+        self.candidates = []
+        self.preview_dir = "."
+        self.base_name = ""
+        self.selected_index = None
+        self.encoding_progress = 0
+        self.lock = threading.Lock()
+
+    def update(self, **kwargs):
+        """Thread-safe update of state"""
+        with self.lock:
+            for key, value in kwargs.items():
+                setattr(self, key, value)
+
+    def get(self, key):
+        """Thread-safe get of state value"""
+        with self.lock:
+            return getattr(self, key)
+
+    def get_dict(self):
+        """Get a thread-safe copy of state as dict"""
+        with self.lock:
+            return {
+                'status': self.status,
+                'progress': self.progress,
+                'total_positions': self.total_positions,
+                'current_position': self.current_position,
+                'message': self.message,
+                'candidates': [
+                    {
+                        'index': i + 1,
+                        'x': c.x,
+                        'y': c.y,
+                        'score': c.score,
+                        'strategy': c.strategy
+                    }
+                    for i, c in enumerate(self.candidates)
+                ],
+                'selected_index': self.selected_index,
+                'encoding_progress': self.encoding_progress
+            }
+
+
+def find_free_port():
+    """Find a free port for the webserver"""
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.bind(('', 0))
+        s.listen(1)
+        port = s.getsockname()[1]
+    return port
+
+
+def create_app(state: AppState) -> Flask:
+    """Create Flask app with routes"""
+    app = Flask(__name__)
+
+    @app.route('/')
+    def index():
+        """Main UI page"""
+        html = """
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Smart Crop Video</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #1a1a1a;
+            color: #e0e0e0;
+        }
+        h1 {
+            color: #4CAF50;
+            border-bottom: 2px solid #4CAF50;
+            padding-bottom: 10px;
+        }
+        .status {
+            background: #2a2a2a;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+            border-left: 4px solid #4CAF50;
+        }
+        .progress-bar {
+            width: 100%;
+            height: 30px;
+            background: #333;
+            border-radius: 15px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #4CAF50, #45a049);
+            transition: width 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+        }
+        .candidates {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 20px;
+            margin: 20px 0;
+        }
+        .candidate {
+            background: #2a2a2a;
+            border: 2px solid #444;
+            border-radius: 8px;
+            padding: 15px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .candidate:hover {
+            border-color: #4CAF50;
+            transform: translateY(-5px);
+            box-shadow: 0 5px 15px rgba(76, 175, 80, 0.3);
+        }
+        .candidate.selected {
+            border-color: #4CAF50;
+            background: #1e3a1e;
+        }
+        .candidate img {
+            width: 100%;
+            border-radius: 4px;
+            margin-bottom: 10px;
+        }
+        .candidate-info {
+            font-size: 14px;
+        }
+        .strategy {
+            color: #4CAF50;
+            font-weight: bold;
+        }
+        .score {
+            color: #888;
+        }
+        button {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-top: 10px;
+        }
+        button:hover {
+            background: #45a049;
+        }
+        button:disabled {
+            background: #666;
+            cursor: not-allowed;
+        }
+        .encoding {
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <h1>🎬 Smart Crop Video</h1>
+
+    <div class="status">
+        <h2 id="status-title">Status</h2>
+        <div id="status-message">Loading...</div>
+        <div class="progress-bar">
+            <div class="progress-fill" id="progress-bar" style="width: 0%">0%</div>
+        </div>
+    </div>
+
+    <div id="candidates-section" style="display: none;">
+        <h2>Select Your Preferred Crop</h2>
+        <p>Click on an option to select it, then click "Confirm Selection"</p>
+        <div class="candidates" id="candidates"></div>
+        <button id="confirm-btn" disabled onclick="confirmSelection()">Confirm Selection</button>
+    </div>
+
+    <div id="encoding-section" class="encoding" style="display: none;">
+        <h2>Encoding Video</h2>
+        <div class="progress-bar">
+            <div class="progress-fill" id="encoding-bar" style="width: 0%">0%</div>
+        </div>
+    </div>
+
+    <script>
+        let selectedIndex = null;
+
+        function updateStatus() {
+            fetch('/api/status')
+                .then(r => r.json())
+                .then(data => {
+                    document.getElementById('status-message').textContent = data.message;
+                    document.getElementById('progress-bar').style.width = data.progress + '%';
+                    document.getElementById('progress-bar').textContent = data.progress + '%';
+
+                    if (data.status === 'candidates_ready' && data.candidates.length > 0) {
+                        showCandidates(data.candidates);
+                    }
+
+                    if (data.status === 'encoding' || data.selected_index !== null) {
+                        document.getElementById('encoding-section').style.display = 'block';
+                        document.getElementById('encoding-bar').style.width = data.encoding_progress + '%';
+                        document.getElementById('encoding-bar').textContent = data.encoding_progress + '%';
+                    }
+
+                    if (data.status !== 'complete') {
+                        setTimeout(updateStatus, 500);
+                    } else {
+                        document.getElementById('status-message').textContent = 'Complete! You can close this window.';
+                        document.getElementById('progress-bar').style.width = '100%';
+                        document.getElementById('progress-bar').textContent = '100%';
+                    }
+                });
+        }
+
+        function showCandidates(candidates) {
+            const section = document.getElementById('candidates-section');
+            const container = document.getElementById('candidates');
+
+            if (container.children.length === 0) {
+                section.style.display = 'block';
+
+                candidates.forEach(c => {
+                    const div = document.createElement('div');
+                    div.className = 'candidate';
+                    div.onclick = () => selectCandidate(c.index);
+                    div.innerHTML = `
+                        <img src="/api/preview/${c.index}" alt="Crop option ${c.index}">
+                        <div class="candidate-info">
+                            <div><strong>Option ${c.index}</strong></div>
+                            <div class="strategy">${c.strategy}</div>
+                            <div class="score">Score: ${c.score.toFixed(2)}</div>
+                            <div style="font-size: 12px; color: #888;">Position: (${c.x}, ${c.y})</div>
+                        </div>
+                    `;
+                    container.appendChild(div);
+                });
+            }
+        }
+
+        function selectCandidate(index) {
+            selectedIndex = index;
+            document.querySelectorAll('.candidate').forEach((el, i) => {
+                el.classList.toggle('selected', i === index - 1);
+            });
+            document.getElementById('confirm-btn').disabled = false;
+        }
+
+        function confirmSelection() {
+            if (selectedIndex !== null) {
+                fetch(`/api/select/${selectedIndex}`, {method: 'POST'})
+                    .then(() => {
+                        document.getElementById('candidates-section').style.display = 'none';
+                        document.getElementById('status-message').textContent =
+                            `Selected option ${selectedIndex}. Encoding video...`;
+                    });
+            }
+        }
+
+        updateStatus();
+    </script>
+</body>
+</html>
+        """
+        return html
+
+    @app.route('/api/status')
+    def api_status():
+        """Status API endpoint"""
+        return jsonify(state.get_dict())
+
+    @app.route('/api/preview/<int:index>')
+    def api_preview(index):
+        """Serve preview image"""
+        preview_file = f"{state.base_name}_crop_option_{index}.jpg"
+        preview_path = Path(state.preview_dir) / preview_file
+        if preview_path.exists():
+            return send_file(preview_path, mimetype='image/jpeg')
+        return "Not found", 404
+
+    @app.route('/api/select/<int:index>', methods=['POST'])
+    def api_select(index):
+        """Handle selection from web UI"""
+        state.update(selected_index=index)
+        return jsonify({'success': True})
+
+    return app
+
+
+def run_flask_server(app: Flask, port: int):
+    """Run Flask server in thread"""
+    app.run(host='0.0.0.0', port=port, debug=False, use_reloader=False)
 
 
 def run_ffmpeg(cmd: List[str]) -> str:
@@ -71,6 +385,36 @@ def get_video_duration(input_file: str) -> float:
     ]
     result = subprocess.run(cmd, capture_output=True, text=True)
     return float(result.stdout.strip())
+
+
+def get_video_frame_count(input_file: str) -> int:
+    """Estimate total number of frames in video (fast method using duration and fps)"""
+    # Get FPS
+    cmd_fps = [
+        'ffprobe', '-v', 'error',
+        '-select_streams', 'v:0',
+        '-show_entries', 'stream=r_frame_rate',
+        '-of', 'csv=p=0',
+        input_file
+    ]
+    result_fps = subprocess.run(cmd_fps, capture_output=True, text=True)
+    fps_str = result_fps.stdout.strip()
+
+    try:
+        if '/' in fps_str:
+            num, den = map(int, fps_str.split('/'))
+            fps = num / den
+        else:
+            fps = float(fps_str)
+    except (ValueError, ZeroDivisionError):
+        fps = 24.0  # Default fallback
+
+    # Get duration
+    duration = get_video_duration(input_file)
+
+    # Estimate frame count
+    estimated_frames = int(duration * fps)
+    return max(estimated_frames, 1)  # Ensure at least 1
 
 
 def extract_metric_from_showinfo(output: str, metric: str) -> List[float]:
@@ -192,6 +536,24 @@ def main():
     analysis_frames = int(os.getenv('ANALYSIS_FRAMES', '50'))
     crop_scale = float(os.getenv('CROP_SCALE', '0.75'))
 
+    # Initialize state and Flask app
+    state = AppState()
+    state.base_name = Path(input_file).stem
+    app = create_app(state)
+
+    # Use fixed port for consistency with Docker port mapping
+    port = 8765
+    server_thread = threading.Thread(target=run_flask_server, args=(app, port), daemon=True)
+    server_thread.start()
+
+    # Wait a moment for server to start
+    time.sleep(1)
+
+    print("\n" + "="*70)
+    print("🌐 Web UI available at: http://localhost:{}".format(port))
+    print("="*70)
+    print()
+
     print(f"Analyzing video: {input_file}")
     print(f"Target aspect ratio: {aspect_ratio}")
 
@@ -236,6 +598,8 @@ def main():
         print("Crop dimensions match video, no position analysis needed")
         crop_x, crop_y = 0, 0
     else:
+        state.update(status="analyzing", total_positions=25, message="Analyzing positions...")
+
         print("\n" + "="*70)
         print("Analysis Plan:")
         print("="*70)
@@ -265,7 +629,14 @@ def main():
             for x in x_positions:
                 current += 1
                 percent = (current * 100) // total
-                print(f"\r[{percent:3d}%] Analyzing position {current:2d}/{total} (x={x}, y={y})...  ", end='', flush=True)
+                progress_msg = f"Analyzing position {current}/{total} (x={x}, y={y})"
+                print(f"\r[{percent:3d}%] {progress_msg}...  ", end='', flush=True)
+
+                state.update(
+                    current_position=current,
+                    progress=percent,
+                    message=progress_msg
+                )
 
                 pos = analyze_position(input_file, x, y, crop_w, crop_h, analysis_frames)
                 positions.append(pos)
@@ -345,11 +716,15 @@ def main():
         duration = get_video_duration(input_file)
         sample_time = duration / 2
 
+        state.update(status="generating_previews", message="Extracting sample frame...")
         print(f"Extracting sample frame at {sample_time:.1f}s for preview generation...")
 
-        preview_dir = "."
+        preview_dir = os.getcwd()  # Use absolute path for Flask to find images
         base_name = Path(input_file).stem
         temp_frame = f".{base_name}_temp_frame.jpg"
+
+        # Update state with absolute preview directory
+        state.preview_dir = preview_dir
 
         cmd = [
             'ffmpeg', '-ss', str(sample_time), '-i', input_file,
@@ -380,34 +755,103 @@ def main():
 
             print(f"✓ {preview_file}")
 
+        # Update state with candidates
+        state.update(status="candidates_ready", candidates=unique_candidates, message="Preview options ready")
+
         print()
         print("="*50)
-        print("Please review the preview images above.")
-        print("Each option uses a different scoring strategy.")
-        print("Open them in your image viewer if needed.")
+        print("Review options at: http://localhost:{}".format(port))
+        print("Or view preview images: {}_crop_option_*.jpg".format(base_name))
         print("="*50)
         print()
 
-        # Interactive selection
-        choice = input(f"Which crop looks best? [1-{len(unique_candidates)}] (or press Enter for automatic selection): ").strip()
+        # Interactive selection with web UI awareness
+        # First check if already selected via web UI before we got here
+        web_selection = state.get('selected_index')
 
-        if not choice:
-            selected = unique_candidates[0]
-            print(f"Using automatic selection: Position (x={selected.x}, y={selected.y}) with score: {selected.score:.2f}")
+        if web_selection is not None:
+            selected = unique_candidates[web_selection - 1]
+            print(f"Using web UI selection #{web_selection}: Position (x={selected.x}, y={selected.y}) with score: {selected.score:.2f}")
             print(f"Strategy: {selected.strategy}")
         else:
-            try:
-                idx = int(choice) - 1
-                if 0 <= idx < len(unique_candidates):
-                    selected = unique_candidates[idx]
-                    print(f"Using your selection #{choice}: Position (x={selected.x}, y={selected.y}) with score: {selected.score:.2f}")
+            # Poll for web selection while waiting for text input
+            print(f"Waiting for selection via web UI or text input...")
+            print(f"  - Web UI: Open http://localhost:{port} and click an option")
+            print(f"  - Text: Enter a number [1-{len(unique_candidates)}] or press Enter for automatic selection")
+            print()
+
+            import select
+            import sys
+
+            # Wait up to 300 seconds (5 minutes) for selection
+            max_wait = 300
+            poll_interval = 0.5
+            elapsed = 0
+            choice = None
+
+            # Check if stdin is a terminal
+            is_terminal = sys.stdin.isatty()
+
+            if is_terminal:
+                print(f"Which crop looks best? [1-{len(unique_candidates)}] ", end='', flush=True)
+
+                while elapsed < max_wait:
+                    # Check for web UI selection
+                    web_selection = state.get('selected_index')
+                    if web_selection is not None:
+                        print(f"\n\n✓ Selection received from web UI: #{web_selection}")
+                        selected = unique_candidates[web_selection - 1]
+                        break
+
+                    # Check for text input (non-blocking on Unix-like systems)
+                    if hasattr(select, 'select'):
+                        ready, _, _ = select.select([sys.stdin], [], [], poll_interval)
+                        if ready:
+                            choice = sys.stdin.readline().strip()
+                            break
+                    else:
+                        # Fallback for systems without select (Windows)
+                        time.sleep(poll_interval)
+
+                    elapsed += poll_interval
+
+                # If we timed out or got input via stdin
+                if web_selection is None:
+                    if choice is None and elapsed >= max_wait:
+                        # Timeout - use automatic selection
+                        print("\n\nNo selection made, using automatic selection")
+                        choice = ""
+                    elif choice is None:
+                        # This shouldn't happen, but just in case
+                        choice = input()
+            else:
+                # Not a terminal (piped input or non-interactive), read directly
+                print(f"Which crop looks best? [1-{len(unique_candidates)}] (or press Enter for automatic selection): ", end='', flush=True)
+                choice = input().strip()
+
+            # Process text input choice if no web selection was made
+            if web_selection is None:
+                if not choice:
+                    selected = unique_candidates[0]
+                    print(f"Using automatic selection: Position (x={selected.x}, y={selected.y}) with score: {selected.score:.2f}")
                     print(f"Strategy: {selected.strategy}")
                 else:
-                    print("Invalid selection, using automatic selection")
-                    selected = unique_candidates[0]
-            except ValueError:
-                print("Invalid input, using automatic selection")
-                selected = unique_candidates[0]
+                    try:
+                        idx = int(choice) - 1
+                        if 0 <= idx < len(unique_candidates):
+                            selected = unique_candidates[idx]
+                            state.update(selected_index=int(choice))
+                            print(f"Using your selection #{choice}: Position (x={selected.x}, y={selected.y}) with score: {selected.score:.2f}")
+                            print(f"Strategy: {selected.strategy}")
+                        else:
+                            print("Invalid selection, using automatic selection")
+                            selected = unique_candidates[0]
+                    except ValueError:
+                        print("Invalid input, using automatic selection")
+                        selected = unique_candidates[0]
+            else:
+                print(f"Position (x={selected.x}, y={selected.y}) with score: {selected.score:.2f}")
+                print(f"Strategy: {selected.strategy}")
 
         crop_x, crop_y = selected.x, selected.y
 
@@ -420,21 +864,92 @@ def main():
         print("(You can delete these preview files once you're satisfied with the result)")
 
     # Apply the crop
+    state.update(status="encoding", message="Encoding video...")
     print(f"Applying crop: {crop_w}x{crop_h} at position ({crop_x},{crop_y})")
     print(f"Encoding with preset: {preset}")
+
+    # Get total frame count for progress tracking
+    print("Estimating total frames for progress tracking...")
+    total_frames = get_video_frame_count(input_file)
+    print(f"Estimated frames: {total_frames} (duration × fps)")
+
+    if total_frames <= 0:
+        print("Warning: Could not determine frame count, progress tracking will be disabled")
+        total_frames = 1  # Avoid division by zero
+
+    # Create a temporary file for FFmpeg progress output
+    import tempfile
+    progress_fd, progress_file = tempfile.mkstemp(suffix='.txt', text=True)
+    os.close(progress_fd)  # Close the file descriptor, we'll read it separately
 
     cmd = [
         'ffmpeg', '-i', input_file,
         '-vf', f'crop={crop_w}:{crop_h}:{crop_x}:{crop_y}',
         '-c:v', 'libx264', '-preset', preset, '-crf', '19',
         '-c:a', 'copy',
+        '-progress', progress_file,  # Write progress to temp file
         '-y', output_file
     ]
 
-    subprocess.run(cmd)
+    # Run encoding in background
+    process = subprocess.Popen(
+        cmd,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL
+    )
+
+    # Monitor progress file in real-time
+    last_frame = 0
+    import time as time_module
+
+    print(f"Monitoring progress file: {progress_file}")
+    state.update(encoding_progress=0)  # Initialize to 0
+
+    while process.poll() is None:  # While process is running
+        try:
+            with open(progress_file, 'r') as f:
+                lines = f.readlines()
+
+            # Parse the progress file
+            current_frame = 0
+            for line in lines:
+                line = line.strip()
+                if line.startswith('frame='):
+                    try:
+                        current_frame = int(line.split('=')[1])
+                    except (ValueError, IndexError):
+                        pass
+
+            # Update if we have a new frame count
+            if current_frame > last_frame and current_frame > 0:
+                last_frame = current_frame
+                progress = min(int((current_frame / total_frames) * 100), 99)
+                state.update(encoding_progress=progress)
+                print(f"\rEncoding: {current_frame}/{total_frames} frames ({progress}%)  ", end='', flush=True)
+
+        except (IOError, FileNotFoundError) as e:
+            # File might not exist yet - this is normal at the start
+            pass
+
+        time_module.sleep(0.5)  # Check every 500ms
+
+    # Wait for process to fully complete
+    process.wait()
+
+    # Clean up progress file
+    try:
+        os.unlink(progress_file)
+    except:
+        pass
+
+    print()  # New line after progress
+
+    state.update(status="complete", encoding_progress=100, message="Encoding complete!")
 
     print(f"Done! Output saved to: {output_file}")
     print(f"Final dimensions: {crop_w}x{crop_h} (aspect ratio {aspect_ratio})")
+    print()
+    print("You can now close the web UI.")
 
 
 if __name__ == '__main__':

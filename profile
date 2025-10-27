@@ -24,7 +24,7 @@ function stabilize_video() {
 }
 
 function smart_crop_video() {
-	docker run --rm -it --volume=$(pwd):/content/ --workdir=/content/ --network=none \
+	docker run --rm -it --volume=$(pwd):/content/ --workdir=/content/ -p 8765:8765 \
 		-e PRESET="${PRESET:-medium}" \
 		-e ANALYSIS_FRAMES="${ANALYSIS_FRAMES:-20}" \
 		-e CROP_SCALE="${CROP_SCALE:-0.75}" \
