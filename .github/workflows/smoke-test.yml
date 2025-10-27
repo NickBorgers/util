@@ -5,12 +5,10 @@ on:
     branches: [ main, develop ]
     paths:
       - 'network-mapper/**'
-      - '.github/workflows/smoke-test.yml'
   pull_request:
     branches: [ main, develop ]
     paths:
       - 'network-mapper/**'
-      - '.github/workflows/smoke-test.yml'
   workflow_dispatch:
 
 env:
@@ -107,7 +105,6 @@ jobs:
         fi
 
         echo "✅ Smoke test passed on ${{ runner.os }}"
-      shell: bash
 
   validate-device-rules:
     name: Validate Device Rules
