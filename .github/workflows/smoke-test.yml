@@ -1,6 +1,6 @@
 name: Smoke Test
 
-on:
+'on':
   push:
     branches: [main, develop]
     paths:
