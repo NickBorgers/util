@@ -6,3 +6,6 @@
 **/env/
 **/.env/
 **/ENV/
+
+# There are sometimes images in here and I'm on Mac
+**/.DS_Store
