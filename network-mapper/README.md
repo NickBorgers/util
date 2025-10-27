@@ -1,6 +1,7 @@
 # Network Mapper 🌐
 
 [![Build Status](https://github.com/NickBorgers/util/workflows/Build%20and%20Test/badge.svg)](https://github.com/NickBorgers/util/actions)
+
 [![Release](https://github.com/NickBorgers/util/workflows/Release/badge.svg)](https://github.com/NickBorgers/util/releases)
 [![Docker](https://img.shields.io/badge/docker-available-blue)](https://github.com/NickBorgers/util/pkgs/container/network-mapper)
 [![Homebrew](https://img.shields.io/badge/homebrew-available-orange)](https://github.com/NickBorgers/homebrew-tap)
