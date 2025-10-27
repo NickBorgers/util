@@ -533,7 +533,7 @@ The project uses GitHub Actions for automated building, testing, and releases:
 - **Artifacts**: Cross-platform binaries with checksums
 
 #### Automated Releases
-- **Triggered on**: Git tags (`v*` pattern)
+- **Triggered on**: Git tags (`network-mapper-v*` or legacy `v*` pattern)
 - **Deliverables**:
   - GitHub Release with binaries and checksums
   - Docker images published to GitHub Container Registry

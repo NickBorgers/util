@@ -20,6 +20,55 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Determine which utilities to build
+        id: utils
+        run: |
+          TAG_NAME="${{ github.event.release.tag_name }}"
+
+          # Determine which utilities to build based on tag prefix
+          if [[ $TAG_NAME == network-mapper-v* ]] || [[ $TAG_NAME == v* ]]; then
+            echo "build_network_mapper=false" >> $GITHUB_OUTPUT
+          else
+            echo "build_network_mapper=false" >> $GITHUB_OUTPUT
+          fi
+
+          if [[ $TAG_NAME == smart-crop-video-v* ]]; then
+            echo "build_smart_crop=true" >> $GITHUB_OUTPUT
+          else
+            echo "build_smart_crop=false" >> $GITHUB_OUTPUT
+          fi
+
+          if [[ $TAG_NAME == mov-to-gif-v* ]]; then
+            echo "build_mov_to_gif=true" >> $GITHUB_OUTPUT
+          else
+            echo "build_mov_to_gif=false" >> $GITHUB_OUTPUT
+          fi
+
+          if [[ $TAG_NAME == update-pdf-v* ]]; then
+            echo "build_update_pdf=true" >> $GITHUB_OUTPUT
+          else
+            echo "build_update_pdf=false" >> $GITHUB_OUTPUT
+          fi
+
+          if [[ $TAG_NAME == stress-v* ]]; then
+            echo "build_stress=true" >> $GITHUB_OUTPUT
+          else
+            echo "build_stress=false" >> $GITHUB_OUTPUT
+          fi
+
+          if [[ $TAG_NAME == onedrive-backup-v* ]]; then
+            echo "build_onedrive_backup=true" >> $GITHUB_OUTPUT
+          else
+            echo "build_onedrive_backup=false" >> $GITHUB_OUTPUT
+          fi
+
+          if [[ $TAG_NAME == unraid-util-v* ]]; then
+            echo "build_unraid_util=true" >> $GITHUB_OUTPUT
+          else
+            echo "build_unraid_util=false" >> $GITHUB_OUTPUT
+          fi
+
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
       - name: Set up Docker Buildx
@@ -30,6 +79,7 @@ jobs:
           username: nickborgers
           password: ${{ secrets.DOCKER_HUB_PAT }}
       - name: Build and push mov-to-gif
+        if: steps.utils.outputs.build_mov_to_gif == 'true'
         uses: docker/build-push-action@v5
         with:
           context: ./mov-to-gif/
@@ -38,6 +88,7 @@ jobs:
           push: true
           tags: nickborgers/mov-to-gif:latest,nickborgers/mov-to-gif:${{ github.ref_name }}
       - name: Build and push update-pdf
+        if: steps.utils.outputs.build_update_pdf == 'true'
         uses: docker/build-push-action@v5
         with:
           context: ./update-pdf/
@@ -46,6 +97,7 @@ jobs:
           push: true
           tags: nickborgers/update-pdf:latest,nickborgers/update-pdf:${{ github.ref_name }}
       - name: Build and push stress
+        if: steps.utils.outputs.build_stress == 'true'
         uses: docker/build-push-action@v5
         with:
           context: ./stress/
@@ -54,6 +106,7 @@ jobs:
           push: true
           tags: nickborgers/stress:latest,nickborgers/stress:${{ github.ref_name }}
       - name: Build and push onedrive-backup
+        if: steps.utils.outputs.build_onedrive_backup == 'true'
         uses: docker/build-push-action@v5
         with:
           context: ./onedrive-backup/
@@ -62,6 +115,7 @@ jobs:
           push: true
           tags: nickborgers/onedrive-backup:latest,nickborgers/onedrive-backup:${{ github.ref_name }}
       - name: Build and push unraid-util
+        if: steps.utils.outputs.build_unraid_util == 'true'
         uses: docker/build-push-action@v5
         with:
           context: ./unraid-util/
@@ -70,6 +124,7 @@ jobs:
           push: true
           tags: nickborgers/unraid-util:latest,nickborgers/unraid-util:${{ github.ref_name }}
       - name: Build and push smart-crop-video
+        if: steps.utils.outputs.build_smart_crop == 'true'
         uses: docker/build-push-action@v5
         with:
           context: ./smart-crop-video/

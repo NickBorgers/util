@@ -275,6 +275,142 @@ ENTRYPOINT ["/entrypoint.sh"]
 - **Validation steps**: Smoke tests after releases
 - **Automated updates**: Package manager update workflows
 
+## Release and Tagging Strategy
+
+### The Monorepo Challenge
+This repository is a **monorepo** containing multiple independent utilities. Each utility has its own version lifecycle, release cadence, and potentially different maintainers. This creates a challenge for tagging and releases that traditional single-project repositories don't face.
+
+### Historical Context
+**All existing tags from v1.0 through v2.8.3 refer exclusively to network-mapper releases.** This includes:
+- Early tags without 'v' prefix: `1.0`, `1.1`, `1.1.1`, `1.2.1`-`1.2.6`
+- Modern tags with 'v' prefix: `v1.2.1`, `v1.3.0`, `v1.4.0`, `v1.5.0`, `v1.5.1`, `v2.0.0`-`v2.8.3`
+
+The tag `v1.0.0-smart-crop` was an attempt to version the smart-crop-video utility, but this approach has problems:
+- It still triggered network-mapper build workflows (matching the `v*` pattern)
+- The suffix approach is ambiguous and doesn't follow standard conventions
+- Version numbers would conflict across utilities (both utilities could want v1.0.0)
+
+### Official Tagging Convention
+
+**Going forward, ALL releases MUST use utility-prefixed tags:**
+
+```
+<utility-name>-v<version>
+```
+
+#### Examples:
+```
+network-mapper-v2.9.0
+smart-crop-video-v1.0.0
+backup-photos-to-gdrive-v1.0.0
+onedrive-backup-v1.0.0
+stress-v1.0.0
+```
+
+#### Rules:
+1. **Utility name prefix**: Use the exact directory name from the repository
+2. **Dash separator**: Always use `-` between utility name and version
+3. **Version format**: `v<major>.<minor>.<patch>` following semantic versioning
+4. **No exceptions**: Even if a utility is the "primary" utility, it must use the prefix
+
+### Creating a Release
+
+When you're ready to release a utility, follow these steps:
+
+#### 1. Update Version References
+Update version numbers in relevant files for the utility (e.g., `go.mod`, documentation, package files)
+
+#### 2. Create the Tag Locally
+```bash
+# Example for network-mapper v2.9.0
+git tag network-mapper-v2.9.0
+git push origin network-mapper-v2.9.0
+```
+
+#### 3. The Tag Triggers CI/CD
+The `.github/workflows/release.yml` workflow will:
+- Detect which utility is being released based on the tag prefix
+- Build binaries for that specific utility
+- Create a GitHub Release
+- Upload release artifacts
+- Trigger package manager updates (if applicable)
+
+#### 4. Verify the Release
+After the tag is pushed:
+- Check GitHub Actions to ensure workflows completed successfully
+- Verify the GitHub Release was created with correct artifacts
+- For network-mapper: confirm Homebrew and Chocolatey packages were updated
+- For Docker-based utilities: confirm images were published to Docker Hub
+
+### Workflow Implications
+
+#### Current Workflows That Need Updates
+As of this writing, the following workflows need to be updated to properly handle utility-prefixed tags:
+
+1. **`.github/workflows/release.yml`**:
+   - Currently triggers on `v*` tags (matches ALL version tags)
+   - Should parse the tag prefix to determine which utility to build
+   - Example: `network-mapper-v2.9.0` should only build network-mapper
+
+2. **`.github/workflows/publish.yml`**:
+   - Currently builds ALL utilities' Docker images for ANY release
+   - Should be split into utility-specific workflows, or add conditional logic based on tag prefix
+   - Example: `smart-crop-video-v1.0.0` should only build smart-crop-video Docker image
+
+3. **`.github/workflows/update-packages.yml`**:
+   - Already has detection logic to check for network-mapper assets
+   - Should additionally check the tag prefix for clarity
+   - Only network-mapper should trigger Homebrew/Chocolatey updates
+
+#### Recommended Workflow Structure
+For maximum clarity, consider creating utility-specific workflows:
+- `.github/workflows/release-network-mapper.yml` (triggers on `network-mapper-v*`)
+- `.github/workflows/release-smart-crop-video.yml` (triggers on `smart-crop-video-v*`)
+- `.github/workflows/release-backup-photos.yml` (triggers on `backup-photos-to-gdrive-v*`)
+
+Alternatively, use a single workflow with conditional steps based on tag prefix parsing.
+
+### Handling the Historical network-mapper Tags
+
+**Do NOT rename or delete existing tags.** They are part of the release history and users may depend on them. Instead:
+
+1. **Document the transition**: This section serves as that documentation
+2. **Continue from current version**: The next network-mapper release should be `network-mapper-v2.9.0` (or whatever follows v2.8.3)
+3. **Update documentation**: README files should reference the new tag format
+4. **Maintain compatibility**: Keep existing GitHub releases and their download URLs intact
+
+### For Contributors and AI Assistants
+
+When creating a release:
+1. **Always use the utility-prefixed format**: Never create tags like `v1.0.0` without a utility prefix
+2. **Check existing versions**: Look at existing tags for the specific utility to determine the next version number
+3. **Update relevant workflows**: Ensure CI/CD workflows will properly handle the new tag
+4. **Test before tagging**: Verify builds work locally before creating the tag
+5. **Verify after release**: Always check that workflows completed successfully
+6. **Don't batch releases**: Release one utility at a time to avoid confusion
+
+### Querying Tags by Utility
+
+To see all tags for a specific utility:
+```bash
+# List all network-mapper releases
+git tag -l 'network-mapper-v*'
+
+# List all smart-crop-video releases
+git tag -l 'smart-crop-video-v*'
+
+# List all tags (sorted by version)
+git tag --list --sort=-version:refname
+```
+
+### Version Number Independence
+
+Each utility maintains its own version numbers independently:
+- `network-mapper-v2.9.0` can coexist with `smart-crop-video-v1.0.0`
+- Version numbers have no relation between utilities
+- Breaking changes in one utility don't affect others
+- Each utility follows semantic versioning for its own scope
+
 ## Installation Philosophy
 
 ### For Early Generation Utilities (Profile-Based)

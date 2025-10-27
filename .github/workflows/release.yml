@@ -3,7 +3,8 @@ name: Release Network Mapper
 on:
   push:
     tags:
-      - 'v*'
+      - 'network-mapper-v*'
+      - 'v*'  # Legacy support for existing tags
 
 env:
   GO_VERSION: '1.21'
@@ -29,6 +30,14 @@ jobs:
         # Get the tag name
         TAG_NAME=${GITHUB_REF#refs/tags/}
         echo "TAG_NAME=$TAG_NAME" >> $GITHUB_ENV
+
+        # Extract version (strip utility prefix if present)
+        if [[ $TAG_NAME == network-mapper-v* ]]; then
+          VERSION=${TAG_NAME#network-mapper-}
+        else
+          VERSION=$TAG_NAME
+        fi
+        echo "VERSION=$VERSION" >> $GITHUB_ENV
 
         # Generate changelog from commits since last tag for network-mapper
         PREVIOUS_TAG=$(git describe --abbrev=0 --tags ${TAG_NAME}^ 2>/dev/null || echo "")
@@ -74,8 +83,8 @@ jobs:
         ## Docker
 
         \`\`\`bash
-        docker pull ghcr.io/nickborgers/network-mapper:${TAG_NAME}
-        docker run --rm --network host ghcr.io/nickborgers/network-mapper:${TAG_NAME}
+        docker pull ghcr.io/nickborgers/network-mapper:${VERSION}
+        docker run --rm --network host ghcr.io/nickborgers/network-mapper:${VERSION}
         \`\`\`
 
         ## Verification
@@ -92,10 +101,10 @@ jobs:
       uses: softprops/action-gh-release@v2
       with:
         tag_name: ${{ env.TAG_NAME }}
-        name: Network Mapper ${{ env.TAG_NAME }}
+        name: Network Mapper ${{ env.VERSION }}
         body_path: network-mapper/release_notes.md
         draft: false
-        prerelease: ${{ contains(env.TAG_NAME, '-') }}
+        prerelease: ${{ contains(env.VERSION, '-') }}
         files: |
           network-mapper/build/*
 
@@ -210,16 +219,31 @@ jobs:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
 
-    - name: Extract metadata
-      id: meta
-      uses: docker/metadata-action@v5
-      with:
-        images: ghcr.io/nickborgers/network-mapper
-        tags: |
-          type=ref,event=tag
-          type=semver,pattern={{version}}
-          type=semver,pattern={{major}}.{{minor}}
-          type=semver,pattern={{major}}
+    - name: Extract version and prepare Docker tags
+      id: docker_tags
+      run: |
+        TAG_NAME=${GITHUB_REF#refs/tags/}
+
+        # Extract version (strip utility prefix if present)
+        if [[ $TAG_NAME == network-mapper-v* ]]; then
+          VERSION=${TAG_NAME#network-mapper-}
+        else
+          VERSION=$TAG_NAME
+        fi
+
+        # Build Docker tags list
+        TAGS="ghcr.io/nickborgers/network-mapper:${VERSION}"
+        TAGS="${TAGS},ghcr.io/nickborgers/network-mapper:latest"
+
+        # Add semver tags if this is a proper version (not a prerelease)
+        if [[ $VERSION =~ ^v([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
+          MAJOR="${BASH_REMATCH[1]}"
+          MINOR="${BASH_REMATCH[2]}"
+          TAGS="${TAGS},ghcr.io/nickborgers/network-mapper:${MAJOR}"
+          TAGS="${TAGS},ghcr.io/nickborgers/network-mapper:${MAJOR}.${MINOR}"
+        fi
+
+        echo "tags=${TAGS}" >> $GITHUB_OUTPUT
 
     - name: Build and push Docker image
       uses: docker/build-push-action@v5
@@ -227,7 +251,6 @@ jobs:
         context: network-mapper
         platforms: linux/amd64,linux/arm64
         push: true
-        tags: ${{ steps.meta.outputs.tags }}
-        labels: ${{ steps.meta.outputs.labels }}
+        tags: ${{ steps.docker_tags.outputs.tags }}
         cache-from: type=gha
         cache-to: type=gha,mode=max

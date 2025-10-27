@@ -20,20 +20,32 @@ jobs:
     outputs:
       is_network_mapper: ${{ steps.check.outputs.is_network_mapper }}
     steps:
-    - name: Check for network-mapper assets
+    - name: Check for network-mapper release
       id: check
       run: |
         if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
           VERSION="${{ github.event.inputs.version }}"
+          TAG_NAME="v${VERSION}"
         else
-          VERSION=${GITHUB_REF#refs/tags/v}
+          TAG_NAME=${GITHUB_REF#refs/tags/}
+          if [[ $TAG_NAME == network-mapper-v* ]]; then
+            VERSION=${TAG_NAME#network-mapper-}
+          elif [[ $TAG_NAME == v* ]]; then
+            VERSION=${TAG_NAME}
+          else
+            echo "Tag '$TAG_NAME' does not match network-mapper format - skipping package updates"
+            echo "is_network_mapper=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
         fi
 
+        echo "Checking for network-mapper release with tag: $TAG_NAME"
+
         # Check if network-mapper binary assets exist in the release
-        RELEASE_INFO=$(gh api repos/${{ github.repository }}/releases/tags/v${VERSION} 2>/dev/null || echo "")
+        RELEASE_INFO=$(gh api repos/${{ github.repository }}/releases/tags/${TAG_NAME} 2>/dev/null || echo "")
 
         if [ -z "$RELEASE_INFO" ]; then
-          echo "Release v${VERSION} not found"
+          echo "Release ${TAG_NAME} not found"
           echo "is_network_mapper=false" >> $GITHUB_OUTPUT
           exit 0
         fi
@@ -42,10 +54,10 @@ jobs:
         ASSET_COUNT=$(echo "$RELEASE_INFO" | jq -r '[.assets[] | select(.name | contains("network-mapper"))] | length')
 
         if [ "$ASSET_COUNT" -gt 0 ]; then
-          echo "Found $ASSET_COUNT network-mapper assets in release v${VERSION}"
+          echo "Found $ASSET_COUNT network-mapper assets in release ${TAG_NAME}"
           echo "is_network_mapper=true" >> $GITHUB_OUTPUT
         else
-          echo "No network-mapper assets found in release v${VERSION} - skipping package updates"
+          echo "No network-mapper assets found in release ${TAG_NAME} - skipping package updates"
           echo "is_network_mapper=false" >> $GITHUB_OUTPUT
         fi
       env:
@@ -70,15 +82,25 @@ jobs:
         if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
           VERSION="${{ github.event.inputs.version }}"
         else
-          VERSION=${GITHUB_REF#refs/tags/v}
+          TAG_NAME=${GITHUB_REF#refs/tags/}
+          if [[ $TAG_NAME == network-mapper-v* ]]; then
+            VERSION=${TAG_NAME#network-mapper-v}
+          elif [[ $TAG_NAME == v* ]]; then
+            VERSION=${TAG_NAME#v}
+          fi
         fi
         echo "VERSION=$VERSION" >> $GITHUB_ENV
         echo "version=$VERSION" >> $GITHUB_OUTPUT
 
     - name: Download and extract checksums
       run: |
+        TAG_NAME=${GITHUB_REF#refs/tags/}
+        if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+          TAG_NAME="v${{ github.event.inputs.version }}"
+        fi
+
         mkdir -p /tmp/checksums
-        gh release download v${{ env.VERSION }} --pattern "*.tar.gz.sha256" --dir /tmp/checksums
+        gh release download ${TAG_NAME} --pattern "*.tar.gz.sha256" --dir /tmp/checksums
 
         # Extract checksums
         DARWIN_ARM64_SHA=$(cat /tmp/checksums/network-mapper-darwin-arm64.tar.gz.sha256 | cut -d' ' -f1)
@@ -199,7 +221,12 @@ jobs:
         if ("${{ github.event_name }}" -eq "workflow_dispatch") {
           $Version = "${{ github.event.inputs.version }}"
         } else {
-          $Version = "${{ github.ref }}" -replace "refs/tags/v", ""
+          $TagName = "${{ github.ref }}" -replace "refs/tags/", ""
+          if ($TagName -match "^network-mapper-v(.+)$") {
+            $Version = $Matches[1]
+          } elseif ($TagName -match "^v(.+)$") {
+            $Version = $Matches[1]
+          }
         }
         echo "VERSION=$Version" >> $env:GITHUB_ENV
         echo "version=$Version" >> $env:GITHUB_OUTPUT
@@ -207,7 +234,12 @@ jobs:
     - name: Download Windows checksum
       shell: pwsh
       run: |
-        gh release download v${{ env.VERSION }} --pattern "*windows-amd64.exe.zip.sha256" --dir "C:\temp\checksums"
+        $TagName = "${{ github.ref }}" -replace "refs/tags/", ""
+        if ("${{ github.event_name }}" -eq "workflow_dispatch") {
+          $TagName = "v${{ github.event.inputs.version }}"
+        }
+
+        gh release download $TagName --pattern "*windows-amd64.exe.zip.sha256" --dir "C:\temp\checksums"
         $WindowsSha = (Get-Content "C:\temp\checksums\*windows-amd64.exe.zip.sha256").Split(' ')[0]
         echo "WINDOWS_SHA=$WindowsSha" >> $env:GITHUB_ENV
       env:
@@ -268,19 +300,26 @@ jobs:
       with:
         fetch-depth: 0
 
-    - name: Set version
+    - name: Set version and tag
       run: |
         if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
           VERSION="${{ github.event.inputs.version }}"
+          TAG_NAME="v${VERSION}"
         else
-          VERSION=${GITHUB_REF#refs/tags/v}
+          TAG_NAME=${GITHUB_REF#refs/tags/}
+          if [[ $TAG_NAME == network-mapper-v* ]]; then
+            VERSION=${TAG_NAME#network-mapper-v}
+          elif [[ $TAG_NAME == v* ]]; then
+            VERSION=${TAG_NAME#v}
+          fi
         fi
         echo "VERSION=$VERSION" >> $GITHUB_ENV
+        echo "TAG_NAME=$TAG_NAME" >> $GITHUB_ENV
 
     - name: Download and extract all checksums
       run: |
         mkdir -p /tmp/checksums
-        gh release download v${{ env.VERSION }} --pattern "*.sha256" --dir /tmp/checksums
+        gh release download ${{ env.TAG_NAME }} --pattern "*.sha256" --dir /tmp/checksums
 
         # Extract all checksums
         DARWIN_ARM64_SHA=$(cat /tmp/checksums/network-mapper-darwin-arm64.tar.gz.sha256 | cut -d' ' -f1)
