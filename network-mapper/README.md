@@ -586,3 +586,4 @@ Some operations may require elevated privileges:
 ### Gateway Not Detected
 - The tool will fall back to guessing the gateway (.1 address)
 - Ensure routing commands are available on your system
+
