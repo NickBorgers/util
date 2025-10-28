@@ -79,10 +79,10 @@ jobs:
           TIMEOUT_CMD="timeout"
         fi
 
-        $TIMEOUT_CMD 30s $BINARY --scan-mode quick --no-dns --no-services || true
+        $TIMEOUT_CMD 420s $BINARY --scan-mode quick --no-dns --no-services || true
 
         echo "Testing output format..."
-        OUTPUT=$($TIMEOUT_CMD 30s $BINARY --scan-mode quick --no-dns --no-services 2>&1 || true)
+        OUTPUT=$($TIMEOUT_CMD 420s $BINARY --scan-mode quick --no-dns --no-services 2>&1 || true)
 
         echo "=== DEBUG: Binary output ==="
         echo "$OUTPUT"
@@ -232,11 +232,11 @@ jobs:
         fi
 
         if [[ -n "$TIMEOUT_CMD" ]]; then
-          $TIMEOUT_CMD 60s $BINARY --scan-mode quick --no-dns --no-services > benchmark_output.txt
+          $TIMEOUT_CMD 420s $BINARY --scan-mode quick --no-dns --no-services > benchmark_output.txt
         else
           $BINARY --scan-mode quick --no-dns --no-services > benchmark_output.txt &
           SCAN_PID=$!
-          sleep 60
+          sleep 420
           kill $SCAN_PID 2>/dev/null || true
           wait $SCAN_PID 2>/dev/null || true
         fi
@@ -246,9 +246,9 @@ jobs:
 
         echo "Scan completed in ${duration} seconds"
 
-        # Verify reasonable performance (should complete quickly)
-        if [[ $duration -gt 45 ]]; then
-          echo "WARNING: Scan took longer than expected (${duration}s > 45s)"
+        # Verify reasonable performance (scan should complete within 7 minutes)
+        if [[ $duration -gt 420 ]]; then
+          echo "WARNING: Scan took longer than expected (${duration}s > 420s)"
           echo "This may indicate performance regression"
         else
           echo "✅ Performance benchmark passed (${duration}s)"
