@@ -315,32 +315,118 @@ stress-v1.0.0
 
 ### Creating a Release
 
+**IMPORTANT**: Always use `gh` (GitHub CLI) to create releases. Do not rely on manual tagging alone.
+
 When you're ready to release a utility, follow these steps:
 
 #### 1. Update Version References
 Update version numbers in relevant files for the utility (e.g., `go.mod`, documentation, package files)
 
-#### 2. Create the Tag Locally
+#### 2. Commit Changes
 ```bash
-# Example for network-mapper v2.9.0
-git tag network-mapper-v2.9.0
-git push origin network-mapper-v2.9.0
+# Stage and commit all changes
+git add <modified-files>
+git commit -m "Release message with feature summary
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+
+Co-Authored-By: Claude <noreply@anthropic.com>"
 ```
 
-#### 3. The Tag Triggers CI/CD
-The `.github/workflows/release.yml` workflow will:
-- Detect which utility is being released based on the tag prefix
-- Build binaries for that specific utility
-- Create a GitHub Release
-- Upload release artifacts
-- Trigger package manager updates (if applicable)
+#### 3. Create Tag Locally
+```bash
+# Example for smart-crop-video v1.2.0
+git tag smart-crop-video-v1.2.0
+```
 
-#### 4. Verify the Release
-After the tag is pushed:
-- Check GitHub Actions to ensure workflows completed successfully
-- Verify the GitHub Release was created with correct artifacts
+#### 4. Push Commit and Tag
+```bash
+git push origin main
+git push origin smart-crop-video-v1.2.0
+```
+
+#### 5. Create GitHub Release with `gh`
+**CRITICAL**: Use `gh release create` to create the GitHub release with proper release notes:
+
+```bash
+gh release create smart-crop-video-v1.2.0 \
+  --title "smart-crop-video v1.2.0 - Feature Title" \
+  --notes "$(cat <<'EOF'
+## 🎉 Major Features
+
+- Feature 1 description
+- Feature 2 description
+
+## 🔧 Configuration Options
+
+```bash
+# Example configuration
+OPTION=value utility command
+```
+
+## 🐛 Bug Fixes
+
+- Fix 1
+- Fix 2
+
+## 📝 Technical Details
+
+Technical information for developers...
+
+---
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+EOF
+)"
+```
+
+This creates a properly formatted GitHub Release with:
+- Clean markdown formatting
+- Organized sections (Features, Config, Bug Fixes, etc.)
+- Release notes that are searchable and linkable
+- Automatic association with the tag
+
+#### 6. Verify the Release
+After creating the release:
+- Visit the GitHub Releases page to confirm it was created
+- Check GitHub Actions to ensure any CI/CD workflows triggered correctly
 - For network-mapper: confirm Homebrew and Chocolatey packages were updated
 - For Docker-based utilities: confirm images were published to Docker Hub
+
+#### Why Use `gh release create`?
+
+- **Consistency**: All releases have properly formatted notes
+- **Discoverability**: Release notes are searchable on GitHub
+- **Automation**: Can be scripted and integrated into workflows
+- **Rich Content**: Supports markdown, emojis, code blocks
+- **Immediate**: Creates release instantly, not dependent on CI/CD
+
+#### Example: Complete Release Process
+
+```bash
+# 1. Commit changes
+git add smart-crop-video.py README.md
+git commit -m "Add intelligent acceleration feature
+
+Major improvements to scene selection...
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+
+Co-Authored-By: Claude <noreply@anthropic.com>"
+
+# 2. Create and push tag
+git tag smart-crop-video-v1.2.0
+git push origin main
+git push origin smart-crop-video-v1.2.0
+
+# 3. Create GitHub release
+gh release create smart-crop-video-v1.2.0 \
+  --title "smart-crop-video v1.2.0 - Interactive Scene Selection" \
+  --notes "Release notes here..."
+
+# 4. Verify
+gh release view smart-crop-video-v1.2.0
+```
 
 ### Workflow Implications
 
