@@ -9,6 +9,7 @@ Social media platforms often require specific aspect ratios (square 1:1 for Inst
 ## Features
 
 - **Interactive crop selection**: Analyzes top 10 crop candidates and lets you choose the best one
+- **Intelligent acceleration**: Optionally speeds up boring sections of video (2x-4x) based on your selected strategy
 - **Web UI interface**: Ephemeral webserver provides visual preview and selection interface
 - **Text interface fallback**: All decisions can be made via command line without the web UI
 - **Preview JPEG files**: Generates preview images for each candidate crop position
@@ -113,6 +114,83 @@ The tool starts an ephemeral webserver that provides:
 - **Better results**: Human judgment can catch cases where the algorithm's top choice isn't ideal
 - **Faster iteration**: No need to run the full encoding multiple times to get the crop right
 - **Visual feedback**: Preview JPEG files let you evaluate options before the final encode
+
+## Intelligent Acceleration (NEW!)
+
+After selecting your preferred crop, the tool can **automatically accelerate boring sections** of your video to create more engaging content.
+
+### How It Works
+
+1. **Strategy-Based Analysis**: Uses the same metric from your selected crop strategy (motion, edges, complexity)
+2. **Scene Detection**: Automatically detects scene changes throughout the video
+3. **Intelligent Scoring**: Analyzes each scene using the relevant metric (e.g., motion for "Motion Priority")
+4. **Variable Speed**: Boring sections (bottom 30%) are sped up 2x-4x, interesting sections play at normal speed
+5. **Smooth Audio**: Adjusts audio tempo to match video speed changes
+
+### Example Use Cases
+
+- **Screen recordings**: Speed through idle moments, keep action at normal speed
+- **Timelapses**: Accelerate static periods while maintaining interesting changes
+- **Tutorial videos**: Fast-forward through repetitive setup, normal speed for important steps
+- **Long recordings**: Compress boring sections automatically without losing important content
+
+### How to Use
+
+After selecting your crop, you'll be prompted:
+```
+Would you like to intelligently accelerate boring parts of the video?
+This analyzes the video and speeds up sections with low activity
+based on your selected strategy ('Motion Priority').
+
+Accelerate boring sections? [y/N]:
+```
+
+Simply type `y` and press Enter to enable, or press Enter to skip.
+
+### What Happens
+
+1. **Scene Detection**: Detects all scene changes in your video (or uses time-based segments as fallback)
+2. **Automatic Fallback**: If fewer than 3 scenes detected, splits video into 5-second segments
+3. **Metric Analysis**: Samples 10 frames per scene/segment to calculate the relevant metric
+4. **Boring Section Identification**: Finds scenes below the 30th percentile
+5. **Time Savings Report**: Shows which sections will be accelerated and by how much
+6. **Segment Encoding**: Encodes each scene with appropriate speed (1x, 2x, 3x, or 4x)
+7. **Final Concatenation**: Combines all segments into the final video
+
+### Configuration
+
+Fine-tune the boring section detection:
+```bash
+# Adjust what qualifies as "boring" (default: 30th percentile)
+BORING_THRESHOLD=40.0 smart_crop_video video.mp4
+
+# Lower = more aggressive (more sections sped up)
+BORING_THRESHOLD=20.0 smart_crop_video video.mp4
+
+# Higher = more conservative (fewer sections sped up)
+BORING_THRESHOLD=40.0 smart_crop_video video.mp4
+
+# Adjust scene detection sensitivity (default: 0.2)
+# Lower = more scene changes detected, higher = fewer scenes
+SCENE_THRESHOLD=0.15 smart_crop_video video.mp4
+
+# Adjust time-based segment duration when scene detection finds too few scenes (default: 5.0s)
+# Shorter = more granular analysis, longer = broader analysis
+SEGMENT_DURATION=3.0 smart_crop_video video.mp4
+
+# Combine settings for fine control
+BORING_THRESHOLD=25.0 SEGMENT_DURATION=4.0 smart_crop_video video.mp4
+```
+
+**Scene Detection vs Time-Based Segmentation:**
+- The tool first tries to detect natural scene changes (cuts, fades, etc.)
+- If fewer than 3 scenes are detected, it automatically falls back to time-based segments
+- This ensures the feature works even on videos without scene changes (e.g., continuous screen recordings)
+- You can force smaller/larger segments with `SEGMENT_DURATION`
+
+### Performance Note
+
+Enabling acceleration adds processing time for scene analysis but creates shorter, more engaging final videos. The analysis typically takes 1-3 minutes depending on video length and number of scenes.
 
 ## Aggressive Cropping
 
@@ -225,16 +303,20 @@ The Docker image is built natively for ARM64 (Apple Silicon), providing optimal 
 
 ## How It Works
 
+### Crop Position Analysis
+
 1. **Analyze dimensions**: Determines video size and calculates crop dimensions for target aspect ratio
 2. **Apply crop scale**: Reduces crop size by scale factor (default 0.75x) to allow scanning for subjects/content
 3. **Sample 5×5 grid**: Tests 25 positions across the entire frame for fine-grained positioning
-4. **Measure three key metrics**: For each position:
-   - **Edge detection (40%)**: Uses ffmpeg's edgedetect filter to identify areas with defined subjects, people, and features
-   - **Visual complexity (50%)**: Measures pixel variance (stdev) - areas with more detail and variation
-   - **Temporal motion (10%)**: Measures frame-to-frame differences - actual movement between frames
-5. **Combine scores**: Weighted combination: 10% motion + 50% complexity + 40% edges
-6. **Interactive selection**: Presents top 5 candidates as preview JPEGs for user review
-7. **Apply crop**: Crops video at the selected position using high-quality encoding settings
+4. **Measure key metrics**: For each position:
+   - **Edge detection**: Uses ffmpeg's edgedetect filter to identify areas with defined subjects, people, and features
+   - **Visual complexity**: Measures pixel variance (stdev) - areas with more detail and variation
+   - **Temporal motion**: Measures frame-to-frame differences - actual movement between frames
+   - **Color saturation**: Identifies colorful, vibrant areas
+5. **Generate strategies**: Creates 10 crop candidates using different scoring strategies (Motion Priority, Visual Detail, Subject Detection, etc.)
+6. **Interactive selection**: Presents top 10 candidates as preview JPEGs for user review
+7. **Optional acceleration**: Analyzes entire video to identify and speed up boring sections based on selected strategy
+8. **Apply crop**: Crops video (with or without variable speed) using high-quality encoding settings
 
 **Why this approach works for diverse content:**
 - **Edge detection (40%)** identifies people, objects, and defined subjects - not just smooth backgrounds
