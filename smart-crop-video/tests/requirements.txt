@@ -1,0 +1,18 @@
+# Test dependencies for smart-crop-video
+
+# Testing framework
+pytest>=7.4.0
+pytest-timeout>=2.1.0
+pytest-xdist>=3.3.0  # For parallel test execution
+
+# Docker integration
+docker>=6.1.0
+
+# HTTP requests for API testing
+requests>=2.31.0
+
+# Web UI testing with Playwright
+playwright>=1.40.0
+
+# For JSON handling in subprocess calls (usually built-in, but explicit for clarity)
+# json is built-in, no need to install

@@ -1,0 +1,33 @@
+# Docker Compose configuration for running smart-crop-video tests
+#
+# Usage:
+#   docker-compose -f docker-compose.test.yml run --rm tests
+#   docker-compose -f docker-compose.test.yml run --rm tests pytest tests/test_container.py -v
+#
+# This allows running the full test suite without installing Python or Playwright locally.
+
+version: '3.8'
+
+services:
+  tests:
+    build:
+      context: .
+      dockerfile: tests/Dockerfile
+    volumes:
+      # Mount the entire smart-crop-video directory
+      - .:/workspace
+      # Mount Docker socket to allow tests to create containers
+      - /var/run/docker.sock:/var/run/docker.sock
+      # Mount test cache for faster reruns
+      - pytest-cache:/workspace/.pytest_cache
+    working_dir: /workspace
+    environment:
+      # Ensure tests can communicate with Docker daemon
+      - DOCKER_HOST=unix:///var/run/docker.sock
+    # Run as root to access Docker socket (tests create containers)
+    user: root
+    # Default: run all tests
+    command: pytest tests/ -v --tb=short
+
+volumes:
+  pytest-cache:

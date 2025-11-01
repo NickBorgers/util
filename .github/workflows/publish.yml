@@ -14,7 +14,44 @@ on:
     types: [published]
 
 jobs:
+  test_smart_crop_video:
+    name: Test smart-crop-video before publishing
+    runs-on: ubuntu-latest
+    if: startsWith(github.event.release.tag_name, 'smart-crop-video-v')
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          cd smart-crop-video
+          pip install -r tests/requirements.txt
+          playwright install chromium
+
+      - name: Run container tests
+        run: |
+          cd smart-crop-video
+          pytest tests/test_container.py -v --tb=short
+        timeout-minutes: 15
+
+      - name: Run basic API tests
+        run: |
+          cd smart-crop-video
+          # Run only the fast API tests, skip the long-running ones
+          pytest tests/test_api.py -v --tb=short -k "not candidates and not preview and not select and not acceleration and not scene"
+        timeout-minutes: 10
+
   push_to_registry:
+    needs: test_smart_crop_video
+    if: |
+      always() &&
+      (needs.test_smart_crop_video.result == 'success' ||
+       needs.test_smart_crop_video.result == 'skipped')
     name: Push Docker image to Docker Hub
     runs-on: ubuntu-latest
     steps:

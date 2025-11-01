@@ -1,0 +1,43 @@
+# Test artifacts
+tests/.pytest_cache/
+tests/__pycache__/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Generated preview images
+*_crop_option_*.jpg
+.*_scene_*_first.jpg
+.*_scene_*_last.jpg
+.*_temp_frame.jpg
+
+# Generated videos
+*.smart_cropped.*
+
+# Temporary directories
+tmp/
+temp/
+
+# Python virtual environments
+venv/
+env/
+.venv/
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Keep example_movie.mov for tests
+!example_movie.mov
+
+# Docker volumes
+.pytest_cache/
+*.log

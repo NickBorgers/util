@@ -376,6 +376,19 @@ CROP_SCALE=0.6 smart_crop_video video3.mp4
 # Creates: video1.smart_cropped.mp4, video2.smart_cropped.mp4, video3.smart_cropped.mp4
 ```
 
+## Testing
+
+A comprehensive integration test suite is available to validate functionality:
+
+```bash
+# Run containerized tests (no Python/Playwright installation needed)
+./run-tests.sh container    # Fast validation (15 tests, ~40s)
+./run-tests.sh quick        # Quick smoke test
+./run-tests.sh all          # Full test suite
+```
+
+See [CONTAINERIZED_TESTING.md](CONTAINERIZED_TESTING.md) for complete testing documentation.
+
 ## Requirements
 
 - Docker installed and running
