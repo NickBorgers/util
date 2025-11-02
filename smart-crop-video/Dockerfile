@@ -19,4 +19,6 @@ ENV PYTHONPATH=/app
 # This ensures preview images are created in the mounted directory
 WORKDIR /content
 
-ENTRYPOINT ["python3", "/app/smart-crop-video.py"]
+# Use CMD instead of ENTRYPOINT to allow tests to override the command
+# while still providing a default for normal docker run usage
+CMD ["python3", "/app/smart-crop-video.py"]

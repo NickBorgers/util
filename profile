@@ -68,7 +68,7 @@ function smart_crop_video() {
 		-e CROP_SCALE="${CROP_SCALE:-0.75}" \
 		-e SCENE_THRESHOLD="${SCENE_THRESHOLD:-0.2}" \
 		-e SEGMENT_DURATION="${SEGMENT_DURATION:-5.0}" \
-		nickborgers/smart-crop-video "$input" "$output" "$aspect"
+		nickborgers/smart-crop-video python3 /app/smart-crop-video.py "$input" "$output" "$aspect"
 }
 
 function update_pdf() {
