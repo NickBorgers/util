@@ -8,6 +8,15 @@ RUN apk add --no-cache \
 # Install Flask for ephemeral webserver
 RUN pip3 install --no-cache-dir flask --break-system-packages
 
-COPY smart-crop-video.py /usr/local/bin/smart-crop-video
+# Copy the entire package (includes smart_crop modules)
+COPY smart-crop-video.py /app/
+COPY smart_crop/ /app/smart_crop/
 
-RUN chmod +x /usr/local/bin/smart-crop-video
+# Set Python path to find smart_crop modules
+ENV PYTHONPATH=/app
+
+# Set working directory to /content (where volume is mounted)
+# This ensures preview images are created in the mounted directory
+WORKDIR /content
+
+ENTRYPOINT ["python3", "/app/smart-crop-video.py"]

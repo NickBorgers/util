@@ -21,6 +21,25 @@ from dataclasses import dataclass
 from flask import Flask, jsonify, send_file, request
 import logging
 
+# Import refactored modules (Phase 6.1: Parallelization)
+from smart_crop.core.grid import Position, generate_analysis_grid
+from smart_crop.analysis.parallel import analyze_positions_parallel
+
+# Import refactored modules (Phase 6.2: Scene Detection)
+from smart_crop.analysis.scenes import (
+    parse_scene_timestamps,
+    create_scenes_from_timestamps,
+    create_time_based_segments as create_time_segments
+)
+
+# Import refactored modules (Phase 6.3: Scoring)
+from smart_crop.core.scoring import (
+    normalize,
+    score_position,
+    PositionMetrics,
+    NormalizationBounds
+)
+
 # Disable Flask development server warning
 log = logging.getLogger('werkzeug')
 log.setLevel(logging.ERROR)
@@ -668,32 +687,13 @@ def detect_scenes(input_file: str, threshold: float = 0.3) -> List[Scene]:
 
     result = subprocess.run(cmd, capture_output=True, text=True, check=False)
 
-    # Parse scene changes from showinfo output
-    scene_changes = []
-    pts_pattern = r'pts_time:([0-9.]+)'
-    n_pattern = r'n:\s*(\d+)'
+    # Parse scene changes from showinfo output (Phase 6.2: Use refactored module)
+    scene_changes = parse_scene_timestamps(result.stderr)
 
-    for line in result.stderr.split('\n'):
-        if 'pts_time' in line:
-            pts_match = re.search(pts_pattern, line)
-            n_match = re.search(n_pattern, line)
-            if pts_match and n_match:
-                scene_changes.append((float(pts_match.group(1)), int(n_match.group(1))))
-
-    # Add start and end
+    # Create Scene objects (Phase 6.2: Use refactored module)
     duration = get_video_duration(input_file)
-    scene_changes = [(0.0, 0)] + scene_changes + [(duration, int(get_video_frame_count(input_file)))]
-
-    # Create Scene objects
-    scenes = []
-    for i in range(len(scene_changes) - 1):
-        scenes.append(Scene(
-            start_time=scene_changes[i][0],
-            end_time=scene_changes[i + 1][0],
-            start_frame=scene_changes[i][1],
-            end_frame=scene_changes[i + 1][1],
-            metric_value=0.0  # Will be calculated later
-        ))
+    total_frames = int(get_video_frame_count(input_file))
+    scenes = create_scenes_from_timestamps(scene_changes, duration, total_frames)
 
     return scenes
 
@@ -708,29 +708,11 @@ def create_time_based_segments(input_file: str, segment_duration: float = 5.0) -
     Returns:
         List of Scene objects representing time-based segments
     """
+    # Phase 6.2: Use refactored module function
     duration = get_video_duration(input_file)
     fps = get_video_fps(input_file)
 
-    scenes = []
-    current_time = 0.0
-    current_frame = 0
-
-    while current_time < duration:
-        end_time = min(current_time + segment_duration, duration)
-        end_frame = int(end_time * fps)
-
-        scenes.append(Scene(
-            start_time=current_time,
-            end_time=end_time,
-            start_frame=current_frame,
-            end_frame=end_frame,
-            metric_value=0.0  # Will be calculated later
-        ))
-
-        current_time = end_time
-        current_frame = end_frame
-
-    return scenes
+    return create_time_segments(duration, fps, segment_duration)
 
 
 def extract_scene_thumbnails(input_file: str, scenes: List[Scene], x: int, y: int,
@@ -1120,36 +1102,37 @@ def analyze_position(input_file: str, x: int, y: int, crop_w: int, crop_h: int,
     return CropPosition(x, y, motion, complexity, edges, color_variance)
 
 
-def normalize(value: float, min_val: float, max_val: float) -> float:
-    """Normalize value to 0-100 range"""
-    if max_val - min_val > 0:
-        return ((value - min_val) / (max_val - min_val)) * 100
-    return 50.0
+# Phase 6.3: normalize() imported from smart_crop.core.scoring
 
 
 def score_with_strategy(pos: CropPosition, mins: Dict[str, float], maxs: Dict[str, float],
                        strategy: str) -> float:
-    """Score a position using a specific strategy"""
+    """Score a position using a specific strategy (Phase 6.3: Use refactored module)"""
 
-    # Normalize metrics
-    motion_norm = normalize(pos.motion, mins['motion'], maxs['motion'])
-    complexity_norm = normalize(pos.complexity, mins['complexity'], maxs['complexity'])
-    edge_norm = normalize(pos.edges, mins['edges'], maxs['edges'])
-    sat_norm = normalize(pos.saturation, mins['saturation'], maxs['saturation'])
+    # Convert CropPosition to PositionMetrics for refactored module
+    metrics = PositionMetrics(
+        x=pos.x,
+        y=pos.y,
+        motion=pos.motion,
+        complexity=pos.complexity,
+        edges=pos.edges,
+        saturation=pos.saturation
+    )
 
-    # Apply strategy weights
-    strategies = {
-        'Subject Detection': (0.05, 0.25, 0.40, 0.30),
-        'Motion Priority': (0.50, 0.15, 0.25, 0.10),
-        'Visual Detail': (0.05, 0.50, 0.30, 0.15),
-        'Balanced': (0.25, 0.25, 0.25, 0.25),
-        'Color Focus': (0.05, 0.20, 0.30, 0.45),
-    }
+    # Convert mins/maxs dicts to NormalizationBounds
+    bounds = NormalizationBounds(
+        motion_min=mins['motion'],
+        motion_max=maxs['motion'],
+        complexity_min=mins['complexity'],
+        complexity_max=maxs['complexity'],
+        edges_min=mins['edges'],
+        edges_max=maxs['edges'],
+        saturation_min=mins['saturation'],
+        saturation_max=maxs['saturation']
+    )
 
-    w_motion, w_complexity, w_edges, w_sat = strategies[strategy]
-
-    return (motion_norm * w_motion + complexity_norm * w_complexity +
-            edge_norm * w_edges + sat_norm * w_sat)
+    # Use refactored scoring function
+    return score_position(metrics, bounds, strategy)
 
 
 def main():
@@ -1255,35 +1238,57 @@ def main():
         print("="*70)
         print()
 
-        # Generate 5x5 grid positions (start from 1, not 0)
-        x_positions = [max(1, max_x * i // 4) for i in range(5)]
-        y_positions = [max(1, max_y * i // 4) for i in range(5)]
+        # Generate 5x5 grid positions (Phase 6.4: Use refactored module)
+        grid_positions = generate_analysis_grid(max_x, max_y, grid_size=5)
 
-        # Analyze all positions
+        # Analyze all positions (Phase 6.1: Using parallel analysis)
         print("Pass 1: Analyzing all positions...")
         print("Metrics: motion, complexity, strong-edges (high-threshold), color-saturation")
-        print(f"This will analyze 25 positions × 3 passes (motion/complexity + strong-edges + saturation)")
+        print(f"This will analyze {len(grid_positions)} positions × 3 passes (motion/complexity + strong-edges + saturation)")
         print()
 
+        total = len(grid_positions)
+
+        # Progress callback for parallel analysis
+        def progress_callback(current, total_positions):
+            percent = (current * 100) // total_positions
+            if current <= len(grid_positions):
+                pos = grid_positions[current - 1]
+                progress_msg = f"Analyzing position {current}/{total_positions} (x={pos.x}, y={pos.y})"
+            else:
+                progress_msg = f"Analyzing position {current}/{total_positions}"
+
+            print(f"\r[{percent:3d}%] {progress_msg}...  ", end='', flush=True)
+
+            state.update(
+                current_position=current,
+                progress=percent,
+                message=progress_msg
+            )
+
+        # Parallel analysis (4-8x faster than sequential)
+        position_metrics = analyze_positions_parallel(
+            input_file,
+            grid_positions,
+            crop_w=crop_w,
+            crop_h=crop_h,
+            sample_frames=analysis_frames,
+            max_workers=None,  # Auto-detect CPU cores
+            progress_callback=progress_callback
+        )
+
+        # Convert PositionMetrics back to CropPosition for compatibility
         positions = []
-        total = len(x_positions) * len(y_positions)
-        current = 0
-
-        for y in y_positions:
-            for x in x_positions:
-                current += 1
-                percent = (current * 100) // total
-                progress_msg = f"Analyzing position {current}/{total} (x={x}, y={y})"
-                print(f"\r[{percent:3d}%] {progress_msg}...  ", end='', flush=True)
-
-                state.update(
-                    current_position=current,
-                    progress=percent,
-                    message=progress_msg
-                )
-
-                pos = analyze_position(input_file, x, y, crop_w, crop_h, analysis_frames)
-                positions.append(pos)
+        for metric in position_metrics:
+            pos = CropPosition(
+                x=metric.x,
+                y=metric.y,
+                motion=metric.motion,
+                complexity=metric.complexity,
+                edges=metric.edges,
+                saturation=metric.saturation
+            )
+            positions.append(pos)
 
         print(f"\r{' '*80}\r✓ Completed analyzing all {total} positions")
         print()
