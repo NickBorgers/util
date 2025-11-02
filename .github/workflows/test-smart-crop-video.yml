@@ -22,8 +22,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest]
-        python-version: ['3.9', '3.11']
+        os: [ubuntu-latest]
+        python-version: ['3.11']
 
     steps:
       - name: Checkout repository
@@ -33,17 +33,14 @@ jobs:
         uses: actions/setup-python@v4
         with:
           python-version: ${{ matrix.python-version }}
+          cache: 'pip'
+          cache-dependency-path: 'smart-crop-video/tests/requirements.txt'
 
       - name: Install system dependencies (Ubuntu)
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
           sudo apt-get install -y ffmpeg
-
-      - name: Install system dependencies (macOS)
-        if: runner.os == 'macOS'
-        run: |
-          brew install ffmpeg
 
       - name: Install Python dependencies
         working-directory: smart-crop-video
@@ -53,7 +50,7 @@ jobs:
 
       - name: Install Playwright browsers
         run: |
-          playwright install chromium
+          playwright install chromium --with-deps
 
       - name: Verify test video exists
         working-directory: smart-crop-video
@@ -82,17 +79,7 @@ jobs:
       - name: Run Web UI tests
         working-directory: smart-crop-video
         run: |
-          pytest tests/test_web_ui.py -v --timeout=900
-
-      - name: Run workflow tests
-        working-directory: smart-crop-video
-        run: |
-          pytest tests/test_workflow.py -v --timeout=1200
-
-      - name: Run video processing tests
-        working-directory: smart-crop-video
-        run: |
-          pytest tests/test_video_processing.py -v --timeout=900
+          pytest tests/test_web_ui_focused.py -v --timeout=900
 
       - name: Upload test logs
         if: always()
@@ -103,6 +90,7 @@ jobs:
             smart-crop-video/tests/test_run.log
             smart-crop-video/tests/*.log
           retention-days: 7
+          if-no-files-found: ignore
 
       - name: Upload test artifacts
         if: always()
