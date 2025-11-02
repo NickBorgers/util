@@ -27,6 +27,7 @@ from smart_crop.analysis.parallel import analyze_positions_parallel
 
 # Import refactored modules (Phase 6.2: Scene Detection)
 from smart_crop.analysis.scenes import (
+    Scene,
     parse_scene_timestamps,
     create_scenes_from_timestamps,
     create_time_based_segments as create_time_segments
@@ -40,29 +41,15 @@ from smart_crop.core.scoring import (
     NormalizationBounds
 )
 
+# Import refactored modules (Phase 7A: Remove Duplicates)
+from smart_crop.core.candidates import ScoredCandidate
+
 # Disable Flask development server warning
 log = logging.getLogger('werkzeug')
 log.setLevel(logging.ERROR)
 
-@dataclass
-class CropPosition:
-    """Represents a crop position with its metrics"""
-    x: int
-    y: int
-    motion: float = 0.0
-    complexity: float = 0.0
-    edges: float = 0.0
-    saturation: float = 0.0
-
-
-@dataclass
-class ScoredCandidate:
-    """Represents a candidate crop with its score and strategy"""
-    x: int
-    y: int
-    score: float
-    strategy: str
-
+# Phase 7A: Removed duplicate CropPosition class - using PositionMetrics from smart_crop.core.scoring
+# Phase 7A: Removed duplicate ScoredCandidate class - using import from smart_crop.core.candidates
 
 class AppState:
     """Shared state between main thread and webserver"""
@@ -660,21 +647,7 @@ def get_video_fps(input_file: str) -> float:
         return 24.0  # Default fallback
 
 
-@dataclass
-class Scene:
-    """Represents a scene in the video"""
-    start_time: float
-    end_time: float
-    start_frame: int
-    end_frame: int
-    metric_value: float = 0.0
-    first_frame_path: str = ""
-    last_frame_path: str = ""
-
-    @property
-    def duration(self) -> float:
-        return self.end_time - self.start_time
-
+# Phase 7A: Removed duplicate Scene class - using import from smart_crop.analysis.scenes
 
 def detect_scenes(input_file: str, threshold: float = 0.3) -> List[Scene]:
     """Detect scene changes in video using FFmpeg's scene detection"""
@@ -1052,7 +1025,7 @@ def extract_metric_from_showinfo(output: str, metric: str) -> List[float]:
 
 
 def analyze_position(input_file: str, x: int, y: int, crop_w: int, crop_h: int,
-                    analysis_frames: int) -> CropPosition:
+                    analysis_frames: int) -> PositionMetrics:
     """Analyze a crop position and return its metrics"""
 
     # Get motion and complexity from showinfo
@@ -1099,25 +1072,18 @@ def analyze_position(input_file: str, x: int, y: int, crop_w: int, crop_h: int,
                 rgb_sums.append(sum(values[:3]))  # R, G, B
         color_variance = sum(rgb_sums) / len(rgb_sums) if rgb_sums else 0.0
 
-    return CropPosition(x, y, motion, complexity, edges, color_variance)
+    return PositionMetrics(x, y, motion, complexity, edges, color_variance)
 
 
 # Phase 6.3: normalize() imported from smart_crop.core.scoring
 
 
-def score_with_strategy(pos: CropPosition, mins: Dict[str, float], maxs: Dict[str, float],
+def score_with_strategy(pos: PositionMetrics, mins: Dict[str, float], maxs: Dict[str, float],
                        strategy: str) -> float:
     """Score a position using a specific strategy (Phase 6.3: Use refactored module)"""
 
-    # Convert CropPosition to PositionMetrics for refactored module
-    metrics = PositionMetrics(
-        x=pos.x,
-        y=pos.y,
-        motion=pos.motion,
-        complexity=pos.complexity,
-        edges=pos.edges,
-        saturation=pos.saturation
-    )
+    # Phase 7A: No longer need to convert - pos is already PositionMetrics
+    metrics = pos
 
     # Convert mins/maxs dicts to NormalizationBounds
     bounds = NormalizationBounds(
@@ -1277,18 +1243,8 @@ def main():
             progress_callback=progress_callback
         )
 
-        # Convert PositionMetrics back to CropPosition for compatibility
-        positions = []
-        for metric in position_metrics:
-            pos = CropPosition(
-                x=metric.x,
-                y=metric.y,
-                motion=metric.motion,
-                complexity=metric.complexity,
-                edges=metric.edges,
-                saturation=metric.saturation
-            )
-            positions.append(pos)
+        # Phase 7A: No longer need conversion - use PositionMetrics directly
+        positions = position_metrics
 
         print(f"\r{' '*80}\r✓ Completed analyzing all {total} positions")
         print()
