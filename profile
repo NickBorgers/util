@@ -24,11 +24,51 @@ function stabilize_video() {
 }
 
 function smart_crop_video() {
+	# Intelligent video cropping with motion and visual analysis
+	# Usage: smart_crop_video input.mp4 [output.mp4] [aspect_ratio]
+	# Examples:
+	#   smart_crop_video video.mp4                          # Outputs: video_cropped.mp4, aspect: 9:16
+	#   smart_crop_video video.mp4 output.mp4               # Custom output, aspect: 9:16
+	#   smart_crop_video video.mp4 output.mp4 1:1           # Custom output and aspect
+	#
+	# Environment variables for configuration:
+	# - PRESET: FFmpeg encoding preset (ultrafast/fast/medium/slow/veryslow, default: medium)
+	# - ANALYSIS_FRAMES: Number of frames to analyze per position (default: 50)
+	# - CROP_SCALE: Crop size scale factor 0.0-1.0 (default: 0.75)
+	# - SCENE_THRESHOLD: Scene detection sensitivity 0.0-1.0 (default: 0.2, lower=more scenes)
+	# - SEGMENT_DURATION: Time-based segment duration in seconds (default: 5.0)
+
+	# Parse arguments with defaults
+	local input="$1"
+	if [ -z "$input" ]; then
+		echo "Error: Input file required"
+		echo "Usage: smart_crop_video input.mp4 [output.mp4] [aspect_ratio]"
+		return 1
+	fi
+
+	local output="${2:-${input%.*}_cropped.mp4}"
+	local aspect="${3:-9:16}"
+
+	# Launch browser after delay (background job for bash/zsh)
+	(
+		sleep 3
+		if [[ $(uname) == "Darwin" ]]; then
+			open "http://localhost:8765" 2>/dev/null
+		elif command -v xdg-open >/dev/null 2>&1; then
+			xdg-open "http://localhost:8765" 2>/dev/null
+		elif command -v wslview >/dev/null 2>&1; then
+			wslview "http://localhost:8765" 2>/dev/null
+		fi
+	) &
+
+	# Run the docker command (foreground, interactive)
 	docker run --rm -it --volume=$(pwd):/content/ --workdir=/content/ -p 8765:8765 \
 		-e PRESET="${PRESET:-medium}" \
-		-e ANALYSIS_FRAMES="${ANALYSIS_FRAMES:-20}" \
+		-e ANALYSIS_FRAMES="${ANALYSIS_FRAMES:-50}" \
 		-e CROP_SCALE="${CROP_SCALE:-0.75}" \
-		nickborgers/smart-crop-video smart-crop-video "$1" "$2" "$3"
+		-e SCENE_THRESHOLD="${SCENE_THRESHOLD:-0.2}" \
+		-e SEGMENT_DURATION="${SEGMENT_DURATION:-5.0}" \
+		nickborgers/smart-crop-video "$input" "$output" "$aspect"
 }
 
 function update_pdf() {

@@ -315,15 +315,21 @@ stress-v1.0.0
 
 ### Creating a Release
 
-**IMPORTANT**: Always use `gh` (GitHub CLI) to create releases. Do not rely on manual tagging alone.
+**IMPORTANT**:
+1. Always create a Pull Request for review before releasing
+2. Always use `gh` (GitHub CLI) to create releases
+3. Do not rely on manual tagging alone
 
 When you're ready to release a utility, follow these steps:
 
 #### 1. Update Version References
 Update version numbers in relevant files for the utility (e.g., `go.mod`, documentation, package files)
 
-#### 2. Commit Changes
+#### 2. Commit Changes on Feature Branch
 ```bash
+# Create feature/release branch if not already on one
+git checkout -b feature/release-smart-crop-video-v1.2.0
+
 # Stage and commit all changes
 git add <modified-files>
 git commit -m "Release message with feature summary
@@ -333,19 +339,70 @@ git commit -m "Release message with feature summary
 Co-Authored-By: Claude <noreply@anthropic.com>"
 ```
 
-#### 3. Create Tag Locally
+#### 3. Push Feature Branch and Create Pull Request
+```bash
+# Push feature branch to origin
+git push -u origin feature/release-smart-crop-video-v1.2.0
+
+# Create Pull Request with detailed release notes
+gh pr create --title "smart-crop-video v1.2.0 - Feature Title" --body "$(cat <<'EOF'
+## Summary
+
+Brief overview of the release and major changes.
+
+## 🎉 Major Features
+
+- Feature 1 description
+- Feature 2 description
+
+## 🔧 Configuration Options
+
+```bash
+# Example configuration
+OPTION=value utility command
+```
+
+## 🐛 Bug Fixes
+
+- Fix 1
+- Fix 2
+
+## 📝 Technical Details
+
+Technical information for developers...
+
+---
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+EOF
+)"
+```
+
+#### 4. Wait for PR Review and Merge
+**CRITICAL**: Do not proceed with tagging and release until the PR has been:
+- Reviewed by repository owner
+- All CI/CD checks passing
+- Merged to main branch
+
+#### 5. Switch to Main and Pull Latest
+```bash
+# After PR is merged, switch to main and pull
+git checkout main
+git pull origin main
+```
+
+#### 6. Create Tag Locally
 ```bash
 # Example for smart-crop-video v1.2.0
 git tag smart-crop-video-v1.2.0
 ```
 
-#### 4. Push Commit and Tag
+#### 7. Push Tag to Origin
 ```bash
-git push origin main
 git push origin smart-crop-video-v1.2.0
 ```
 
-#### 5. Create GitHub Release with `gh`
+#### 8. Create GitHub Release with `gh`
 **CRITICAL**: Use `gh release create` to create the GitHub release with proper release notes:
 
 ```bash
@@ -386,12 +443,20 @@ This creates a properly formatted GitHub Release with:
 - Release notes that are searchable and linkable
 - Automatic association with the tag
 
-#### 6. Verify the Release
+#### 9. Verify the Release
 After creating the release:
 - Visit the GitHub Releases page to confirm it was created
 - Check GitHub Actions to ensure any CI/CD workflows triggered correctly
 - For network-mapper: confirm Homebrew and Chocolatey packages were updated
 - For Docker-based utilities: confirm images were published to Docker Hub
+
+#### Why Use Pull Requests Before Releases?
+
+- **Code Review**: Repository owner can review changes before release
+- **CI/CD Validation**: All tests and checks run before merging
+- **Discussion**: Opportunity to discuss changes and get feedback
+- **History**: Clear audit trail of what was released and when
+- **Rollback**: Easy to identify and revert problematic changes
 
 #### Why Use `gh release create`?
 
@@ -401,10 +466,11 @@ After creating the release:
 - **Rich Content**: Supports markdown, emojis, code blocks
 - **Immediate**: Creates release instantly, not dependent on CI/CD
 
-#### Example: Complete Release Process
+#### Example: Complete Release Process with PR
 
 ```bash
-# 1. Commit changes
+# 1. Create feature branch and commit changes
+git checkout -b feature/release-smart-crop-video-v1.2.0
 git add smart-crop-video.py README.md
 git commit -m "Add intelligent acceleration feature
 
@@ -414,17 +480,25 @@ Major improvements to scene selection...
 
 Co-Authored-By: Claude <noreply@anthropic.com>"
 
-# 2. Create and push tag
+# 2. Push branch and create PR
+git push -u origin feature/release-smart-crop-video-v1.2.0
+gh pr create --title "smart-crop-video v1.2.0 - Interactive Scene Selection" \
+  --body "Release notes here..."
+
+# 3. Wait for PR review and merge by repository owner
+
+# 4. After merge, switch to main and create release
+git checkout main
+git pull origin main
 git tag smart-crop-video-v1.2.0
-git push origin main
 git push origin smart-crop-video-v1.2.0
 
-# 3. Create GitHub release
+# 5. Create GitHub release
 gh release create smart-crop-video-v1.2.0 \
   --title "smart-crop-video v1.2.0 - Interactive Scene Selection" \
   --notes "Release notes here..."
 
-# 4. Verify
+# 6. Verify
 gh release view smart-crop-video-v1.2.0
 ```
 

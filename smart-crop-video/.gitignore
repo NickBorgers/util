@@ -35,9 +35,6 @@ env/
 .DS_Store
 Thumbs.db
 
-# Keep example_movie.mov for tests
-!example_movie.mov
-
 # Docker volumes
 .pytest_cache/
 *.log
