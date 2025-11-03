@@ -86,7 +86,7 @@ def smart_crop_container(
         # Start container with port mapping and volume mount
         container = docker_client.containers.run(
             docker_image,
-            command=["python3", "/app/smart-crop-video.py", "example_movie.mov", "output.mov", "1:1"],
+            command=["smart-crop-video", "example_movie.mov", "output.mov", "1:1"],
             detach=True,
             remove=False,  # We'll remove manually after logs
             stdin_open=True,  # Keep stdin open (enables TTY mode in script)

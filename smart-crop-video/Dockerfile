@@ -15,10 +15,15 @@ COPY smart_crop/ /app/smart_crop/
 # Set Python path to find smart_crop modules
 ENV PYTHONPATH=/app
 
+# Create wrapper script in PATH for easy command invocation
+RUN echo '#!/bin/sh' > /usr/local/bin/smart-crop-video && \
+    echo 'exec python3 /app/smart-crop-video.py "$@"' >> /usr/local/bin/smart-crop-video && \
+    chmod +x /usr/local/bin/smart-crop-video
+
 # Set working directory to /content (where volume is mounted)
 # This ensures preview images are created in the mounted directory
 WORKDIR /content
 
 # Use CMD instead of ENTRYPOINT to allow tests to override the command
 # while still providing a default for normal docker run usage
-CMD ["python3", "/app/smart-crop-video.py"]
+CMD ["smart-crop-video"]
