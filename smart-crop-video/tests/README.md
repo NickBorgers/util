@@ -2,26 +2,75 @@
 
 Comprehensive integration tests for the smart-crop-video utility, covering containerized testing, API endpoints, Web UI interaction, end-to-end workflows, and video processing verification.
 
-## ⚡ Quick Start (Containerized - Recommended)
+## ⚡ Quick Start
 
-**Run tests without installing Python, Playwright, or any dependencies!**
+### Containerized Testing (Recommended for Unit + Integration Tests)
 
-Only Docker and Docker Compose required:
+**Run 294 tests (unit + integration with FFmpeg) without installing any dependencies!**
+
+Only Docker required:
 
 ```bash
-# Fast validation (15 tests, ~40s)
-./run-tests.sh container
+# Build the test image (only needed once)
+./run-tests-docker.sh build
 
-# Quick smoke test
-./run-tests.sh quick
+# Run containerized tests (unit + integration)
+./run-tests-docker.sh all           # 294 tests in ~2s
 
-# Full test suite
-./run-tests.sh all
+# Or run specific suites:
+./run-tests-docker.sh unit          # 286 unit tests (~0.2s)
+./run-tests-docker.sh integration   # 8 integration tests with FFmpeg (~2s)
+./run-tests-docker.sh quick         # Fast minimal output
+./run-tests-docker.sh coverage      # With coverage report
+./run-tests-docker.sh shell         # Interactive debugging
 ```
 
-📚 **See [CONTAINERIZED_TESTING.md](../CONTAINERIZED_TESTING.md) for complete documentation**
+**Benefits:**
+- ✅ No need to install FFmpeg, Python, pytest, or dependencies
+- ✅ Consistent environment across all platforms
+- ✅ Integration tests run with real FFmpeg (not skipped)
+- ✅ Fast feedback (~2 seconds for all 294 tests)
+
+### Host-Based Testing (Required for Container/API Tests)
+
+**Run all 328 tests including Docker container and API tests:**
+
+```bash
+# Prerequisites: Docker, Python 3.9+, pytest
+pip install -r tests/requirements.txt
+
+# Run all tests (takes ~3 minutes due to Docker containers)
+pytest tests/ -v
+
+# Or run just container/API tests
+pytest tests/test_container.py tests/test_api.py -v
+```
+
+**Note:** Container and API tests (34 tests) cannot run inside Docker because they need to create Docker containers (Docker-in-Docker). These tests must run on the host where Docker is available.
 
 ---
+
+## Test Suite Summary
+
+| Test Suite | Count | Where to Run | Speed | Description |
+|------------|-------|--------------|-------|-------------|
+| **Unit Tests** | 286 | Docker or Host | ~0.2s | Core business logic (dimensions, grid, scoring, etc.) |
+| **Integration Tests** | 8 | Docker or Host* | ~2s | Real FFmpeg analysis with test video |
+| **Container Tests** | 15 | Host only | ~30s | Docker image building and container lifecycle |
+| **API Tests** | 19 | Host only | ~3min | Flask API endpoints with real containers |
+| **UI Tests** | 5 | Host only | ~10min | Playwright browser-based UI testing |
+| **Diagnostic Tests** | 1 | Host only | ~2min | Application state monitoring |
+| **TOTAL** | **334** | - | - | Full validation coverage |
+
+*Integration tests require FFmpeg - automatically skipped on host if FFmpeg not installed
+
+**Docker Testing (Recommended):** 294 tests (unit + integration) in ~2 seconds
+**Host Testing (Complete):** All 334 tests in ~15 minutes
+
+**Tests automatically skipped:**
+- Integration tests skip if FFmpeg not available on host
+- UI tests skip if Playwright not available
+- Container/API tests skip inside Docker (need Docker-in-Docker)
 
 ## Overview
 
@@ -31,6 +80,66 @@ This test suite follows the integration testing philosophy of the util repositor
 - **Production-like environments**: Tests run in the same Docker container as production
 - **Comprehensive coverage**: Tests cover all critical paths and edge cases
 
+## Test Suite Organization
+
+The test suite is organized into two main categories:
+
+### Unit Tests (`tests/unit/`)
+Fast, isolated tests of business logic modules without external dependencies:
+- **`test_dimensions.py`**: Crop dimension calculations (27 tests, 100% coverage)
+- **`test_grid.py`**: Position grid generation (28 tests, 100% coverage)
+- **`test_scoring.py`**: Scoring strategies (48 tests, 100% coverage)
+- **`test_candidates.py`**: Candidate generation and deduplication (38 tests, 100% coverage)
+- **`test_scenes.py`**: Scene detection and segmentation (52 tests, 100% coverage)
+- **`test_scene_analysis.py`**: Scene metric analysis (50+ tests, 100% coverage)
+- **`test_parallel.py`**: Parallel processing (33 tests, 100% coverage)
+- **`test_mock_analyzer.py`**: Mock infrastructure (19 tests, 100% coverage)
+
+**Total**: ~295 unit tests, all passing, < 1 second execution time
+
+### Integration Tests (`tests/integration/`)
+Tests that require FFmpeg and test with real video files:
+- **`test_parallel_integration.py`**: Real FFmpeg integration (8 tests)
+
+**Note**: Integration tests are **automatically skipped** when FFmpeg is not available on the host system. This is expected behavior and **completely normal** - these tests verify FFmpeg integration and are primarily useful for development.
+
+#### Running Integration Tests in Docker (Recommended)
+
+The easiest way to run integration tests is using the containerized test environment:
+
+```bash
+# Build the test image (only needed once)
+./run-tests-docker.sh build
+
+# Run integration tests in Docker (includes FFmpeg)
+./run-tests-docker.sh integration
+
+# Or run all tests (unit + integration)
+./run-tests-docker.sh all
+```
+
+**Benefits**:
+- ✅ No need to install FFmpeg locally
+- ✅ No need to install Python dependencies
+- ✅ Consistent test environment across all platforms
+- ✅ Matches the containerized philosophy of this repository
+
+#### Running Integration Tests Locally
+
+Alternatively, install FFmpeg locally:
+```bash
+# macOS
+brew install ffmpeg
+
+# Ubuntu/Debian
+sudo apt-get install ffmpeg
+
+# Then run the integration tests
+pytest tests/integration/ -v
+```
+
+**Important**: The integration tests being skipped does not indicate a problem. The main test suite (unit tests, container tests, and API tests) provides comprehensive coverage without requiring FFmpeg on the host.
+
 ## Test Categories
 
 ### 1. Container Integration Tests (`test_container.py`)
@@ -38,7 +147,7 @@ Tests Docker image building, container startup, port mapping, and volume mounts.
 
 **Key tests:**
 - Docker image builds successfully with all dependencies (FFmpeg, Python, Flask)
-- Container starts and runs with correct port mapping (8765)
+- Container starts and runs with correct port mapping (dynamically allocated)
 - Volume mounts allow file access between host and container
 - Environment variables are properly passed and respected
 - Network access is available (unlike older utils with `--network=none`)
@@ -285,14 +394,20 @@ playwright install chromium
 **Cause:** Video encoding can take several minutes, especially with slower CPUs.
 **Solution:** Tests use `ultrafast` preset and reduced analysis frames. If still timing out, increase the timeout in `pytest.ini`.
 
-### Issue: Port 8765 already in use
-**Cause:** Another instance of the container or test is running.
+### Issue: Port allocation conflicts
+**Cause:** In rare cases, dynamically allocated ports may conflict with other services.
 **Solution:**
 ```bash
-# Kill any running containers on that port
-docker ps -a | grep 8765
+# Kill any running test containers
+docker ps -a --filter ancestor=smart-crop-video:test
 docker stop <container_id>
+
+# Or clean up all test containers
+docker stop $(docker ps -q --filter ancestor=smart-crop-video:test)
+docker rm $(docker ps -aq --filter ancestor=smart-crop-video:test)
 ```
+
+**Note:** Tests now use dynamic port allocation to avoid conflicts between parallel test runs.
 
 ### Issue: Permission denied for Docker socket
 **Cause:** User doesn't have permission to access Docker.

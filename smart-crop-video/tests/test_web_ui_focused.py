@@ -14,9 +14,15 @@ Test Priority (from user-advocate analysis):
 
 import pytest
 import time
-from playwright.sync_api import sync_playwright, expect, Page
 import os
 from pathlib import Path
+
+# Playwright is only available on systems where it can be installed (not Alpine Linux)
+# These tests will be skipped in containerized testing environments
+playwright = pytest.importorskip("playwright.sync_api", reason="Playwright not available (e.g., Alpine Linux)")
+sync_playwright = playwright.sync_playwright
+expect = playwright.expect
+Page = playwright.Page
 
 
 @pytest.mark.timeout(300)

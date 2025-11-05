@@ -1,0 +1,37 @@
+# Test-specific Dockerfile for running the full test suite
+# Includes pytest and all test dependencies + FFmpeg for integration tests
+FROM alpine:3.19
+
+# Install FFmpeg, Python, and build dependencies
+RUN apk add --no-cache \
+    ffmpeg \
+    python3 \
+    py3-pip \
+    gcc \
+    musl-dev \
+    python3-dev \
+    libffi-dev
+
+# Install Flask for the application
+RUN pip3 install --no-cache-dir flask --break-system-packages
+
+# Copy the application code
+COPY smart-crop-video.py /app/
+COPY smart_crop/ /app/smart_crop/
+
+# Copy the test suite
+COPY tests/ /app/tests/
+COPY example_movie.mov /app/
+
+# Install test dependencies (minimal set for containerized testing)
+COPY tests/requirements-docker.txt /app/tests/
+RUN pip3 install --no-cache-dir -r /app/tests/requirements-docker.txt --break-system-packages
+
+# Set Python path to find smart_crop modules
+ENV PYTHONPATH=/app
+
+# Set working directory
+WORKDIR /app
+
+# Default command runs all tests
+CMD ["pytest", "tests/", "-v", "--tb=short"]

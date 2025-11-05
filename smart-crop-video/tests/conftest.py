@@ -14,6 +14,16 @@ from typing import Generator, Dict, Any
 import tempfile
 import shutil
 import os
+import socket
+
+
+def find_free_port() -> int:
+    """Find a free port for the webserver."""
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.bind(('', 0))
+        s.listen(1)
+        port = s.getsockname()[1]
+    return port
 
 
 @pytest.fixture(scope="session")
@@ -77,12 +87,16 @@ def smart_crop_container(
 
     Yields dict with:
         - container: Docker container object
-        - port: Port number (8765)
+        - port: Port number (dynamically allocated)
         - base_url: Base URL for API calls
         - workdir: Path to temp working directory
     """
     container = None
+    port = None
     try:
+        # Find a free port to avoid conflicts between tests
+        port = find_free_port()
+
         # Start container with port mapping and volume mount
         container = docker_client.containers.run(
             docker_image,
@@ -91,7 +105,7 @@ def smart_crop_container(
             remove=False,  # We'll remove manually after logs
             stdin_open=True,  # Keep stdin open (enables TTY mode in script)
             tty=True,  # Allocate pseudo-TTY (makes sys.stdin.isatty() return True)
-            ports={"8765/tcp": 8765},
+            ports={"8765/tcp": port},  # Map container port 8765 to dynamic host port
             volumes={
                 str(temp_workdir): {"bind": "/content", "mode": "rw"}
             },
@@ -104,7 +118,7 @@ def smart_crop_container(
         )
 
         # Wait for Flask server to be ready
-        base_url = "http://localhost:8765"
+        base_url = f"http://localhost:{port}"
         max_wait = 30
         wait_interval = 0.5
         elapsed = 0
@@ -115,7 +129,7 @@ def smart_crop_container(
             try:
                 response = requests.get(f"{base_url}/api/status", timeout=1)
                 if response.status_code == 200:
-                    print(f"Flask server ready after {elapsed:.1f}s")
+                    print(f"Flask server ready after {elapsed:.1f}s on port {port}")
                     break
             except requests.exceptions.RequestException:
                 pass
@@ -129,7 +143,7 @@ def smart_crop_container(
 
         yield {
             "container": container,
-            "port": 8765,
+            "port": port,
             "base_url": base_url,
             "workdir": temp_workdir
         }
@@ -141,18 +155,26 @@ def smart_crop_container(
                 logs = container.logs().decode('utf-8')
                 if os.getenv('PYTEST_VERBOSE'):
                     print(f"\n=== Container logs ===\n{logs}\n===================")
-            except:
-                pass
+            except Exception as e:
+                print(f"Warning: Could not fetch container logs: {e}")
 
+            # Stop container with timeout
             try:
+                print(f"Stopping container on port {port}...")
                 container.stop(timeout=5)
-            except:
-                pass
+                print(f"Container stopped successfully")
+            except Exception as e:
+                print(f"Warning: Could not stop container gracefully: {e}")
 
+            # Force remove container
             try:
                 container.remove(force=True)
-            except:
-                pass
+                print(f"Container removed successfully")
+            except Exception as e:
+                print(f"Warning: Could not remove container: {e}")
+
+            # Small delay to ensure port is released
+            time.sleep(0.5)
 
 
 @pytest.fixture

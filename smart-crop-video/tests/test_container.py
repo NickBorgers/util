@@ -63,7 +63,7 @@ def test_container_starts_successfully(smart_crop_container: dict):
 
 
 def test_port_mapping_works(smart_crop_container: dict):
-    """Test that port 8765 is correctly mapped and accessible."""
+    """Test that port mapping is correctly configured and accessible."""
     base_url = smart_crop_container["base_url"]
     response = requests.get(f"{base_url}/api/status", timeout=5)
     assert response.status_code == 200
@@ -99,13 +99,17 @@ def test_environment_variables_are_set(smart_crop_container: dict):
 
 
 def test_flask_server_starts_on_correct_port(smart_crop_container: dict):
-    """Test that Flask server is listening on port 8765."""
+    """Test that Flask server is listening on the mapped port."""
     base_url = smart_crop_container["base_url"]
+    port = smart_crop_container["port"]
 
     # Should be able to reach the server
     response = requests.get(f"{base_url}/", timeout=5)
     assert response.status_code == 200
     assert "Smart Crop Video" in response.text
+
+    # Verify port is in the expected range (dynamically allocated)
+    assert 1024 < port < 65535, f"Port {port} outside valid range"
 
 
 def test_container_has_network_access(docker_client: docker.DockerClient, docker_image: str, temp_workdir: Path):

@@ -1,0 +1,17 @@
+# Test dependencies for Docker-based testing
+# Excludes Playwright (not available on Alpine Linux)
+# Suitable for running unit tests and integration tests inside containers
+
+# Test framework
+pytest>=7.4.0
+pytest-timeout>=2.1.0
+pytest-xdist>=3.3.0
+
+# Docker integration
+docker>=6.1.0
+
+# HTTP requests
+requests>=2.31.0
+
+# Coverage (optional)
+pytest-cov>=4.1.0

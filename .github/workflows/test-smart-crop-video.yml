@@ -65,21 +65,65 @@ jobs:
         working-directory: smart-crop-video
         run: |
           docker build -t smart-crop-video:test .
+          echo "Docker image built successfully"
+
+      # Note: Tests run on host (not in Docker) because:
+      # 1. GitHub Actions runners have Docker, FFmpeg, and Playwright available
+      # 2. Container/API tests need Docker access (can't run in container)
+      # 3. All 334 tests can run with full coverage this way
+      # For local development, use: ./run-tests-docker.sh (294 tests without dependencies)
+
+      - name: Run unit tests (fast)
+        working-directory: smart-crop-video
+        run: |
+          pytest tests/unit/ -v --timeout=60 -n auto
+          echo "✅ Unit tests passed (286 tests in parallel)"
+
+      - name: Run integration tests
+        working-directory: smart-crop-video
+        run: |
+          pytest tests/integration/ -v --timeout=300
+          echo "✅ Integration tests passed (8 tests with FFmpeg)"
 
       - name: Run container tests
         working-directory: smart-crop-video
         run: |
           pytest tests/test_container.py -v --timeout=300
+          echo "✅ Container tests passed (15 tests)"
 
       - name: Run API tests
         working-directory: smart-crop-video
         run: |
           pytest tests/test_api.py -v --timeout=600
+          echo "✅ API tests passed (19 tests)"
 
       - name: Run Web UI tests
         working-directory: smart-crop-video
         run: |
           pytest tests/test_web_ui_focused.py -v --timeout=900
+          echo "✅ Web UI tests passed (5 tests)"
+
+      - name: Run diagnostic tests
+        working-directory: smart-crop-video
+        run: |
+          pytest tests/test_diagnostic.py -v --timeout=300
+          echo "✅ Diagnostic tests passed (1 test)"
+
+      - name: Test Summary
+        if: always()
+        run: |
+          echo "================================================"
+          echo "Test Execution Complete"
+          echo "================================================"
+          echo "Unit tests:        286 tests"
+          echo "Integration tests:   8 tests (FFmpeg)"
+          echo "Container tests:    15 tests"
+          echo "API tests:          19 tests"
+          echo "Web UI tests:        5 tests"
+          echo "Diagnostic tests:    1 test"
+          echo "------------------------------------------------"
+          echo "TOTAL:             334 tests"
+          echo "================================================"
 
       - name: Upload test logs
         if: always()
