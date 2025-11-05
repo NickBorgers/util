@@ -49,6 +49,7 @@ jobs:
           pip install -r tests/requirements.txt
 
       - name: Install Playwright browsers
+        if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
         run: |
           playwright install chromium --with-deps
 
@@ -71,8 +72,9 @@ jobs:
       # 1. GitHub Actions runners have Docker, FFmpeg, and Playwright available
       # 2. Container/API tests need Docker access (can't run in container)
       # 3. All 334 tests can run with full coverage this way
-      # For local development, use: ./run-tests-docker.sh (294 tests without dependencies)
+      # For local development, use: docker-compose -f docker-compose.test.yml run test-fast
 
+      # Fast tests (always run) - ~8 minutes
       - name: Run unit tests (fast)
         working-directory: smart-crop-video
         run: |
@@ -97,17 +99,26 @@ jobs:
           pytest tests/test_api.py -v --timeout=600
           echo "✅ API tests passed (19 tests)"
 
-      - name: Run Web UI tests
-        working-directory: smart-crop-video
-        run: |
-          pytest tests/test_web_ui_focused.py -v --timeout=900
-          echo "✅ Web UI tests passed (5 tests)"
-
       - name: Run diagnostic tests
         working-directory: smart-crop-video
         run: |
           pytest tests/test_diagnostic.py -v --timeout=300
           echo "✅ Diagnostic tests passed (1 test)"
+
+      # Slow tests (PRs and manual runs only) - ~10 minutes
+      - name: Run Web UI tests
+        if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
+        working-directory: smart-crop-video
+        run: |
+          pytest tests/test_web_ui_focused.py -v --timeout=900
+          echo "✅ Web UI tests passed (5 tests)"
+
+      - name: Skipped Web UI tests
+        if: github.event_name == 'push'
+        run: |
+          echo "⏭️  Web UI tests skipped on push (run on PRs and manual triggers)"
+          echo "   To run locally: pytest tests/test_web_ui_focused.py -v"
+          echo "   Or skip with: pytest tests/ -m \"not ui\" -v"
 
       - name: Test Summary
         if: always()
@@ -115,14 +126,20 @@ jobs:
           echo "================================================"
           echo "Test Execution Complete"
           echo "================================================"
-          echo "Unit tests:        286 tests"
-          echo "Integration tests:   8 tests (FFmpeg)"
-          echo "Container tests:    15 tests"
-          echo "API tests:          19 tests"
-          echo "Web UI tests:        5 tests"
-          echo "Diagnostic tests:    1 test"
-          echo "------------------------------------------------"
-          echo "TOTAL:             334 tests"
+          echo "Unit tests:        286 tests ✅"
+          echo "Integration tests:   8 tests (FFmpeg) ✅"
+          echo "Container tests:    15 tests ✅"
+          echo "API tests:          19 tests ✅"
+          echo "Diagnostic tests:    1 test ✅"
+          if [ "${{ github.event_name }}" == "pull_request" ] || [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            echo "Web UI tests:        5 tests ✅"
+            echo "------------------------------------------------"
+            echo "TOTAL:             334 tests"
+          else
+            echo "Web UI tests:        5 tests ⏭️  (skipped on push)"
+            echo "------------------------------------------------"
+            echo "TOTAL:             329 tests (5 UI tests skipped)"
+          fi
           echo "================================================"
 
       - name: Upload test logs

@@ -1,14 +1,25 @@
 # Docker Compose configuration for running smart-crop-video tests
 #
-# Usage:
-#   docker-compose -f docker-compose.test.yml run --rm tests
-#   docker-compose -f docker-compose.test.yml run --rm tests pytest tests/test_container.py -v
+# Quick Start:
+#   docker-compose -f docker-compose.test.yml build          # Build test image
+#   docker-compose -f docker-compose.test.yml run test-quick # Fast unit tests (~2s)
+#   docker-compose -f docker-compose.test.yml run test-all   # All tests (~18min)
 #
-# This allows running the full test suite without installing Python or Playwright locally.
+# Available Services:
+#   test-quick       Fast unit tests only (286 tests)
+#   test-unit        Unit tests with verbose output
+#   test-integration Integration tests with FFmpeg (8 tests)
+#   test-fast        Unit + integration + container + API (skip UI, ~8min)
+#   test-all         All tests including Web UI (~18min)
+#   test-shell       Interactive shell for debugging
+#
+# Custom test command:
+#   docker-compose -f docker-compose.test.yml run tests pytest tests/test_api.py -v
 
 version: '3.8'
 
 services:
+  # Base test service (shared configuration)
   tests:
     build:
       context: .
@@ -28,6 +39,38 @@ services:
     user: root
     # Default: run all tests
     command: pytest tests/ -v --tb=short
+
+  # Quick unit tests (fastest option)
+  test-quick:
+    extends: tests
+    command: pytest tests/unit/ -q
+
+  # Unit tests with verbose output
+  test-unit:
+    extends: tests
+    command: pytest tests/unit/ -v
+
+  # Integration tests with FFmpeg
+  test-integration:
+    extends: tests
+    command: pytest tests/integration/ -v
+
+  # Fast tests (skip Web UI - ~8 minutes)
+  test-fast:
+    extends: tests
+    command: pytest tests/ -m "not ui" -v --tb=short
+
+  # All tests including Web UI (~18 minutes)
+  test-all:
+    extends: tests
+    command: pytest tests/ -v --tb=short
+
+  # Interactive shell for debugging
+  test-shell:
+    extends: tests
+    command: /bin/bash
+    stdin_open: true
+    tty: true
 
 volumes:
   pytest-cache:

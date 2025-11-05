@@ -25,6 +25,7 @@ expect = playwright.expect
 Page = playwright.Page
 
 
+@pytest.mark.ui
 @pytest.mark.timeout(300)
 def test_progress_indicators_update_during_analysis(smart_crop_container):
     """
@@ -116,6 +117,7 @@ def test_progress_indicators_update_during_analysis(smart_crop_container):
         print(f"  - Total analysis time: {progress_samples[-1][0]:.1f}s")
 
 
+@pytest.mark.ui
 @pytest.mark.timeout(400)
 def test_complete_happy_path_analysis_to_output(smart_crop_container, temp_workdir):
     """
@@ -268,6 +270,7 @@ def test_complete_happy_path_analysis_to_output(smart_crop_container, temp_workd
         print(f"Total test duration: {time.time() - start_time:.1f}s")
 
 
+@pytest.mark.ui
 @pytest.mark.timeout(200)
 def test_preview_images_load_and_display(smart_crop_container):
     """
@@ -342,6 +345,7 @@ def test_preview_images_load_and_display(smart_crop_container):
         print(f"  - {len(unique_strategies)} unique strategies: {', '.join(sorted(unique_strategies))}")
 
 
+@pytest.mark.ui
 @pytest.mark.timeout(200)
 def test_selection_and_confirmation_flow(smart_crop_container):
     """
@@ -435,6 +439,7 @@ def test_selection_and_confirmation_flow(smart_crop_container):
         browser.close()
 
 
+@pytest.mark.ui
 @pytest.mark.timeout(400)
 def test_encoding_completes_and_produces_valid_output(smart_crop_container, temp_workdir):
     """
