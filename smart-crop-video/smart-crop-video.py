@@ -1597,10 +1597,20 @@ def main():
                     # Add 1 to convert from 0-based (test format) to 1-based (UI format)
                     scene_selections[int(idx_str) + 1] = float(speed_str)
                 print(f"Using SCENE_SELECTIONS from environment: {len(scene_selections)} scenes to accelerate")
-            # Check for non-interactive mode
+            # Check for non-interactive mode - automatically detect boring sections
             elif os.getenv('AUTO_CONFIRM'):
-                print("AUTO_CONFIRM enabled, skipping scene selection (no acceleration)")
-                scene_selections = None
+                print("AUTO_CONFIRM enabled, automatically detecting boring sections")
+                # Auto-detect boring sections
+                boring_sections_list = identify_boring_sections(scenes)
+                # Convert to scene_selections format: {scene_idx: speedup_factor}
+                scene_selections = {}
+                for scene_idx, speedup_factor in boring_sections_list:
+                    # identify_boring_sections returns 0-based indices, convert to 1-based for UI format
+                    scene_selections[scene_idx + 1] = speedup_factor
+                if scene_selections:
+                    print(f"Auto-detected {len(scene_selections)} boring sections to accelerate")
+                else:
+                    print("No boring sections detected, no acceleration will be applied")
             else:
                 # Wait for user to select scenes (from web UI or text interface)
                 print()

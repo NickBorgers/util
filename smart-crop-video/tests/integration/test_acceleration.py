@@ -11,6 +11,7 @@ These tests verify that the intelligent acceleration feature works correctly:
 These tests validate the key advertised feature beyond basic cropping.
 """
 
+import os
 import pytest
 import shutil
 import docker
@@ -19,12 +20,17 @@ import subprocess
 from pathlib import Path
 from typing import List, Dict, Any
 
-from tests.helpers import video_generator as vg
 from tests.helpers import frame_analyzer as fa
+
+# Try to import video_generator for edge case tests that need dynamic generation
+try:
+    from tests.helpers import video_generator as vg
+    HAS_VIDEO_GENERATOR = True
+except ImportError:
+    HAS_VIDEO_GENERATOR = False
 
 
 # Check dependencies
-HAS_FFMPEG = shutil.which('ffmpeg') is not None
 HAS_DOCKER = shutil.which('docker') is not None
 HAS_PILLOW = False
 try:
@@ -34,53 +40,51 @@ except ImportError:
     pass
 
 
+# Path to pre-generated test fixtures
+FIXTURES_DIR = Path(__file__).parent.parent / "fixtures"
+
+
 @pytest.fixture(scope="module")
 def accel_test_videos_dir():
-    """Create a temporary directory for acceleration test videos."""
+    """Create a temporary directory for output videos."""
     with tempfile.TemporaryDirectory(prefix="smart_crop_accel_") as tmpdir:
         yield Path(tmpdir)
 
 
 @pytest.fixture(scope="module")
-def multi_scene_video(accel_test_videos_dir):
+def multi_scene_video():
     """
-    Generate a multi-scene video with varying motion levels.
+    Load pre-generated multi-scene video with varying motion levels.
 
     Structure:
     - Scene 1 (0-5s): High motion
     - Scene 2 (5-10s): Low motion (boring)
     - Scene 3 (10-15s): High motion
     """
-    video_path = accel_test_videos_dir / "multi_scene.mov"
+    fixture_path = FIXTURES_DIR / "multi_scene.mov"
+    if not fixture_path.exists():
+        pytest.skip(f"Test fixture not found: {fixture_path}")
 
-    scenes = [
-        vg.SceneConfig(duration=5.0, motion_level="high", object_color="red"),
-        vg.SceneConfig(duration=5.0, motion_level="low", object_color="blue"),
-        vg.SceneConfig(duration=5.0, motion_level="high", object_color="green"),
-    ]
+    # Return scene info matching the generated video structure
+    scene_info = {
+        "scenes": [
+            {"start": 0.0, "end": 5.0, "duration": 5.0, "motion_level": "high"},
+            {"start": 5.0, "end": 10.0, "duration": 5.0, "motion_level": "low"},
+            {"start": 10.0, "end": 15.0, "duration": 5.0, "motion_level": "high"},
+        ],
+        "total_duration": 15.0
+    }
 
-    scene_info = vg.create_video_with_scenes(
-        video_path,
-        scenes,
-        config=vg.VideoConfig(width=1920, height=1080, fps=30)
-    )
-
-    return {"path": video_path, "scenes": scene_info}
+    return {"path": fixture_path, "scenes": scene_info}
 
 
 @pytest.fixture(scope="module")
-def audio_video_for_acceleration(accel_test_videos_dir):
-    """Generate a video with audio for tempo testing."""
-    video_path = accel_test_videos_dir / "audio_for_accel.mov"
-    config = vg.VideoConfig(width=1920, height=1080, duration=10.0, fps=30)
-
-    vg.create_test_video_with_audio(
-        video_path,
-        config,
-        audio_frequency=440  # A4 note
-    )
-
-    return video_path
+def audio_video_for_acceleration():
+    """Load pre-generated video with audio for tempo testing."""
+    fixture_path = FIXTURES_DIR / "audio_test.mov"
+    if not fixture_path.exists():
+        pytest.skip(f"Test fixture not found: {fixture_path}")
+    return fixture_path
 
 
 def run_smart_crop_with_acceleration(
@@ -113,6 +117,21 @@ def run_smart_crop_with_acceleration(
     input_name = input_video.name
     output_name = output_video.name
 
+    # Convert container path to host path for Docker-in-Docker
+    # When running tests in Docker, we need to mount the actual host path
+    host_workspace_dir = os.environ.get('HOST_WORKSPACE_DIR')
+    if host_workspace_dir:
+        # We're running in Docker, convert /workspace path to host path
+        container_work_dir_str = str(work_dir)
+        if container_work_dir_str.startswith('/workspace'):
+            # Replace /workspace with the actual host path
+            host_work_dir = container_work_dir_str.replace('/workspace', host_workspace_dir, 1)
+        else:
+            host_work_dir = container_work_dir_str
+    else:
+        # Running directly on host
+        host_work_dir = str(work_dir)
+
     # Environment variables for the container
     environment = {
         "ENABLE_ACCELERATION": "true",
@@ -132,7 +151,7 @@ def run_smart_crop_with_acceleration(
         container = client.containers.run(
             docker_image,
             command=["smart-crop-video", input_name, output_name, aspect_ratio],
-            volumes={str(work_dir): {"bind": "/content", "mode": "rw"}},
+            volumes={host_work_dir: {"bind": "/content", "mode": "rw"}},
             working_dir="/content",
             environment=environment,
             remove=True,
@@ -163,7 +182,6 @@ def run_smart_crop_with_acceleration(
         }
 
 
-@pytest.mark.skipif(not HAS_FFMPEG, reason="FFmpeg not available")
 @pytest.mark.skipif(not HAS_DOCKER, reason="Docker not available")
 @pytest.mark.comprehensive
 class TestAccelerationFeature:
@@ -343,7 +361,7 @@ class TestAccelerationFeature:
             timeout=180
         )
 
-        assert result["returncode"] == 0
+        assert result.returncode == 0
         assert output_video.exists()
 
         # Durations should match (within tolerance for encoding)
@@ -449,7 +467,6 @@ class TestAccelerationFeature:
             pytest.fail(f"Frame extraction failed (possible glitches): {e}")
 
 
-@pytest.mark.skipif(not HAS_FFMPEG, reason="FFmpeg not available")
 @pytest.mark.skipif(not HAS_DOCKER, reason="Docker not available")
 @pytest.mark.comprehensive
 class TestAccelerationEdgeCases:
@@ -463,6 +480,9 @@ class TestAccelerationEdgeCases:
         When: Apply acceleration
         Then: Should handle gracefully (no crash)
         """
+        if not HAS_VIDEO_GENERATOR:
+            pytest.skip("video_generator not available for dynamic video generation")
+
         input_video = accel_test_videos_dir / "very_short.mov"
         config = vg.VideoConfig(width=1920, height=1080, duration=1.0, fps=30)
 
@@ -493,6 +513,9 @@ class TestAccelerationEdgeCases:
         When: Auto-detect boring sections
         Then: Should find no/few boring sections to accelerate
         """
+        if not HAS_VIDEO_GENERATOR:
+            pytest.skip("video_generator not available for dynamic video generation")
+
         input_video = accel_test_videos_dir / "all_high_motion.mov"
 
         # Create video with all high-motion scenes
