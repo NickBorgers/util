@@ -91,14 +91,16 @@ case "$COMMAND" in
     all)
         print_info "Running fast tests (unit, integration, API)..."
         print_info "Note: Use 'all-with-e2e' to include comprehensive tests"
-        docker-compose -f docker-compose.test.yml build tests
+        print_info "Pulling latest test image from GHCR (if available)..."
+        docker-compose -f docker-compose.test.yml pull tests 2>/dev/null || print_info "Using local image"
         docker-compose -f docker-compose.test.yml run --rm tests \
             pytest tests/ -m "not comprehensive" -v
         ;;
 
     fast)
         print_info "Running fast tests explicitly..."
-        docker-compose -f docker-compose.test.yml build tests
+        print_info "Pulling latest test image from GHCR (if available)..."
+        docker-compose -f docker-compose.test.yml pull tests 2>/dev/null || print_info "Using local image"
         docker-compose -f docker-compose.test.yml run --rm tests \
             pytest tests/ -m "not comprehensive" -v
         ;;
@@ -106,7 +108,8 @@ case "$COMMAND" in
     comprehensive)
         print_info "Running comprehensive end-to-end tests..."
         print_info "This will take 10-15 minutes..."
-        docker-compose -f docker-compose.test.yml build tests
+        print_info "Pulling latest test image from GHCR (if available)..."
+        docker-compose -f docker-compose.test.yml pull tests 2>/dev/null || print_info "Using local image"
         docker-compose -f docker-compose.test.yml run --rm tests \
             pytest tests/integration/test_end_to_end_video.py tests/integration/test_acceleration.py \
             -m comprehensive -v --tb=short
@@ -115,68 +118,78 @@ case "$COMMAND" in
     all-with-e2e)
         print_info "Running ALL tests including comprehensive..."
         print_info "This will take 15-20 minutes..."
-        docker-compose -f docker-compose.test.yml build tests
+        print_info "Pulling latest test image from GHCR (if available)..."
+        docker-compose -f docker-compose.test.yml pull tests 2>/dev/null || print_info "Using local image"
         docker-compose -f docker-compose.test.yml run --rm tests \
             pytest tests/ -v --tb=short
         ;;
 
     e2e)
         print_info "Running end-to-end video validation tests only..."
-        docker-compose -f docker-compose.test.yml build tests
+        print_info "Pulling latest test image from GHCR (if available)..."
+        docker-compose -f docker-compose.test.yml pull tests 2>/dev/null || print_info "Using local image"
         docker-compose -f docker-compose.test.yml run --rm tests \
             pytest tests/integration/test_end_to_end_video.py -m comprehensive -v --tb=short
         ;;
 
     acceleration)
         print_info "Running acceleration feature tests only..."
-        docker-compose -f docker-compose.test.yml build tests
+        print_info "Pulling latest test image from GHCR (if available)..."
+        docker-compose -f docker-compose.test.yml pull tests 2>/dev/null || print_info "Using local image"
         docker-compose -f docker-compose.test.yml run --rm tests \
             pytest tests/integration/test_acceleration.py -m comprehensive -v --tb=short
         ;;
 
     container)
         print_info "Running container integration tests..."
-        docker-compose -f docker-compose.test.yml build tests
+        print_info "Pulling latest test image from GHCR (if available)..."
+        docker-compose -f docker-compose.test.yml pull tests 2>/dev/null || print_info "Using local image"
         docker-compose -f docker-compose.test.yml run --rm tests \
             pytest tests/test_container.py -v
         ;;
 
     api)
         print_info "Running API tests..."
-        docker-compose -f docker-compose.test.yml build tests
+        print_info "Pulling latest test image from GHCR (if available)..."
+        docker-compose -f docker-compose.test.yml pull tests 2>/dev/null || print_info "Using local image"
         docker-compose -f docker-compose.test.yml run --rm tests \
             pytest tests/test_api.py -v --tb=short
         ;;
 
     ui)
         print_info "Running web UI tests..."
-        docker-compose -f docker-compose.test.yml build tests
+        print_info "Pulling latest test image from GHCR (if available)..."
+        docker-compose -f docker-compose.test.yml pull tests 2>/dev/null || print_info "Using local image"
         docker-compose -f docker-compose.test.yml run --rm tests \
             pytest tests/test_web_ui.py -v --tb=short
         ;;
 
     focused)
         print_info "Running focused web UI tests..."
-        docker-compose -f docker-compose.test.yml build tests
+        print_info "Pulling latest test image from GHCR (if available)..."
+        docker-compose -f docker-compose.test.yml pull tests 2>/dev/null || print_info "Using local image"
         docker-compose -f docker-compose.test.yml run --rm tests \
             pytest tests/test_web_ui_focused.py -v -s --tb=short
         ;;
 
     quick)
         print_info "Running quick validation tests..."
-        docker-compose -f docker-compose.test.yml build tests
+        print_info "Pulling latest test image from GHCR (if available)..."
+        docker-compose -f docker-compose.test.yml pull tests 2>/dev/null || print_info "Using local image"
         docker-compose -f docker-compose.test.yml run --rm tests \
             pytest tests/test_container.py tests/test_diagnostic.py -v
         ;;
 
     shell)
         print_info "Opening shell in test container..."
-        docker-compose -f docker-compose.test.yml build tests
+        print_info "Pulling latest test image from GHCR (if available)..."
+        docker-compose -f docker-compose.test.yml pull tests 2>/dev/null || print_info "Using local image"
         docker-compose -f docker-compose.test.yml run --rm tests /bin/bash
         ;;
 
     build)
-        print_info "Building test container image..."
+        print_info "Building test container image locally..."
+        print_info "Note: Pre-built images are available from GHCR"
         docker-compose -f docker-compose.test.yml build tests
         ;;
 

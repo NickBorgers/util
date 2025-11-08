@@ -1,9 +1,14 @@
 # Docker Compose configuration for running smart-crop-video tests
 #
 # Quick Start:
-#   docker-compose -f docker-compose.test.yml build          # Build test image
 #   docker-compose -f docker-compose.test.yml run test-quick # Fast unit tests (~2s)
+#   docker-compose -f docker-compose.test.yml run test-fast  # Fast tests (~8min)
 #   docker-compose -f docker-compose.test.yml run test-all   # All tests (~18min)
+#
+# Image Caching:
+#   By default, uses pre-built test image from GHCR (much faster!)
+#   To force local build: docker-compose -f docker-compose.test.yml build
+#   To force pull latest: PULL_POLICY=always docker-compose ...
 #
 # Available Services:
 #   test-quick       Fast unit tests only (286 tests)
@@ -21,9 +26,12 @@ version: '3.8'
 services:
   # Base test service (shared configuration)
   tests:
+    # Use pre-built image from GHCR if available, otherwise build locally
+    image: ${TEST_IMAGE:-ghcr.io/nickborgers/util/smart-crop-video-test:latest}
     build:
       context: .
       dockerfile: tests/Dockerfile
+    pull_policy: ${PULL_POLICY:-missing}
     volumes:
       # Mount the entire smart-crop-video directory
       - .:/workspace
@@ -35,6 +43,8 @@ services:
     environment:
       # Ensure tests can communicate with Docker daemon
       - DOCKER_HOST=unix:///var/run/docker.sock
+      # Pass host working directory for Docker-in-Docker volume mounts
+      - HOST_WORKSPACE_DIR=${PWD}
     # Run as root to access Docker socket (tests create containers)
     user: root
     # Default: run all tests
