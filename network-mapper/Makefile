@@ -3,18 +3,21 @@ VERSION=1.0.0
 BUILD_DIR=build
 PLATFORMS=linux/amd64 darwin/amd64 darwin/arm64 windows/amd64
 
-.PHONY: all build clean test help
+.PHONY: all build clean test test-integration test-integration-quick test-integration-clean help
 
 all: clean build
 
 help:
 	@echo "Available targets:"
-	@echo "  build     - Build binary for current platform"
-	@echo "  build-all - Build binaries for all platforms"
-	@echo "  clean     - Clean build directory"
-	@echo "  test      - Run tests"
-	@echo "  run       - Build and run the application"
-	@echo "  deps      - Download dependencies"
+	@echo "  build                  - Build binary for current platform"
+	@echo "  build-all              - Build binaries for all platforms"
+	@echo "  clean                  - Clean build directory"
+	@echo "  test                   - Run unit tests"
+	@echo "  test-integration       - Run integration tests with Docker"
+	@echo "  test-integration-quick - Run integration tests without cleanup (for debugging)"
+	@echo "  test-integration-clean - Clean up integration test containers"
+	@echo "  run                    - Build and run the application"
+	@echo "  deps                   - Download dependencies"
 
 deps:
 	go mod download
@@ -43,8 +46,29 @@ clean:
 	@rm -rf $(BUILD_DIR)
 
 test:
-	@echo "Running tests..."
+	@echo "Running unit tests..."
 	go test -v ./...
+
+test-integration:
+	@echo "🧪 Running integration tests..."
+	@docker compose -f docker-compose.test.yml up --build --abort-on-container-exit --exit-code-from test-runner
+	@EXIT_CODE=$$?; \
+	echo "🧹 Cleaning up test environment..."; \
+	docker compose -f docker-compose.test.yml down -v; \
+	if [ $$EXIT_CODE -eq 0 ]; then \
+		echo "✅ Integration tests passed!"; \
+	else \
+		echo "❌ Integration tests failed!"; \
+		exit $$EXIT_CODE; \
+	fi
+
+test-integration-quick:
+	@echo "🧪 Running integration tests (quick mode - no cleanup)..."
+	docker compose -f docker-compose.test.yml up --build --abort-on-container-exit --exit-code-from test-runner
+
+test-integration-clean:
+	@echo "🧹 Cleaning up test environment..."
+	docker compose -f docker-compose.test.yml down -v
 
 run: build
 	@echo "Running $(BINARY_NAME)..."
@@ -73,3 +97,6 @@ vet:
 
 lint: vet fmt
 	@echo "Code formatting and vetting complete"
+
+# Set help as default target when running 'make' without arguments
+.DEFAULT_GOAL := help

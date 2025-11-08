@@ -1,0 +1,140 @@
+services:
+  # Test network 1: Common home network (192.168.1.x)
+  nginx-home:
+    image: nginx:alpine
+    networks:
+      home_network:
+        ipv4_address: 192.168.1.10
+    ports:
+      - "8080:80"
+    volumes:
+      - ./test-data/nginx-home.conf:/etc/nginx/nginx.conf
+    healthcheck:
+      test: ["CMD", "sh", "-c", "curl -f http://localhost/ || exit 1"]
+      interval: 2s
+      timeout: 1s
+      retries: 5
+      start_period: 3s
+
+  # Test network 2: Corporate network (10.10.0.x)
+  nginx-corp:
+    image: nginx:alpine
+    networks:
+      corp_network:
+        ipv4_address: 10.10.0.50
+    ports:
+      - "8081:80"
+    volumes:
+      - ./test-data/nginx-corp.conf:/etc/nginx/nginx.conf
+    healthcheck:
+      test: ["CMD", "sh", "-c", "curl -f http://localhost/ || exit 1"]
+      interval: 2s
+      timeout: 1s
+      retries: 5
+      start_period: 3s
+
+  # Test network 3: Alternative home network (192.168.0.x)
+  nginx-alt:
+    image: nginx:alpine
+    networks:
+      alt_network:
+        ipv4_address: 192.168.0.100
+    ports:
+      - "8082:80"
+    healthcheck:
+      test: ["CMD", "sh", "-c", "curl -f http://localhost/ || exit 1"]
+      interval: 2s
+      timeout: 1s
+      retries: 5
+      start_period: 3s
+
+  # SSDP/UPnP service for testing service discovery
+  ssdp-service:
+    image: alpine
+    networks:
+      home_network:
+        ipv4_address: 192.168.1.20
+    command: |
+      sh -c '
+        apk add --no-cache socat &&
+        while true; do
+          printf "HTTP/1.1 200 OK\r\nServer: Test/1.0 UPnP/1.0 TestDevice/1.0\r\nST: upnp:rootdevice\r\nUSN: uuid:test-device-uuid::upnp:rootdevice\r\nLocation: http://192.168.1.20:8080/device.xml\r\nCache-Control: max-age=1800\r\n\r\n" | socat - UDP4-SENDTO:239.255.255.250:1900,broadcast &&
+          sleep 30
+        done
+      '
+
+  # Integration test runner - executes the network-mapper scan
+  test-runner:
+    build: .
+    container_name: network-mapper-test-runner
+    networks:
+      - home_network
+      - corp_network
+      - alt_network
+    depends_on:
+      nginx-home:
+        condition: service_healthy
+      nginx-corp:
+        condition: service_healthy
+      nginx-alt:
+        condition: service_healthy
+      ssdp-service:
+        condition: service_started
+    entrypoint: ["/bin/sh"]
+    command:
+      - -c
+      - |
+        echo "🧪 Integration Test - Network Mapper Multi-Network Discovery"
+        echo "============================================================="
+        echo ""
+        echo "📋 Test Environment:"
+        echo "  - Home Network:   192.168.1.0/24 (nginx on .10, SSDP on .20)"
+        echo "  - Corp Network:   10.10.0.0/24 (nginx on .50)"
+        echo "  - Alt Network:    192.168.0.0/24 (nginx on .100)"
+        echo ""
+        echo "🔍 Running network-mapper in intelligent scan mode..."
+        echo "============================================================="
+        echo ""
+
+        # Run network-mapper with intelligent discovery
+        ./network-mapper --scan-mode intelligent --thoroughness 4 --timeout 5 --verbose
+        EXIT_CODE=$$?
+
+        echo ""
+        echo "============================================================="
+        if [ $$EXIT_CODE -eq 0 ]; then
+          echo "✅ Integration test completed successfully!"
+          echo ""
+          echo "📊 Expected Discoveries:"
+          echo "  ✓ 3 network segments (192.168.1.0/24, 10.10.0.0/24, 192.168.0.0/24)"
+          echo "  ✓ 3 gateway IPs (192.168.1.1, 10.10.0.1, 192.168.0.1)"
+          echo "  ✓ nginx services on ports 80"
+          echo "  ✓ SSDP/UPnP service discovery"
+        else
+          echo "❌ Integration test failed with exit code: $$EXIT_CODE"
+        fi
+        echo "============================================================="
+
+        exit $$EXIT_CODE
+
+networks:
+  home_network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 192.168.1.0/24
+          gateway: 192.168.1.1
+
+  corp_network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 10.10.0.0/24
+          gateway: 10.10.0.1
+
+  alt_network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 192.168.0.0/24
+          gateway: 192.168.0.1
