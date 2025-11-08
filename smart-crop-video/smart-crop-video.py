@@ -1432,11 +1432,21 @@ def main():
                         choice = ""
                     elif choice is None:
                         # This shouldn't happen, but just in case
-                        choice = input()
+                        # Check for AUTO_CONFIRM before attempting input
+                        if os.getenv('AUTO_CONFIRM'):
+                            print("\n\nAUTO_CONFIRM enabled, using automatic selection")
+                            choice = ""
+                        else:
+                            choice = input()
             else:
                 # Not a terminal (piped input or non-interactive), read directly
-                print(f"Which crop looks best? [1-{len(unique_candidates)}] (or press Enter for automatic selection): ", end='', flush=True)
-                choice = input().strip()
+                # Check for AUTO_CONFIRM before attempting input
+                if os.getenv('AUTO_CONFIRM'):
+                    print("AUTO_CONFIRM enabled, using automatic selection")
+                    choice = ""
+                else:
+                    print(f"Which crop looks best? [1-{len(unique_candidates)}] (or press Enter for automatic selection): ", end='', flush=True)
+                    choice = input().strip()
 
             # Process text input choice if no web selection was made
             if web_selection is None:
@@ -1549,15 +1559,25 @@ def main():
                     enable_speedup = False
                 elif choice is None:
                     # This shouldn't happen, but just in case
-                    choice = input().strip()
-                    enable_speedup = choice.lower() in ('y', 'yes')
+                    # Check for AUTO_CONFIRM before attempting input
+                    if os.getenv('AUTO_CONFIRM'):
+                        print("\n\nAUTO_CONFIRM enabled, defaulting to no acceleration")
+                        enable_speedup = False
+                    else:
+                        choice = input().strip()
+                        enable_speedup = choice.lower() in ('y', 'yes')
                 else:
                     enable_speedup = choice.lower() in ('y', 'yes')
         else:
             # Not a terminal (piped input or non-interactive), read directly
-            print(f"Accelerate boring sections? [y/N]: ", end='', flush=True)
-            choice = input().strip()
-            enable_speedup = choice.lower() in ('y', 'yes')
+            # Check for AUTO_CONFIRM before attempting input
+            if os.getenv('AUTO_CONFIRM'):
+                print("AUTO_CONFIRM enabled, defaulting to no acceleration")
+                enable_speedup = False
+            else:
+                print(f"Accelerate boring sections? [y/N]: ", end='', flush=True)
+                choice = input().strip()
+                enable_speedup = choice.lower() in ('y', 'yes')
 
     scenes = None
     scene_selections = None
