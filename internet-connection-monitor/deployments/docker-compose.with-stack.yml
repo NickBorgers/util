@@ -41,6 +41,7 @@ services:
       LOG_LEVEL: "info"
       LOG_FORMAT: "json"
     ports:
+      - "8080:8080"    # Health check endpoint
       - "161:161/udp"  # SNMP
       - "9090:9090"    # Prometheus metrics
     depends_on:

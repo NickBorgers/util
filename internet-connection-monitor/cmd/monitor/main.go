@@ -11,6 +11,7 @@ import (
 
 	"github.com/nickborgers/monorepo/internet-connection-monitor/internal/browser"
 	"github.com/nickborgers/monorepo/internet-connection-monitor/internal/config"
+	"github.com/nickborgers/monorepo/internet-connection-monitor/internal/health"
 	"github.com/nickborgers/monorepo/internet-connection-monitor/internal/metrics"
 	"github.com/nickborgers/monorepo/internet-connection-monitor/internal/outputs"
 	"github.com/nickborgers/monorepo/internet-connection-monitor/internal/testloop"
@@ -54,10 +55,51 @@ func main() {
 	dispatcher.RegisterOutput(logger)
 	log.Println("✓ JSON logger enabled")
 
-	// TODO: Initialize optional outputs
-	// - Elasticsearch (if enabled)
-	// - Prometheus (if enabled)
-	// - SNMP (if enabled)
+	// Initialize optional outputs
+	log.Printf("DEBUG: ES_ENABLED config value: %v", cfg.Elasticsearch.Enabled)
+	esOutput, err := outputs.NewElasticsearchOutput(&cfg.Elasticsearch)
+	if err != nil {
+		log.Fatalf("Failed to create Elasticsearch output: %v", err)
+	}
+	if esOutput != nil {
+		dispatcher.RegisterOutput(esOutput)
+		log.Println("✓ Elasticsearch output enabled")
+	} else {
+		log.Println("Elasticsearch output not enabled (config.Enabled=false)")
+	}
+
+	promOutput, err := outputs.NewPrometheusOutput(&cfg.Prometheus)
+	if err != nil {
+		log.Fatalf("Failed to create Prometheus output: %v", err)
+	}
+	if promOutput != nil {
+		dispatcher.RegisterOutput(promOutput)
+		log.Println("✓ Prometheus exporter enabled")
+	}
+
+	snmpOutput, err := outputs.NewSNMPOutput(&cfg.SNMP)
+	if err != nil {
+		log.Fatalf("Failed to create SNMP output: %v", err)
+	}
+	if snmpOutput != nil {
+		dispatcher.RegisterOutput(snmpOutput)
+		log.Println("✓ SNMP agent enabled")
+	}
+
+	// Initialize health check endpoint
+	healthCfg := &health.Config{
+		Enabled:       cfg.Advanced.HealthCheckEnabled,
+		Port:          cfg.Advanced.HealthCheckPort,
+		Path:          cfg.Advanced.HealthCheckPath,
+		ListenAddress: "0.0.0.0",
+	}
+	healthServer, err := health.NewHealthServer(healthCfg)
+	if err != nil {
+		log.Fatalf("Failed to create health check server: %v", err)
+	}
+	if healthServer != nil {
+		log.Println("✓ Health check endpoint enabled")
+	}
 
 	// Create test loop
 	testLoop, err := testloop.NewTestLoop(cfg, browserCtrl, dispatcher)
@@ -110,10 +152,39 @@ func main() {
 	}
 	log.Println("✓ Browser closed")
 
-	// TODO: Close other services
-	// - Flush Elasticsearch bulk processor
-	// - Stop Prometheus HTTP server
-	// - Stop SNMP agent
+	// Close all output modules
+	if esOutput != nil {
+		if err := esOutput.Close(); err != nil {
+			log.Printf("Error closing Elasticsearch output: %v", err)
+		} else {
+			log.Println("✓ Elasticsearch output closed")
+		}
+	}
+
+	if promOutput != nil {
+		if err := promOutput.Close(); err != nil {
+			log.Printf("Error closing Prometheus output: %v", err)
+		} else {
+			log.Println("✓ Prometheus exporter closed")
+		}
+	}
+
+	if snmpOutput != nil {
+		if err := snmpOutput.Close(); err != nil {
+			log.Printf("Error closing SNMP output: %v", err)
+		} else {
+			log.Println("✓ SNMP agent closed")
+		}
+	}
+
+	// Close health check server
+	if healthServer != nil {
+		if err := healthServer.Close(); err != nil {
+			log.Printf("Error closing health check server: %v", err)
+		} else {
+			log.Println("✓ Health check server closed")
+		}
+	}
 
 	log.Println("Shutdown complete")
 }
@@ -137,8 +208,9 @@ func loadConfig() (*config.Config, error) {
 	}
 
 	// Override with environment variables
-	// TODO: Implement env var parsing
-	// This allows Docker deployment with env vars only
+	if err := config.LoadFromEnv(cfg); err != nil {
+		return nil, fmt.Errorf("failed to load environment variables: %w", err)
+	}
 
 	// Load default sites if none configured
 	if len(cfg.Sites.List) == 0 {

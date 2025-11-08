@@ -1,0 +1,939 @@
+{
+  "id": null,
+  "uid": "internet-conn-mon",
+  "title": "Internet Connection Monitor",
+  "tags": [
+    "internet",
+    "monitoring",
+    "connectivity",
+    "user-experience"
+  ],
+  "timezone": "browser",
+  "schemaVersion": 38,
+  "version": 1,
+  "refresh": "1m",
+  "time": {
+    "from": "now-24h",
+    "to": "now"
+  },
+  "timepicker": {
+    "refresh_intervals": [
+      "30s",
+      "1m",
+      "5m",
+      "15m",
+      "30m",
+      "1h"
+    ],
+    "time_options": [
+      "5m",
+      "15m",
+      "1h",
+      "6h",
+      "12h",
+      "24h",
+      "7d",
+      "30d",
+      "90d"
+    ]
+  },
+  "templating": {
+    "list": [
+      {
+        "name": "site_name",
+        "type": "query",
+        "label": "Site",
+        "datasource": {
+          "type": "elasticsearch",
+          "uid": "${DS_ELASTICSEARCH}"
+        },
+        "query": "{\"find\": \"terms\", \"field\": \"site.name.keyword\"}",
+        "multi": true,
+        "includeAll": true,
+        "current": {
+          "selected": true,
+          "text": "All",
+          "value": "$__all"
+        },
+        "refresh": 1
+      },
+      {
+        "name": "interval",
+        "type": "interval",
+        "label": "Interval",
+        "auto": true,
+        "auto_count": 30,
+        "auto_min": "1m",
+        "options": [
+          {
+            "selected": false,
+            "text": "1m",
+            "value": "1m"
+          },
+          {
+            "selected": true,
+            "text": "5m",
+            "value": "5m"
+          },
+          {
+            "selected": false,
+            "text": "15m",
+            "value": "15m"
+          },
+          {
+            "selected": false,
+            "text": "1h",
+            "value": "1h"
+          }
+        ],
+        "current": {
+          "text": "5m",
+          "value": "5m"
+        }
+      }
+    ]
+  },
+  "annotations": {
+    "list": [
+      {
+        "datasource": {
+          "type": "elasticsearch",
+          "uid": "${DS_ELASTICSEARCH}"
+        },
+        "enable": true,
+        "name": "Deployment Events",
+        "iconColor": "blue",
+        "query": "tags:deployment"
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 0,
+        "y": 0
+      },
+      "type": "stat",
+      "title": "Success Rate (Last Hour)",
+      "targets": [
+        {
+          "datasource": {
+            "type": "elasticsearch",
+            "uid": "${DS_ELASTICSEARCH}"
+          },
+          "query": "site.name.keyword:($site_name)",
+          "metrics": [
+            {
+              "id": "1",
+              "type": "avg",
+              "field": "status.success"
+            }
+          ],
+          "timeField": "@timestamp",
+          "bucketAggs": []
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "value": null,
+                "color": "red"
+              },
+              {
+                "value": 0.95,
+                "color": "yellow"
+              },
+              {
+                "value": 0.99,
+                "color": "green"
+              }
+            ]
+          },
+          "decimals": 2
+        }
+      },
+      "options": {
+        "orientation": "auto",
+        "textMode": "value_and_name",
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "auto"
+      }
+    },
+    {
+      "id": 2,
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 6,
+        "y": 0
+      },
+      "type": "stat",
+      "title": "Avg Latency (Last Hour)",
+      "targets": [
+        {
+          "datasource": {
+            "type": "elasticsearch",
+            "uid": "${DS_ELASTICSEARCH}"
+          },
+          "query": "status.success:true AND site.name.keyword:($site_name)",
+          "metrics": [
+            {
+              "id": "1",
+              "type": "avg",
+              "field": "timings.total_duration_ms"
+            }
+          ],
+          "timeField": "@timestamp",
+          "bucketAggs": []
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "value": null,
+                "color": "green"
+              },
+              {
+                "value": 2000,
+                "color": "yellow"
+              },
+              {
+                "value": 5000,
+                "color": "red"
+              }
+            ]
+          },
+          "decimals": 0
+        }
+      },
+      "options": {
+        "orientation": "auto",
+        "textMode": "value_and_name",
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "auto"
+      }
+    },
+    {
+      "id": 3,
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 12,
+        "y": 0
+      },
+      "type": "stat",
+      "title": "P95 Latency (Last Hour)",
+      "targets": [
+        {
+          "datasource": {
+            "type": "elasticsearch",
+            "uid": "${DS_ELASTICSEARCH}"
+          },
+          "query": "status.success:true AND site.name.keyword:($site_name)",
+          "metrics": [
+            {
+              "id": "1",
+              "type": "percentiles",
+              "field": "timings.total_duration_ms",
+              "settings": {
+                "percents": [
+                  "95"
+                ]
+              }
+            }
+          ],
+          "timeField": "@timestamp",
+          "bucketAggs": []
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "value": null,
+                "color": "green"
+              },
+              {
+                "value": 3000,
+                "color": "yellow"
+              },
+              {
+                "value": 8000,
+                "color": "red"
+              }
+            ]
+          },
+          "decimals": 0
+        }
+      },
+      "options": {
+        "orientation": "auto",
+        "textMode": "value_and_name",
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "auto"
+      }
+    },
+    {
+      "id": 4,
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 18,
+        "y": 0
+      },
+      "type": "stat",
+      "title": "Total Tests (Last Hour)",
+      "targets": [
+        {
+          "datasource": {
+            "type": "elasticsearch",
+            "uid": "${DS_ELASTICSEARCH}"
+          },
+          "query": "site.name.keyword:($site_name)",
+          "metrics": [
+            {
+              "id": "1",
+              "type": "count"
+            }
+          ],
+          "timeField": "@timestamp",
+          "bucketAggs": []
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "value": null,
+                "color": "blue"
+              }
+            ]
+          }
+        }
+      },
+      "options": {
+        "orientation": "auto",
+        "textMode": "value_and_name",
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "auto"
+      }
+    },
+    {
+      "id": 5,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 4
+      },
+      "type": "timeseries",
+      "title": "Success Rate Over Time",
+      "targets": [
+        {
+          "datasource": {
+            "type": "elasticsearch",
+            "uid": "${DS_ELASTICSEARCH}"
+          },
+          "query": "site.name.keyword:($site_name)",
+          "metrics": [
+            {
+              "id": "1",
+              "type": "avg",
+              "field": "status.success"
+            }
+          ],
+          "timeField": "@timestamp",
+          "bucketAggs": [
+            {
+              "id": "2",
+              "type": "date_histogram",
+              "field": "@timestamp",
+              "settings": {
+                "interval": "$interval",
+                "min_doc_count": 0
+              }
+            }
+          ]
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1,
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "fillOpacity": 20,
+            "spanNulls": false,
+            "showPoints": "never",
+            "axisPlacement": "auto"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "value": null,
+                "color": "red"
+              },
+              {
+                "value": 0.95,
+                "color": "yellow"
+              },
+              {
+                "value": 0.99,
+                "color": "green"
+              }
+            ]
+          }
+        }
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        },
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true,
+          "calcs": [
+            "mean",
+            "min",
+            "max"
+          ]
+        }
+      }
+    },
+    {
+      "id": 6,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 4
+      },
+      "type": "timeseries",
+      "title": "Page Load Times (Avg, P95, P99)",
+      "targets": [
+        {
+          "datasource": {
+            "type": "elasticsearch",
+            "uid": "${DS_ELASTICSEARCH}"
+          },
+          "query": "status.success:true AND site.name.keyword:($site_name)",
+          "alias": "Average",
+          "metrics": [
+            {
+              "id": "1",
+              "type": "avg",
+              "field": "timings.total_duration_ms"
+            }
+          ],
+          "timeField": "@timestamp",
+          "bucketAggs": [
+            {
+              "id": "2",
+              "type": "date_histogram",
+              "field": "@timestamp",
+              "settings": {
+                "interval": "$interval",
+                "min_doc_count": 0
+              }
+            }
+          ]
+        },
+        {
+          "datasource": {
+            "type": "elasticsearch",
+            "uid": "${DS_ELASTICSEARCH}"
+          },
+          "query": "status.success:true AND site.name.keyword:($site_name)",
+          "alias": "P95",
+          "metrics": [
+            {
+              "id": "1",
+              "type": "percentiles",
+              "field": "timings.total_duration_ms",
+              "settings": {
+                "percents": [
+                  "95"
+                ]
+              }
+            }
+          ],
+          "timeField": "@timestamp",
+          "bucketAggs": [
+            {
+              "id": "2",
+              "type": "date_histogram",
+              "field": "@timestamp",
+              "settings": {
+                "interval": "$interval",
+                "min_doc_count": 0
+              }
+            }
+          ]
+        },
+        {
+          "datasource": {
+            "type": "elasticsearch",
+            "uid": "${DS_ELASTICSEARCH}"
+          },
+          "query": "status.success:true AND site.name.keyword:($site_name)",
+          "alias": "P99",
+          "metrics": [
+            {
+              "id": "1",
+              "type": "percentiles",
+              "field": "timings.total_duration_ms",
+              "settings": {
+                "percents": [
+                  "99"
+                ]
+              }
+            }
+          ],
+          "timeField": "@timestamp",
+          "bucketAggs": [
+            {
+              "id": "2",
+              "type": "date_histogram",
+              "field": "@timestamp",
+              "settings": {
+                "interval": "$interval",
+                "min_doc_count": 0
+              }
+            }
+          ]
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "fillOpacity": 0,
+            "spanNulls": false,
+            "showPoints": "never"
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "P99"
+            },
+            "properties": [
+              {
+                "id": "custom.lineStyle",
+                "value": {
+                  "dash": [
+                    10,
+                    10
+                  ],
+                  "fill": "dash"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi"
+        },
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        }
+      }
+    },
+    {
+      "id": 7,
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 12
+      },
+      "type": "timeseries",
+      "title": "DNS Lookup Time",
+      "targets": [
+        {
+          "datasource": {
+            "type": "elasticsearch",
+            "uid": "${DS_ELASTICSEARCH}"
+          },
+          "query": "status.success:true AND site.name.keyword:($site_name)",
+          "alias": "Avg DNS",
+          "metrics": [
+            {
+              "id": "1",
+              "type": "avg",
+              "field": "timings.dns_lookup_ms"
+            }
+          ],
+          "timeField": "@timestamp",
+          "bucketAggs": [
+            {
+              "id": "2",
+              "type": "date_histogram",
+              "field": "@timestamp",
+              "settings": {
+                "interval": "$interval"
+              }
+            }
+          ]
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 20
+          }
+        }
+      }
+    },
+    {
+      "id": 8,
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 12
+      },
+      "type": "timeseries",
+      "title": "TCP Connection Time",
+      "targets": [
+        {
+          "datasource": {
+            "type": "elasticsearch",
+            "uid": "${DS_ELASTICSEARCH}"
+          },
+          "query": "status.success:true AND site.name.keyword:($site_name)",
+          "alias": "Avg TCP",
+          "metrics": [
+            {
+              "id": "1",
+              "type": "avg",
+              "field": "timings.tcp_connection_ms"
+            }
+          ],
+          "timeField": "@timestamp",
+          "bucketAggs": [
+            {
+              "id": "2",
+              "type": "date_histogram",
+              "field": "@timestamp",
+              "settings": {
+                "interval": "$interval"
+              }
+            }
+          ]
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 20
+          }
+        }
+      }
+    },
+    {
+      "id": 9,
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 12
+      },
+      "type": "timeseries",
+      "title": "TLS Handshake Time",
+      "targets": [
+        {
+          "datasource": {
+            "type": "elasticsearch",
+            "uid": "${DS_ELASTICSEARCH}"
+          },
+          "query": "status.success:true AND site.name.keyword:($site_name)",
+          "alias": "Avg TLS",
+          "metrics": [
+            {
+              "id": "1",
+              "type": "avg",
+              "field": "timings.tls_handshake_ms"
+            }
+          ],
+          "timeField": "@timestamp",
+          "bucketAggs": [
+            {
+              "id": "2",
+              "type": "date_histogram",
+              "field": "@timestamp",
+              "settings": {
+                "interval": "$interval"
+              }
+            }
+          ]
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 20
+          }
+        }
+      }
+    },
+    {
+      "id": 10,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 20
+      },
+      "type": "bargauge",
+      "title": "Success Rate by Site (Last 24h)",
+      "targets": [
+        {
+          "datasource": {
+            "type": "elasticsearch",
+            "uid": "${DS_ELASTICSEARCH}"
+          },
+          "query": "site.name.keyword:($site_name)",
+          "metrics": [
+            {
+              "id": "1",
+              "type": "avg",
+              "field": "status.success"
+            }
+          ],
+          "timeField": "@timestamp",
+          "bucketAggs": [
+            {
+              "id": "2",
+              "type": "terms",
+              "field": "site.name.keyword",
+              "settings": {
+                "size": "20",
+                "order": "asc",
+                "orderBy": "_term"
+              }
+            }
+          ]
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "value": null,
+                "color": "red"
+              },
+              {
+                "value": 0.95,
+                "color": "yellow"
+              },
+              {
+                "value": 0.99,
+                "color": "green"
+              }
+            ]
+          }
+        }
+      },
+      "options": {
+        "orientation": "horizontal",
+        "displayMode": "gradient",
+        "showUnfilled": true
+      }
+    },
+    {
+      "id": 11,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 20
+      },
+      "type": "piechart",
+      "title": "Error Distribution (Last 24h)",
+      "targets": [
+        {
+          "datasource": {
+            "type": "elasticsearch",
+            "uid": "${DS_ELASTICSEARCH}"
+          },
+          "query": "status.success:false AND site.name.keyword:($site_name)",
+          "metrics": [
+            {
+              "id": "1",
+              "type": "count"
+            }
+          ],
+          "timeField": "@timestamp",
+          "bucketAggs": [
+            {
+              "id": "2",
+              "type": "terms",
+              "field": "status.error.type.keyword",
+              "settings": {
+                "size": "10",
+                "order": "desc",
+                "orderBy": "_count"
+              }
+            }
+          ]
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true,
+          "values": [
+            "value",
+            "percent"
+          ]
+        },
+        "pieType": "donut",
+        "displayLabels": [
+          "name",
+          "percent"
+        ]
+      }
+    },
+    {
+      "id": 12,
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 28
+      },
+      "type": "table",
+      "title": "Recent Failures",
+      "targets": [
+        {
+          "datasource": {
+            "type": "elasticsearch",
+            "uid": "${DS_ELASTICSEARCH}"
+          },
+          "query": "status.success:false AND site.name.keyword:($site_name)",
+          "metrics": [
+            {
+              "id": "1",
+              "type": "raw_document"
+            }
+          ],
+          "timeField": "@timestamp",
+          "bucketAggs": []
+        }
+      ],
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "test_id": true,
+              "browser": true,
+              "environment": true
+            },
+            "indexByName": {
+              "@timestamp": 0,
+              "site.name": 1,
+              "site.url": 2,
+              "status.error.type": 3,
+              "status.error.message": 4,
+              "timings.total_duration_ms": 5
+            },
+            "renameByName": {
+              "@timestamp": "Time",
+              "site.name": "Site",
+              "site.url": "URL",
+              "status.error.type": "Error Type",
+              "status.error.message": "Error Message",
+              "timings.total_duration_ms": "Duration (ms)"
+            }
+          }
+        }
+      ],
+      "options": {
+        "showHeader": true,
+        "footer": {
+          "show": false
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "left"
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Time"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 180
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Duration (ms)"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 120
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}
