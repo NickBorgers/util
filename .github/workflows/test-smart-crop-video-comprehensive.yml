@@ -65,6 +65,15 @@ jobs:
           fi
           echo "✅ Test video exists: $(du -h example_movie.mov)"
 
+      - name: Build Docker image for testing
+        working-directory: smart-crop-video
+        run: |
+          echo "Building smart-crop-video Docker image..."
+          docker build -t smart-crop-video:test .
+
+          echo "✅ Docker image built successfully"
+          docker images | grep smart-crop-video
+
       - name: Run end-to-end video validation tests
         working-directory: smart-crop-video
         run: |
