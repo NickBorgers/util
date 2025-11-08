@@ -385,8 +385,6 @@ See [TESTING.md](TESTING.md) for complete testing documentation.
 
 ## 📝 Notes
 
-- **CDP warnings** - The "could not unmarshal event" errors from chromedp are harmless. They're from Chrome DevTools Protocol events that chromedp v0.9.5 doesn't fully support. The application works correctly despite these warnings.
-
 - **Timing metrics** - Timing fields are collected from browser Performance API. Total duration, TTFB, DOM loaded, and page load metrics work correctly. DNS, TCP, and TLS breakdown timings are currently broken (always return 0) - extraction logic exists but the Performance API isn't populating these fields correctly. Needs investigation and testing.
 
 - **Grafana dashboard** - Pre-built dashboard JSON exists and works with the Elasticsearch output.

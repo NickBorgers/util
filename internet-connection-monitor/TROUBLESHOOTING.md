@@ -2,51 +2,6 @@
 
 ## Common Issues
 
-### "ERROR: could not unmarshal event" in logs
-
-**Symptoms:**
-You see many error messages like:
-```
-ERROR: could not unmarshal event: parse error: expected string near offset 1805 of 'cookiePart...'
-ERROR: could not unmarshal event: unknown PrivateNetworkRequestPolicy value: PermissionBlock
-```
-
-**Cause:**
-These are harmless warnings from chromedp v0.9.5 not recognizing newer Chrome DevTools Protocol events. They occur because:
-- chromedp v0.9.5 is compatible with Go 1.21
-- Newer chromedp versions require Go 1.23+
-- Modern Chrome sends protocol events that the older chromedp doesn't know about
-
-**Impact:**
-- ✅ **No functional impact** - Tests work perfectly
-- ✅ **Metrics are accurate** - All timing data is correct
-- ✅ **Sites load successfully** - Browser automation works fine
-- ⚠️ **Logs are noisy** - Makes output harder to read
-
-**Solution:**
-
-All Makefile log commands automatically filter these warnings:
-
-```bash
-# All of these filter CDP warnings automatically
-make monitor-logs
-make logs-standalone
-make demo-logs
-make quick-start
-make watch-json
-```
-
-**Manual filtering:**
-If viewing logs directly with Docker:
-```bash
-docker logs internet-monitor 2>&1 | grep -v "ERROR: could not unmarshal"
-```
-
-**Future fix:**
-When Go 1.23+ is available, upgrade chromedp to latest version which handles these events properly.
-
----
-
 ## Service Won't Start
 
 ### Port conflicts
@@ -328,10 +283,9 @@ make shell-monitor
 
 ## Known Limitations
 
-1. **CDP warnings** - Harmless but noisy (automatically filtered in Makefile commands)
-2. **Timing granularity** - Some detailed timing fields (DNS, TCP, TLS) show 0 (performance.timing API limitations)
-3. **Go version** - Requires Go 1.21 (chromedp compatibility)
-4. **Single browser** - Tests serially (by design, mimics real user)
+1. **Timing granularity** - Some detailed timing fields (DNS, TCP, TLS) show 0 (performance.timing API limitations)
+2. **Go version** - Requires Go 1.25+
+3. **Single browser** - Tests serially (by design, mimics real user)
 
 ---
 

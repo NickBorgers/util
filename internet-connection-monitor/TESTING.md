@@ -251,11 +251,9 @@ Add new validation steps to `test-integration.sh`:
 
 ## Known Issues
 
-1. **CDP Warnings**: The browser logs contain harmless "could not unmarshal event" warnings from chromedp. These are filtered in the Makefile commands and do not indicate failures.
+1. **Timing Zeros**: Some timing fields (DNS, TCP, TLS) may show 0ms values. This is not validated and may indicate either very fast connections or issues with the extraction logic.
 
-2. **Timing Zeros**: Some timing fields (DNS, TCP, TLS) may show 0ms values. This is not validated and may indicate either very fast connections or issues with the extraction logic.
-
-3. **No Unit Tests**: Critical logic (especially timing extraction) has zero test coverage.
+2. **No Unit Tests**: Critical logic (especially timing extraction) has zero test coverage.
 
 ## Roadmap
 

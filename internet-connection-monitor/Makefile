@@ -31,15 +31,14 @@ quick-start: build ## ⚡ Quick start: Build image and run monitor (fastest way 
 	@echo ""
 	@echo "$(YELLOW)Viewing test results (Ctrl+C to stop):$(NC)"
 	@echo "$(CYAN)────────────────────────────────────────────────────────────────$(NC)"
-	@docker logs -f quick-monitor 2>&1 | grep -v "ERROR: could not unmarshal"
+	@docker logs -f quick-monitor
 
 quick-test: build ## 🧪 Quick test: Run monitor for 30 seconds and show results
 	@echo "$(CYAN)Running quick 30-second test...$(NC)"
 	@timeout 30 docker run --rm \
 		-e INTER_TEST_DELAY=5s \
 		-e SITES="google.com,github.com,example.com" \
-		internet-connection-monitor:latest 2>&1 \
-		| grep -v "ERROR: could not unmarshal" || true
+		internet-connection-monitor:latest || true
 	@echo ""
 	@echo "$(GREEN)✓ Test complete$(NC)"
 
@@ -50,7 +49,6 @@ watch-json: ## 👀 Watch test results in real-time (formatted JSON)
 	@echo "$(CYAN)Watching test results (Ctrl+C to stop)...$(NC)"
 	@echo "$(CYAN)────────────────────────────────────────────────────────────────$(NC)"
 	@docker logs -f internet-monitor 2>&1 \
-		| grep -v "ERROR: could not unmarshal" \
 		| grep "^{" \
 		| jq -C '.' || docker logs -f quick-monitor 2>&1 | grep "^{"
 
@@ -160,15 +158,14 @@ demo-status: ## 📊 Show status of all demo services
 	@echo -n "  Monitor:       "
 	@curl -s -o /dev/null -w "%{http_code}" http://localhost:9090/metrics 2>/dev/null | grep -q 200 && echo "$(GREEN)✓ Healthy$(NC)" || echo "$(RED)✗ Not responding$(NC)"
 
-demo-logs: ## 📜 View logs from all demo services (monitor logs filtered)
-	@cd deployments && docker-compose -f docker-compose.with-stack.yml logs -f 2>&1 | grep -v "ERROR: could not unmarshal"
+demo-logs: ## 📜 View logs from all demo services
+	@cd deployments && docker-compose -f docker-compose.with-stack.yml logs -f
 
 ##@ Logs and Debugging
 
-monitor-logs: ## 📝 View internet-monitor test results (filtered, clean output)
+monitor-logs: ## 📝 View internet-monitor test results
 	@echo "$(CYAN)Monitoring test results (Ctrl+C to exit):$(NC)"
-	@echo "$(YELLOW)Filtering out harmless CDP warnings...$(NC)"
-	@cd deployments && docker-compose -f docker-compose.with-stack.yml logs -f internet-monitor 2>&1 | grep -v "ERROR: could not unmarshal"
+	@cd deployments && docker-compose -f docker-compose.with-stack.yml logs -f internet-monitor
 
 es-logs: ## 📝 View Elasticsearch logs
 	@cd deployments && docker-compose -f docker-compose.with-stack.yml logs -f elasticsearch
@@ -244,9 +241,9 @@ run: ## ▶️  Run monitor in standalone mode (no Elasticsearch)
 stop: ## ⏹️  Stop standalone monitor
 	@cd deployments && docker-compose stop
 
-logs-standalone: ## 📜 View standalone monitor logs (filtered)
-	@echo "$(CYAN)Viewing monitor logs (CDP warnings filtered)...$(NC)"
-	@cd deployments && docker-compose logs -f internet-monitor 2>&1 | grep -v "ERROR: could not unmarshal"
+logs-standalone: ## 📜 View standalone monitor logs
+	@echo "$(CYAN)Viewing monitor logs...$(NC)"
+	@cd deployments && docker-compose logs -f internet-monitor
 
 clean-standalone: ## 🗑️  Stop and remove standalone monitor
 	@cd deployments && docker-compose down

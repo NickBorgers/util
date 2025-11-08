@@ -54,11 +54,6 @@ func NewControllerImpl(cfg *config.BrowserConfig) (*ControllerImpl, error) {
 		opts = append(opts, chromedp.Flag("blink-settings", "imagesEnabled=false"))
 	}
 
-	// Note: The CDP "could not unmarshal event" errors are harmless warnings
-	// from chromedp v0.9.5 not supporting newer Chrome protocol events.
-	// They don't affect functionality. To suppress them, we'd need to upgrade
-	// chromedp or filter stderr. For now, Makefile commands filter them.
-
 	return &ControllerImpl{
 		config:        cfg,
 		allocatorOpts: opts,
