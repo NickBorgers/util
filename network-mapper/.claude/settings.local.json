@@ -1,0 +1,24 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(devcontainer up:*)",
+      "Bash(devcontainer exec:*)",
+      "Bash(git commit:*)",
+      "Bash(git pull:*)",
+      "Read(//home/nborgers/code/util/**)",
+      "Bash(git add:*)",
+      "Bash(git tag:*)",
+      "Bash(git push:*)",
+      "WebFetch(domain:github.com)",
+      "Bash(gh run list:*)",
+      "Bash(gh run view:*)",
+      "Bash(go run:*)",
+      "Bash(gh release view:*)",
+      "Bash(go build:*)",
+      "Bash(docker --version:*)",
+      "Bash(docker-compose:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
