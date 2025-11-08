@@ -418,9 +418,13 @@ def get_crop_position_from_video(
     except ImportError:
         raise ImportError("PIL/Pillow is required for frame analysis")
 
-    # Extract frames at same timestamp
-    orig_frame = extract_frame(original_video, timestamp)
-    crop_frame = extract_frame(cropped_video, timestamp)
+    # Extract frames at same timestamp with unique filenames
+    temp_dir = Path(tempfile.gettempdir())
+    orig_frame = temp_dir / f"frame_orig_{timestamp:.2f}_{original_video.stem}.png"
+    crop_frame = temp_dir / f"frame_crop_{timestamp:.2f}_{cropped_video.stem}.png"
+
+    extract_frame(original_video, timestamp, orig_frame)
+    extract_frame(cropped_video, timestamp, crop_frame)
 
     orig_img = Image.open(orig_frame).convert('RGB')
     crop_img = Image.open(crop_frame).convert('RGB')
@@ -462,7 +466,9 @@ def get_crop_position_from_video(
                 best_position = (x, y)
 
     # Clean up temporary frames
-    orig_frame.unlink()
-    crop_frame.unlink()
+    if orig_frame.exists():
+        orig_frame.unlink()
+    if crop_frame.exists():
+        crop_frame.unlink()
 
     return best_position
