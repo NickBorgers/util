@@ -10,9 +10,46 @@ env:
   GO_VERSION: '1.21'
 
 jobs:
+  # Run tests before creating release
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: ${{ env.GO_VERSION }}
+
+    - name: Download dependencies
+      working-directory: network-mapper
+      run: go mod download
+
+    - name: Run unit tests
+      working-directory: network-mapper
+      run: go test -v ./...
+
+  integration-test:
+    name: Integration Test
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Run integration tests
+      working-directory: network-mapper
+      run: make test-integration
+
   create-release:
     name: Create Release
     runs-on: ubuntu-latest
+    needs: [test, integration-test]
     permissions:
       contents: write
       packages: write
