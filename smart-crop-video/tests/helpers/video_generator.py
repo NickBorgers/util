@@ -1,9 +1,22 @@
 """Synthetic video generation utilities for testing smart-crop-video.
 
+⚠️  DEPRECATED FOR NORMAL TEST USE ⚠️
+
+This module is NO LONGER used for regular test execution. Pre-generated test
+fixtures in tests/fixtures/ are used instead, eliminating the need for FFmpeg
+during normal test runs.
+
+This module is kept available for:
+1. Regenerating fixtures if needed (see tests/generate_fixtures.py)
+2. Edge case tests that require dynamic video generation
+3. Future test development that may need custom videos
+
+For normal test execution, this module is optional and tests will skip if
+it's not available (e.g., if FFmpeg is not installed).
+
 This module provides functions to programmatically generate test videos with
 known characteristics (motion in specific regions, static backgrounds, color
-patterns) using FFmpeg. This enables precise testing of crop positioning and
-acceleration features.
+patterns) using FFmpeg.
 """
 
 import subprocess

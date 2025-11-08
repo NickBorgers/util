@@ -32,10 +32,16 @@ tests/
 │   ├── test_end_to_end_video.py       # E2E crop validation (10 tests) 🆕
 │   └── test_acceleration.py           # Acceleration features (9 tests) 🆕
 ├── helpers/                   # Test utilities
-│   ├── video_generator.py     # Synthetic video generation 🆕
+│   ├── video_generator.py     # Synthetic video generation (deprecated - used only for fixture regeneration)
 │   ├── frame_analyzer.py      # Frame extraction and analysis 🆕
 │   ├── docker_manager.py      # Docker container management
 │   └── api_helper.py          # API testing utilities
+├── fixtures/                  # Pre-generated test videos 🆕
+│   ├── motion_top_right.mov   # Motion in top-right corner
+│   ├── motion_center.mov      # Motion in center
+│   ├── subject_left.mov       # Subject on left side
+│   ├── multi_scene.mov        # Multi-scene with varying motion
+│   └── audio_test.mov         # Video with audio track
 ├── test_container.py          # Docker container tests (15 tests)
 ├── test_api.py                # Flask API tests (19 tests)
 ├── test_web_ui_focused.py     # Web UI tests (5 tests)
@@ -78,9 +84,9 @@ Run by default on every commit. Includes:
 pytest tests/ -m "not comprehensive" -v
 ```
 
-### Comprehensive Tests (10-15 minutes) 🆕
+### Comprehensive Tests (5-10 minutes) 🆕
 
-Run on pull requests, releases, and weekly. Validates real-world user scenarios:
+Run on pull requests, releases, and weekly. Validates real-world user scenarios using **pre-generated test fixtures** (no FFmpeg required for test execution).
 
 #### End-to-End Video Validation (10 tests)
 
@@ -104,10 +110,11 @@ Tests the most critical user concern: **"Did it crop my video correctly?"**
   - Audio duration matches video duration
 
 **Implementation:**
-- Generates synthetic test videos with motion in specific regions
-- Processes through smart-crop-video
-- Extracts frames and analyzes crop position
+- Uses pre-generated synthetic test videos with known characteristics (committed to `tests/fixtures/`)
+- Processes videos through smart-crop-video in Docker container
+- Extracts frames and analyzes crop position using template matching
 - Validates metadata and visual content
+- No FFmpeg required for test execution (only for regenerating fixtures)
 
 **Run end-to-end tests:**
 ```bash
@@ -257,11 +264,13 @@ pytest tests/ --cov=smart_crop --cov-report=html
 ### Required for All Tests
 - Python 3.11+
 - pytest >= 7.4.0
-- FFmpeg (system package)
 
 ### Additional for Comprehensive Tests 🆕
 - Pillow >= 10.0.0 (image processing)
 - numpy >= 1.24.0 (numerical analysis)
+
+### Optional (Only for Regenerating Fixtures)
+- FFmpeg (system package) - Only needed if regenerating test fixtures with `tests/generate_fixtures.py`
 
 ### Additional for Container Tests
 - Docker
@@ -343,14 +352,15 @@ def test_parallel_analysis(test_video_path):
 Place in `tests/integration/`, mark with `@pytest.mark.comprehensive`:
 
 ```python
-@pytest.mark.skipif(not HAS_FFMPEG, reason="FFmpeg not available")
+@pytest.mark.skipif(not HAS_PILLOW, reason="Pillow not available")
+@pytest.mark.skipif(not HAS_DOCKER, reason="Docker not available")
 @pytest.mark.comprehensive
 class TestEndToEndVideoCropping:
     """End-to-end tests validating video output correctness."""
 
-    def test_crop_accuracy(self, test_video):
+    def test_crop_accuracy(self, motion_top_right_video, test_videos_dir):
         """Verify crop position matches expected region."""
-        # Generate synthetic video
+        # Load pre-generated test video from fixtures
         # Process through smart-crop-video
         # Analyze output frames
         # Verify crop position
@@ -358,18 +368,29 @@ class TestEndToEndVideoCropping:
 
 ### Using Test Helpers 🆕
 
+**Preferred approach (use pre-generated fixtures):**
 ```python
-from tests.helpers import video_generator as vg
+from pathlib import Path
+
+# Load pre-generated test video
+FIXTURES_DIR = Path(__file__).parent.parent / "fixtures"
+test_video = FIXTURES_DIR / "motion_top_right.mov"
+
+# Analyze output using frame_analyzer
 from tests.helpers import frame_analyzer as fa
-
-# Generate test video with motion
-motion = vg.MotionRegion(x=1400, y=200, size=100, color="red", speed=100)
-vg.create_video_with_motion_in_region(output_path, motion, config)
-
-# Analyze output
 metadata = fa.get_video_metadata(video_path)
 crop_x, crop_y = fa.get_crop_position_from_video(original, cropped)
 frame = fa.extract_frame(video_path, timestamp=2.0)
+```
+
+**Advanced use only (regenerating fixtures):**
+```python
+# Note: video_generator is deprecated for normal test use
+# Only use for regenerating fixtures or edge cases requiring dynamic generation
+from tests.helpers import video_generator as vg
+
+motion = vg.MotionRegion(x=1400, y=200, size=100, color="red", speed=100)
+vg.create_video_with_motion_in_region(output_path, motion, config)
 ```
 
 ## Test Coverage Goals
@@ -387,20 +408,20 @@ frame = fa.extract_frame(video_path, timestamp=2.0)
 
 ### Tests Fail Locally But Pass in CI
 
-- **FFmpeg version differences**: CI uses Ubuntu's FFmpeg
 - **Docker environment**: Tests run on host in CI
 - **Playwright browsers**: Run `playwright install chromium --with-deps`
+- **Missing fixtures**: Ensure `tests/fixtures/` directory exists with test videos
 
-### Comprehensive Tests Are Slow
+### Comprehensive Tests Are Slower
 
-- **Expected**: These tests generate videos and analyze frames
-- **Optimize**: Run only affected tests during development
+- **Expected**: These tests process videos and analyze frames (5-10 minutes)
+- **Optimize**: Run only affected tests during development with `pytest tests/integration/test_end_to_end_video.py::TestEndToEndVideoCropping::test_crop_accuracy_motion_priority -v`
 - **CI**: These only run on PRs and releases, not every push
 
 ### Frame Analysis Errors
 
 - **Missing Pillow**: `pip install Pillow numpy`
-- **FFmpeg not found**: Install system FFmpeg package
+- **Missing fixtures**: Clone repository with `git lfs pull` or regenerate with `python3 tests/generate_fixtures.py`
 - **Permission errors**: Check temp directory permissions
 
 ### Docker Tests Fail
@@ -439,6 +460,7 @@ Recent improvements:
 - ✅ Added acceleration feature comprehensive tests (Nov 2024)
 - ✅ Added synthetic video generation for precise testing (Nov 2024)
 - ✅ Added frame-level analysis utilities (Nov 2024)
+- ✅ Migrated to pre-generated test fixtures, eliminating FFmpeg dependency for test execution (Nov 2024)
 
 ## Questions?
 

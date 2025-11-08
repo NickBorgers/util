@@ -18,12 +18,10 @@ import tempfile
 from pathlib import Path
 from typing import Dict, Any
 
-from tests.helpers import video_generator as vg
 from tests.helpers import frame_analyzer as fa
 
 
-# Check if FFmpeg is available
-HAS_FFMPEG = shutil.which('ffmpeg') is not None
+# Check if Pillow is available
 HAS_PILLOW = False
 try:
     import PIL
@@ -35,81 +33,42 @@ except ImportError:
 HAS_DOCKER = shutil.which('docker') is not None
 
 
+# Path to pre-generated test fixtures
+FIXTURES_DIR = Path(__file__).parent.parent / "fixtures"
+
+
 @pytest.fixture(scope="module")
 def test_videos_dir():
-    """Create a temporary directory for test videos."""
+    """Create a temporary directory for output videos."""
     with tempfile.TemporaryDirectory(prefix="smart_crop_e2e_") as tmpdir:
         yield Path(tmpdir)
 
 
 @pytest.fixture(scope="module")
-def motion_top_right_video(test_videos_dir):
-    """Generate a test video with motion in top-right region."""
-    video_path = test_videos_dir / "motion_top_right.mov"
-    config = vg.VideoConfig(width=1920, height=1080, duration=5.0, fps=30)
-
-    # Motion in top-right (x=1400, y=200 out of 1920x1080)
-    motion = vg.MotionRegion(
-        x=1400, y=200,
-        size=100,
-        color="red",
-        speed=100,
-        direction="horizontal"
-    )
-
-    vg.create_video_with_motion_in_region(
-        video_path,
-        motion,
-        config,
-        background_color="black"
-    )
-
-    return video_path
+def motion_top_right_video():
+    """Load pre-generated test video with motion in top-right region."""
+    fixture_path = FIXTURES_DIR / "motion_top_right.mov"
+    if not fixture_path.exists():
+        pytest.skip(f"Test fixture not found: {fixture_path}")
+    return fixture_path
 
 
 @pytest.fixture(scope="module")
-def motion_center_video(test_videos_dir):
-    """Generate a test video with motion in center."""
-    video_path = test_videos_dir / "motion_center.mov"
-    config = vg.VideoConfig(width=1920, height=1080, duration=5.0, fps=30)
-
-    # Motion in center
-    motion = vg.MotionRegion(
-        x=960, y=540,
-        size=150,
-        color="blue",
-        speed=100,
-        direction="circular"
-    )
-
-    vg.create_video_with_motion_in_region(
-        video_path,
-        motion,
-        config,
-        background_color="black"
-    )
-
-    return video_path
+def motion_center_video():
+    """Load pre-generated test video with motion in center."""
+    fixture_path = FIXTURES_DIR / "motion_center.mov"
+    if not fixture_path.exists():
+        pytest.skip(f"Test fixture not found: {fixture_path}")
+    return fixture_path
 
 
 @pytest.fixture(scope="module")
-def subject_left_video(test_videos_dir):
-    """Generate a test video with subject on left side."""
-    video_path = test_videos_dir / "subject_left.mov"
-    config = vg.VideoConfig(width=1920, height=1080, duration=5.0, fps=30)
-
-    # Subject on left side (x=0.25, y=0.5 normalized)
-    vg.create_video_with_subject(
-        video_path,
-        subject_position=(0.25, 0.5),
-        subject_size=250,
-        config=config,
-        subject_shape="circle",
-        subject_color="white",
-        background_color="black"
-    )
-
-    return video_path
+def subject_left_video():
+    """Load pre-generated test video with subject on left side."""
+    fixture_path = FIXTURES_DIR / "subject_left.mov"
+    if not fixture_path.exists():
+        pytest.skip(f"Test fixture not found: {fixture_path}")
+    return fixture_path
 
 
 def run_smart_crop(
@@ -146,6 +105,21 @@ def run_smart_crop(
     input_name = input_video.name
     output_name = output_video.name
 
+    # Convert container path to host path for Docker-in-Docker
+    # When running tests in Docker, we need to mount the actual host path
+    host_workspace_dir = os.environ.get('HOST_WORKSPACE_DIR')
+    if host_workspace_dir:
+        # We're running in Docker, convert /workspace path to host path
+        container_work_dir_str = str(work_dir)
+        if container_work_dir_str.startswith('/workspace'):
+            # Replace /workspace with the actual host path
+            host_work_dir = container_work_dir_str.replace('/workspace', host_workspace_dir, 1)
+        else:
+            host_work_dir = container_work_dir_str
+    else:
+        # Running directly on host
+        host_work_dir = str(work_dir)
+
     # Environment variables for the container
     environment = {
         "STRATEGY": strategy,
@@ -160,7 +134,7 @@ def run_smart_crop(
         container = client.containers.run(
             docker_image,
             command=["smart-crop-video", input_name, output_name, aspect_ratio],
-            volumes={str(work_dir): {"bind": "/content", "mode": "rw"}},
+            volumes={host_work_dir: {"bind": "/content", "mode": "rw"}},
             working_dir="/content",
             environment=environment,
             remove=True,
@@ -192,7 +166,6 @@ def run_smart_crop(
         }
 
 
-@pytest.mark.skipif(not HAS_FFMPEG, reason="FFmpeg not available")
 @pytest.mark.skipif(not HAS_PILLOW, reason="Pillow not available")
 @pytest.mark.skipif(not HAS_DOCKER, reason="Docker not available")
 @pytest.mark.comprehensive
@@ -420,10 +393,10 @@ class TestEndToEndVideoCropping:
         When: Process through smart-crop-video
         Then: Output should have audio stream with same duration
         """
-        # Create test video with audio
-        input_video = test_videos_dir / "video_with_audio.mov"
-        config = vg.VideoConfig(width=1920, height=1080, duration=5.0, fps=30)
-        vg.create_test_video_with_audio(input_video, config, audio_frequency=440)
+        # Load pre-generated test video with audio
+        input_video = FIXTURES_DIR / "audio_test.mov"
+        if not input_video.exists():
+            pytest.skip(f"Test fixture not found: {input_video}")
 
         output_video = test_videos_dir / "output_with_audio.mov"
 
@@ -450,7 +423,6 @@ class TestEndToEndVideoCropping:
             f"Audio duration ({audio_duration}s) doesn't match video ({video_duration}s)"
 
 
-@pytest.mark.skipif(not HAS_FFMPEG, reason="FFmpeg not available")
 @pytest.mark.skipif(not HAS_DOCKER, reason="Docker not available")
 @pytest.mark.comprehensive
 class TestCropStrategies:
