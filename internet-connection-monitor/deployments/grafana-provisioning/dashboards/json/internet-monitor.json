@@ -45,11 +45,12 @@
         "label": "Site",
         "datasource": {
           "type": "elasticsearch",
-          "uid": "${DS_ELASTICSEARCH}"
+          "uid": "elasticsearch-datasource"
         },
         "query": "{\"find\": \"terms\", \"field\": \"site.name.keyword\"}",
         "multi": true,
         "includeAll": true,
+        "allValue": "*",
         "current": {
           "selected": true,
           "text": "All",
@@ -98,7 +99,7 @@
       {
         "datasource": {
           "type": "elasticsearch",
-          "uid": "${DS_ELASTICSEARCH}"
+          "uid": "elasticsearch-datasource"
         },
         "enable": true,
         "name": "Deployment Events",
@@ -122,9 +123,9 @@
         {
           "datasource": {
             "type": "elasticsearch",
-            "uid": "${DS_ELASTICSEARCH}"
+            "uid": "elasticsearch-datasource"
           },
-          "query": "site.name.keyword:($site_name)",
+          "query": "site.name.keyword:$site_name",
           "metrics": [
             {
               "id": "1",
@@ -133,7 +134,16 @@
             }
           ],
           "timeField": "@timestamp",
-          "bucketAggs": []
+          "bucketAggs": [
+            {
+              "id": "2",
+              "type": "date_histogram",
+              "field": "@timestamp",
+              "settings": {
+                "interval": "auto"
+              }
+            }
+          ]
         }
       ],
       "fieldConfig": {
@@ -181,9 +191,9 @@
         {
           "datasource": {
             "type": "elasticsearch",
-            "uid": "${DS_ELASTICSEARCH}"
+            "uid": "elasticsearch-datasource"
           },
-          "query": "status.success:true AND site.name.keyword:($site_name)",
+          "query": "status.success:true AND site.name.keyword:$site_name",
           "metrics": [
             {
               "id": "1",
@@ -192,7 +202,16 @@
             }
           ],
           "timeField": "@timestamp",
-          "bucketAggs": []
+          "bucketAggs": [
+            {
+              "id": "2",
+              "type": "date_histogram",
+              "field": "@timestamp",
+              "settings": {
+                "interval": "auto"
+              }
+            }
+          ]
         }
       ],
       "fieldConfig": {
@@ -240,9 +259,9 @@
         {
           "datasource": {
             "type": "elasticsearch",
-            "uid": "${DS_ELASTICSEARCH}"
+            "uid": "elasticsearch-datasource"
           },
-          "query": "status.success:true AND site.name.keyword:($site_name)",
+          "query": "status.success:true AND site.name.keyword:$site_name",
           "metrics": [
             {
               "id": "1",
@@ -256,7 +275,16 @@
             }
           ],
           "timeField": "@timestamp",
-          "bucketAggs": []
+          "bucketAggs": [
+            {
+              "id": "2",
+              "type": "date_histogram",
+              "field": "@timestamp",
+              "settings": {
+                "interval": "auto"
+              }
+            }
+          ]
         }
       ],
       "fieldConfig": {
@@ -304,9 +332,9 @@
         {
           "datasource": {
             "type": "elasticsearch",
-            "uid": "${DS_ELASTICSEARCH}"
+            "uid": "elasticsearch-datasource"
           },
-          "query": "site.name.keyword:($site_name)",
+          "query": "site.name.keyword:$site_name",
           "metrics": [
             {
               "id": "1",
@@ -314,7 +342,16 @@
             }
           ],
           "timeField": "@timestamp",
-          "bucketAggs": []
+          "bucketAggs": [
+            {
+              "id": "2",
+              "type": "date_histogram",
+              "field": "@timestamp",
+              "settings": {
+                "interval": "auto"
+              }
+            }
+          ]
         }
       ],
       "fieldConfig": {
@@ -353,9 +390,9 @@
         {
           "datasource": {
             "type": "elasticsearch",
-            "uid": "${DS_ELASTICSEARCH}"
+            "uid": "elasticsearch-datasource"
           },
-          "query": "site.name.keyword:($site_name)",
+          "query": "site.name.keyword:$site_name",
           "metrics": [
             {
               "id": "1",
@@ -440,9 +477,9 @@
         {
           "datasource": {
             "type": "elasticsearch",
-            "uid": "${DS_ELASTICSEARCH}"
+            "uid": "elasticsearch-datasource"
           },
-          "query": "status.success:true AND site.name.keyword:($site_name)",
+          "query": "status.success:true AND site.name.keyword:$site_name",
           "alias": "Average",
           "metrics": [
             {
@@ -467,9 +504,9 @@
         {
           "datasource": {
             "type": "elasticsearch",
-            "uid": "${DS_ELASTICSEARCH}"
+            "uid": "elasticsearch-datasource"
           },
-          "query": "status.success:true AND site.name.keyword:($site_name)",
+          "query": "status.success:true AND site.name.keyword:$site_name",
           "alias": "P95",
           "metrics": [
             {
@@ -499,9 +536,9 @@
         {
           "datasource": {
             "type": "elasticsearch",
-            "uid": "${DS_ELASTICSEARCH}"
+            "uid": "elasticsearch-datasource"
           },
-          "query": "status.success:true AND site.name.keyword:($site_name)",
+          "query": "status.success:true AND site.name.keyword:$site_name",
           "alias": "P99",
           "metrics": [
             {
@@ -586,9 +623,9 @@
         {
           "datasource": {
             "type": "elasticsearch",
-            "uid": "${DS_ELASTICSEARCH}"
+            "uid": "elasticsearch-datasource"
           },
-          "query": "status.success:true AND site.name.keyword:($site_name)",
+          "query": "status.success:true AND site.name.keyword:$site_name",
           "alias": "Avg DNS",
           "metrics": [
             {
@@ -634,9 +671,9 @@
         {
           "datasource": {
             "type": "elasticsearch",
-            "uid": "${DS_ELASTICSEARCH}"
+            "uid": "elasticsearch-datasource"
           },
-          "query": "status.success:true AND site.name.keyword:($site_name)",
+          "query": "status.success:true AND site.name.keyword:$site_name",
           "alias": "Avg TCP",
           "metrics": [
             {
@@ -682,9 +719,9 @@
         {
           "datasource": {
             "type": "elasticsearch",
-            "uid": "${DS_ELASTICSEARCH}"
+            "uid": "elasticsearch-datasource"
           },
-          "query": "status.success:true AND site.name.keyword:($site_name)",
+          "query": "status.success:true AND site.name.keyword:$site_name",
           "alias": "Avg TLS",
           "metrics": [
             {
@@ -730,9 +767,9 @@
         {
           "datasource": {
             "type": "elasticsearch",
-            "uid": "${DS_ELASTICSEARCH}"
+            "uid": "elasticsearch-datasource"
           },
-          "query": "site.name.keyword:($site_name)",
+          "query": "site.name.keyword:$site_name",
           "metrics": [
             {
               "id": "1",
@@ -799,9 +836,9 @@
         {
           "datasource": {
             "type": "elasticsearch",
-            "uid": "${DS_ELASTICSEARCH}"
+            "uid": "elasticsearch-datasource"
           },
-          "query": "status.success:false AND site.name.keyword:($site_name)",
+          "query": "status.success:false AND site.name.keyword:$site_name",
           "metrics": [
             {
               "id": "1",
@@ -854,9 +891,9 @@
         {
           "datasource": {
             "type": "elasticsearch",
-            "uid": "${DS_ELASTICSEARCH}"
+            "uid": "elasticsearch-datasource"
           },
-          "query": "status.success:false AND site.name.keyword:($site_name)",
+          "query": "status.success:false AND site.name.keyword:$site_name",
           "metrics": [
             {
               "id": "1",
@@ -864,7 +901,16 @@
             }
           ],
           "timeField": "@timestamp",
-          "bucketAggs": []
+          "bucketAggs": [
+            {
+              "id": "2",
+              "type": "date_histogram",
+              "field": "@timestamp",
+              "settings": {
+                "interval": "auto"
+              }
+            }
+          ]
         }
       ],
       "transformations": [

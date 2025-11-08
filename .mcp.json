@@ -8,6 +8,7 @@
         "--rm",
         "--init",
         "--pull=always",
+        "--network=host",
         "mcr.microsoft.com/playwright/mcp"
       ]
     }
