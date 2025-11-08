@@ -82,7 +82,7 @@ grafana-dashboard-demo: ## 🚀 Start full Grafana dashboard demo (Elasticsearch
 	@echo "$(CYAN)╚════════════════════════════════════════════════════════════════╝$(NC)"
 	@echo ""
 	@echo "$(YELLOW)Starting full monitoring stack...$(NC)"
-	@cd deployments && docker-compose -f docker-compose.with-stack.yml up -d
+	@cd deployments && docker compose -f docker-compose.with-stack.yml up -d
 	@echo ""
 	@echo "$(YELLOW)Waiting for services to be ready...$(NC)"
 	@sleep 5
@@ -123,13 +123,13 @@ demo-start: grafana-dashboard-demo ## Alias for grafana-dashboard-demo
 
 demo-stop: ## 🛑 Stop the demo stack (keeps data)
 	@echo "$(YELLOW)Stopping demo stack...$(NC)"
-	@cd deployments && docker-compose -f docker-compose.with-stack.yml stop
+	@cd deployments && docker compose -f docker-compose.with-stack.yml stop
 	@echo "$(GREEN)✓ Demo stack stopped$(NC)"
 	@echo "$(YELLOW)Data is preserved. Use 'make grafana-dashboard-demo' to restart$(NC)"
 
 demo-down: ## ⏹️  Stop and remove containers (keeps volumes)
 	@echo "$(YELLOW)Stopping and removing demo containers...$(NC)"
-	@cd deployments && docker-compose -f docker-compose.with-stack.yml down
+	@cd deployments && docker compose -f docker-compose.with-stack.yml down
 	@echo "$(GREEN)✓ Containers removed$(NC)"
 	@echo "$(YELLOW)Data volumes preserved. Use 'make grafana-dashboard-demo' to restart$(NC)"
 
@@ -137,7 +137,7 @@ demo-clean: ## 🗑️  Stop demo and remove all data (DESTRUCTIVE)
 	@echo "$(RED)WARNING: This will delete all monitoring data!$(NC)"
 	@echo -n "$(YELLOW)Continue? [y/N] $(NC)" && read ans && [ $${ans:-N} = y ]
 	@echo "$(YELLOW)Stopping containers and removing volumes...$(NC)"
-	@cd deployments && docker-compose -f docker-compose.with-stack.yml down -v
+	@cd deployments && docker compose -f docker-compose.with-stack.yml down -v
 	@echo "$(GREEN)✓ All demo data cleaned$(NC)"
 
 demo-restart: demo-stop grafana-dashboard-demo ## 🔄 Restart the demo stack
@@ -146,7 +146,7 @@ demo-status: ## 📊 Show status of all demo services
 	@echo "$(CYAN)════════════════════════════════════════════════════════════════$(NC)"
 	@echo "$(CYAN)  Demo Stack Status$(NC)"
 	@echo "$(CYAN)════════════════════════════════════════════════════════════════$(NC)"
-	@cd deployments && docker-compose -f docker-compose.with-stack.yml ps
+	@cd deployments && docker compose -f docker-compose.with-stack.yml ps
 	@echo ""
 	@echo "$(YELLOW)Service Health Checks:$(NC)"
 	@echo -n "  Elasticsearch: "
@@ -159,19 +159,19 @@ demo-status: ## 📊 Show status of all demo services
 	@curl -s -o /dev/null -w "%{http_code}" http://localhost:9090/metrics 2>/dev/null | grep -q 200 && echo "$(GREEN)✓ Healthy$(NC)" || echo "$(RED)✗ Not responding$(NC)"
 
 demo-logs: ## 📜 View logs from all demo services
-	@cd deployments && docker-compose -f docker-compose.with-stack.yml logs -f
+	@cd deployments && docker compose -f docker-compose.with-stack.yml logs -f
 
 ##@ Logs and Debugging
 
 monitor-logs: ## 📝 View internet-monitor test results
 	@echo "$(CYAN)Monitoring test results (Ctrl+C to exit):$(NC)"
-	@cd deployments && docker-compose -f docker-compose.with-stack.yml logs -f internet-monitor
+	@cd deployments && docker compose -f docker-compose.with-stack.yml logs -f internet-monitor
 
 es-logs: ## 📝 View Elasticsearch logs
-	@cd deployments && docker-compose -f docker-compose.with-stack.yml logs -f elasticsearch
+	@cd deployments && docker compose -f docker-compose.with-stack.yml logs -f elasticsearch
 
 grafana-logs: ## 📝 View Grafana logs
-	@cd deployments && docker-compose -f docker-compose.with-stack.yml logs -f grafana
+	@cd deployments && docker compose -f docker-compose.with-stack.yml logs -f grafana
 
 all-logs: demo-logs ## 📝 View all container logs
 
@@ -234,19 +234,19 @@ build: ## 🔨 Build the monitor Docker image
 
 run: ## ▶️  Run monitor in standalone mode (no Elasticsearch)
 	@echo "$(YELLOW)Starting monitor in standalone mode...$(NC)"
-	@cd deployments && docker-compose up -d
+	@cd deployments && docker compose up -d
 	@echo "$(GREEN)✓ Monitor running$(NC)"
 	@echo "$(YELLOW)View logs:$(NC) make logs-standalone"
 
 stop: ## ⏹️  Stop standalone monitor
-	@cd deployments && docker-compose stop
+	@cd deployments && docker compose stop
 
 logs-standalone: ## 📜 View standalone monitor logs
 	@echo "$(CYAN)Viewing monitor logs...$(NC)"
-	@cd deployments && docker-compose logs -f internet-monitor
+	@cd deployments && docker compose logs -f internet-monitor
 
 clean-standalone: ## 🗑️  Stop and remove standalone monitor
-	@cd deployments && docker-compose down
+	@cd deployments && docker compose down
 
 ##@ Setup and Configuration
 
@@ -293,7 +293,7 @@ test-monitor: ## 🧪 Run a quick test to verify monitor is working
 	@echo "$(YELLOW)Waiting for test results...$(NC)"
 	@sleep 10
 	@echo "$(YELLOW)Recent test results:$(NC)"
-	@cd deployments && docker-compose -f docker-compose.with-stack.yml logs --tail=5 internet-monitor
+	@cd deployments && docker compose -f docker-compose.with-stack.yml logs --tail=5 internet-monitor
 	@echo ""
 	@echo "$(GREEN)✓ Monitor is functioning$(NC)"
 
@@ -304,7 +304,7 @@ snmp-test: ## 🔌 Test SNMP connectivity (requires snmpwalk)
 
 watch-tests: ## 👀 Watch test results in real-time
 	@echo "$(CYAN)Watching test results (Ctrl+C to exit)...$(NC)"
-	@cd deployments && docker-compose -f docker-compose.with-stack.yml logs -f internet-monitor | jq -R 'fromjson? | select(.site != null) | {time: ."@timestamp", site: .site.name, success: .status.success, latency: .timings.total_duration_ms}'
+	@cd deployments && docker compose -f docker-compose.with-stack.yml logs -f internet-monitor | jq -R 'fromjson? | select(.site != null) | {time: ."@timestamp", site: .site.name, success: .status.success, latency: .timings.total_duration_ms}'
 
 ##@ Documentation
 
@@ -327,13 +327,13 @@ ps: demo-status ## 📊 Alias for demo-status
 logs: demo-logs ## 📜 Alias for demo-logs
 
 shell-monitor: ## 🐚 Open shell in monitor container
-	@cd deployments && docker-compose -f docker-compose.with-stack.yml exec internet-monitor /bin/sh
+	@cd deployments && docker compose -f docker-compose.with-stack.yml exec internet-monitor /bin/sh
 
 shell-es: ## 🐚 Open shell in Elasticsearch container
-	@cd deployments && docker-compose -f docker-compose.with-stack.yml exec elasticsearch /bin/bash
+	@cd deployments && docker compose -f docker-compose.with-stack.yml exec elasticsearch /bin/bash
 
 shell-grafana: ## 🐚 Open shell in Grafana container
-	@cd deployments && docker-compose -f docker-compose.with-stack.yml exec grafana /bin/bash
+	@cd deployments && docker compose -f docker-compose.with-stack.yml exec grafana /bin/bash
 
 clean-docker: ## 🧹 Remove all stopped containers and unused images
 	@echo "$(YELLOW)Cleaning Docker...$(NC)"

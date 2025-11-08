@@ -72,7 +72,7 @@ jobs:
         run: |
           echo "=== Docker Compose Status ==="
           cd deployments
-          docker-compose -f docker-compose.with-stack.yml ps
+          docker compose -f docker-compose.with-stack.yml ps
 
           echo "=== Monitor Logs ==="
           docker logs internet-monitor 2>&1 | tail -50 || true
@@ -87,7 +87,7 @@ jobs:
         if: always()
         run: |
           cd deployments
-          docker-compose -f docker-compose.with-stack.yml down -v || true
+          docker compose -f docker-compose.with-stack.yml down -v || true
 
   publish-image:
     needs: [check-component, integration-test]

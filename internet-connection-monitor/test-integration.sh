@@ -25,7 +25,7 @@ WAIT_TIMEOUT=180  # 3 minutes max wait
 cleanup() {
     echo -e "${YELLOW}Cleaning up test environment...${NC}"
     cd deployments
-    docker-compose -f docker-compose.with-stack.yml down -v 2>/dev/null || true
+    docker compose -f docker-compose.with-stack.yml down -v 2>/dev/null || true
     cd ..
     echo -e "${GREEN}✓ Cleanup complete${NC}"
 }
@@ -106,7 +106,7 @@ echo ""
 # Step 2: Start the stack
 log_info "Step 2: Starting the full monitoring stack..."
 cd deployments
-docker-compose -f docker-compose.with-stack.yml up -d
+docker compose -f docker-compose.with-stack.yml up -d
 cd ..
 log_success "Stack started"
 echo ""
