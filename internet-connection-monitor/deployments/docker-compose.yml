@@ -1,0 +1,62 @@
+version: '3.8'
+
+# Standalone Internet Connection Monitor
+# Use this if you already have Elasticsearch/Grafana/Prometheus
+
+services:
+  internet-monitor:
+    image: internet-connection-monitor:latest
+    container_name: internet-monitor
+    hostname: internet-monitor-01
+    restart: unless-stopped
+
+    # Use host networking for accurate DNS measurements
+    # This ensures the container uses the same DNS servers and network stack as the host,
+    # providing realistic DNS resolution timing that matches user experience.
+    # With bridge networking, Docker's embedded DNS proxy can cache responses and skew measurements.
+    network_mode: host
+
+    environment:
+      # General Settings
+      INTER_TEST_DELAY: "2s"
+      GLOBAL_TIMEOUT: "30s"
+      CACHE_SIZE: "100"
+
+      # Sites to monitor (comma-separated)
+      # Override via .env file or command line
+      SITES: "${SITES:-google.com,github.com,cloudflare.com}"
+
+      # Elasticsearch Output (disabled by default)
+      ES_ENABLED: "${ES_ENABLED:-false}"
+      ES_ENDPOINT: "${ES_ENDPOINT:-http://localhost:9200}"
+      ES_INDEX_PATTERN: "${ES_INDEX_PATTERN:-internet-connection-monitor-%{+yyyy.MM.dd}}"
+      ES_USERNAME: "${ES_USERNAME:-}"
+      ES_PASSWORD: "${ES_PASSWORD:-}"
+      ES_BULK_SIZE: "${ES_BULK_SIZE:-50}"
+      ES_FLUSH_INTERVAL: "${ES_FLUSH_INTERVAL:-10s}"
+
+      # SNMP Agent (enabled by default)
+      SNMP_ENABLED: "${SNMP_ENABLED:-true}"
+      SNMP_PORT: "161"
+      SNMP_COMMUNITY: "${SNMP_COMMUNITY:-public}"
+
+      # Prometheus Exporter (enabled by default)
+      PROM_ENABLED: "${PROM_ENABLED:-true}"
+      PROM_PORT: "9090"
+      PROM_PATH: "/metrics"
+
+      # Logging
+      LOG_LEVEL: "${LOG_LEVEL:-info}"
+      LOG_FORMAT: "json"
+
+    # Note: Port mapping is not needed with host networking
+    # The container directly binds to ports on the host:
+    #   - Port 161/udp for SNMP
+    #   - Port 9090 for Prometheus metrics
+    #   - Port 8080 for health checks
+    # Ensure these ports are available on your host system
+
+    # Stateless container - no volumes needed
+    labels:
+      com.docker.description: "Internet Connection Monitor - Real-world connectivity testing"
+      com.docker.compose.project: "internet-monitor"

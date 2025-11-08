@@ -1,0 +1,38 @@
+# Prometheus configuration for Internet Connection Monitor
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    cluster: 'internet-monitor'
+    environment: 'home'
+
+scrape_configs:
+  # Scrape the Internet Connection Monitor metrics endpoint
+  # Note: internet-monitor uses host networking, so we access it via host.docker.internal
+  - job_name: 'internet-monitor'
+    static_configs:
+      - targets: ['host.docker.internal:9090']
+        labels:
+          service: 'internet-connection-monitor'
+          instance: 'internet-monitor-01'
+
+  # Self-monitoring: Prometheus itself
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # Optional: Add Elasticsearch exporter if you want to monitor ES health
+  # - job_name: 'elasticsearch-exporter'
+  #   static_configs:
+  #     - targets: ['elasticsearch-exporter:9114']
+
+# Alerting rules (optional)
+# rule_files:
+#   - '/etc/prometheus/rules/*.yml'
+
+# Alertmanager configuration (optional)
+# alerting:
+#   alertmanagers:
+#     - static_configs:
+#         - targets: ['alertmanager:9093']

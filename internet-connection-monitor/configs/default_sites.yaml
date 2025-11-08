@@ -1,0 +1,75 @@
+# Internet Connection Monitor - Default Sites
+# This is the default list of sites tested when no custom configuration is provided.
+# These sites represent different aspects of Internet connectivity.
+
+sites:
+  # Google - Popular, globally distributed CDN, fast response
+  - url: https://www.google.com
+    name: google
+    category: search
+    timeout_seconds: 30
+    wait_for_network_idle: true
+
+  # GitHub - Developer-focused, SaaS reliability test
+  - url: https://github.com
+    name: github
+    category: development
+    timeout_seconds: 30
+    wait_for_network_idle: true
+
+  # Cloudflare - DNS/CDN provider, edge network performance
+  - url: https://www.cloudflare.com
+    name: cloudflare
+    category: infrastructure
+    timeout_seconds: 30
+    wait_for_network_idle: true
+
+  # Wikipedia - Non-commercial, different CDN strategy
+  - url: https://www.wikipedia.org
+    name: wikipedia
+    category: reference
+    timeout_seconds: 30
+    wait_for_network_idle: true
+
+  # Example.com - IANA test domain, minimal page, baseline test
+  - url: https://example.com
+    name: example
+    category: test
+    timeout_seconds: 15
+    wait_for_network_idle: false
+
+# Why these sites?
+#
+# 1. google.com
+#    - Represents modern web application performance
+#    - Globally distributed with aggressive caching
+#    - If Google is down, something is very wrong
+#
+# 2. github.com
+#    - Critical for developers
+#    - Represents SaaS/cloud service reliability
+#    - Different infrastructure than search engines
+#
+# 3. cloudflare.com
+#    - Edge network and CDN provider
+#    - Tests connectivity to infrastructure providers
+#    - Fast, reliable baseline
+#
+# 4. wikipedia.org
+#    - Non-profit, different hosting model
+#    - Global reach but different CDN strategy than commercial sites
+#    - Representative of reference/educational content
+#
+# 5. example.com
+#    - IANA reserved test domain
+#    - Minimal HTML, fast baseline
+#    - No tracking, no JavaScript, pure connectivity test
+#
+# These sites provide coverage across:
+# - Different CDN providers (Google Cloud, Fastly, Cloudflare)
+# - Different regions and data centers
+# - Different page complexity (minimal to full web app)
+# - Commercial and non-commercial services
+#
+# Together, they give a representative view of "is the Internet working
+# from a user's perspective?"

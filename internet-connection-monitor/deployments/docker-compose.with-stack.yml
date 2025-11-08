@@ -1,0 +1,188 @@
+version: '3.8'
+
+# Full monitoring stack for Internet Connection Monitor
+# Includes: Monitor, Elasticsearch, Grafana, Prometheus
+# For production, consider using separate managed services
+
+services:
+  # Internet Connection Monitor
+  internet-monitor:
+    image: internet-connection-monitor:latest
+    container_name: internet-monitor
+    hostname: internet-monitor-01
+    restart: unless-stopped
+
+    # Use host networking for accurate DNS measurements
+    # This ensures the container uses the same DNS servers and network stack as the host,
+    # providing realistic DNS resolution timing that matches user experience.
+    # With bridge networking, Docker's embedded DNS proxy can cache responses and skew measurements.
+    network_mode: host
+
+    environment:
+      # General Settings
+      INTER_TEST_DELAY: "2s"
+      GLOBAL_TIMEOUT: "30s"
+      CACHE_SIZE: "100"
+
+      # Sites to monitor (comma-separated)
+      SITES: "google.com,github.com,cloudflare.com,wikipedia.org,example.com"
+
+      # Elasticsearch Output
+      # With host networking, connect to Elasticsearch via localhost and its exposed port
+      ES_ENABLED: "true"
+      ES_ENDPOINT: "http://localhost:9200"
+      ES_INDEX_PATTERN: "internet-connection-monitor-%{+yyyy.MM.dd}"
+      ES_BULK_SIZE: "50"
+      ES_FLUSH_INTERVAL: "10s"
+
+      # SNMP Agent
+      SNMP_ENABLED: "true"
+      SNMP_PORT: "161"
+      SNMP_COMMUNITY: "public"
+
+      # Prometheus Exporter
+      PROM_ENABLED: "true"
+      PROM_PORT: "9090"
+      PROM_PATH: "/metrics"
+
+      # Logging
+      LOG_LEVEL: "info"
+      LOG_FORMAT: "json"
+
+    # Note: Port mapping is not needed with host networking
+    # The container directly binds to ports on the host:
+    #   - Port 161/udp for SNMP
+    #   - Port 9090 for Prometheus metrics
+    #   - Port 8080 for health checks
+
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+
+    # No volume mounts - stateless container
+    labels:
+      com.docker.description: "Internet Connection Monitor - Real-world connectivity testing"
+
+  # Elasticsearch for storing test results
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.11.0
+    container_name: elasticsearch
+    hostname: elasticsearch
+    restart: unless-stopped
+    environment:
+      - discovery.type=single-node
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+      - xpack.security.enabled=false
+      - xpack.security.enrollment.enabled=false
+    ports:
+      - "9200:9200"
+    volumes:
+      - es-data:/usr/share/elasticsearch/data
+    networks:
+      - monitor-net
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9200/_cluster/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+    labels:
+      com.docker.description: "Elasticsearch for Internet Monitor data storage"
+
+  # Grafana for visualization
+  grafana:
+    image: grafana/grafana:10.2.0
+    container_name: grafana
+    hostname: grafana
+    restart: unless-stopped
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_INSTALL_PLUGINS=grafana-clock-panel,grafana-simple-json-datasource
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
+      - GF_AUTH_DISABLE_LOGIN_FORM=true
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./grafana-provisioning:/etc/grafana/provisioning
+    depends_on:
+      - elasticsearch
+    networks:
+      - monitor-net
+    labels:
+      com.docker.description: "Grafana dashboards for Internet Monitor"
+
+  # Prometheus for metrics scraping (optional)
+  prometheus:
+    image: prom/prometheus:v2.47.0
+    container_name: prometheus
+    hostname: prometheus
+    restart: unless-stopped
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=90d'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+    ports:
+      - "9091:9090"  # 9091 to avoid conflict with monitor's metrics endpoint
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    depends_on:
+      - internet-monitor
+    networks:
+      - monitor-net
+    # Allow Prometheus to reach services on host network
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    labels:
+      com.docker.description: "Prometheus for Internet Monitor metrics"
+
+  # Elasticsearch setup - creates index template and ILM policy
+  es-setup:
+    image: curlimages/curl:8.4.0
+    container_name: es-setup
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    networks:
+      - monitor-net
+    volumes:
+      - ../elasticsearch-index-template.json:/tmp/index-template.json:ro
+      - ../elasticsearch-ilm-policy.json:/tmp/ilm-policy.json:ro
+    command: >
+      sh -c "
+        echo 'Waiting for Elasticsearch to be ready...'
+        sleep 10
+
+        echo 'Creating ILM policy...'
+        curl -X PUT 'http://elasticsearch:9200/_ilm/policy/internet-monitor-ilm-policy' \
+          -H 'Content-Type: application/json' \
+          -d @/tmp/ilm-policy.json
+
+        echo 'Creating index template...'
+        curl -X PUT 'http://elasticsearch:9200/_index_template/internet-connection-monitor' \
+          -H 'Content-Type: application/json' \
+          -d @/tmp/index-template.json
+
+        echo 'Setup complete!'
+      "
+    restart: "no"
+    labels:
+      com.docker.description: "One-time setup for Elasticsearch indices"
+
+networks:
+  monitor-net:
+    driver: bridge
+    name: internet-monitor-network
+
+volumes:
+  es-data:
+    name: internet-monitor-es-data
+  grafana-data:
+    name: internet-monitor-grafana-data
+  prometheus-data:
+    name: internet-monitor-prometheus-data
