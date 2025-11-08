@@ -1485,8 +1485,13 @@ def main():
     print("="*70)
     print()
 
-    # Check for non-interactive mode first
-    if os.getenv('AUTO_CONFIRM'):
+    # Check for explicit ENABLE_ACCELERATION setting first (for tests)
+    enable_accel_env = os.getenv('ENABLE_ACCELERATION')
+    if enable_accel_env is not None:
+        enable_speedup = enable_accel_env.lower() in ('true', '1', 'yes')
+        print(f"ENABLE_ACCELERATION set to: {enable_speedup}")
+    # Check for non-interactive mode
+    elif os.getenv('AUTO_CONFIRM'):
         print("AUTO_CONFIRM enabled, defaulting to no acceleration")
         enable_speedup = False
     # Check if web UI already made the choice

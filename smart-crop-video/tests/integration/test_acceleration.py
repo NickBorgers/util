@@ -15,6 +15,7 @@ import pytest
 import shutil
 import docker
 import tempfile
+import subprocess
 from pathlib import Path
 from typing import List, Dict, Any
 
