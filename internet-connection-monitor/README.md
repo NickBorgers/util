@@ -73,18 +73,20 @@ The monitor runs **continuously**, testing sites one at a time (like a real pers
 ## Features
 
 ✅ **Real browser testing** - Uses headless Chrome via CDP
-✅ **Detailed timing metrics** - DNS, TCP, TLS, TTFB, DOM loaded, network idle
+⚠️ **Timing metrics** - Total duration, TTFB, DOM loaded, page load (working); DNS/TCP/TLS breakdowns currently broken (always 0)
 ✅ **Continuous monitoring** - Serial testing, natural traffic patterns
-✅ **Multiple outputs** - Logs, Elasticsearch, Prometheus, SNMP
+✅ **Multiple outputs** - Logs, Elasticsearch, Prometheus, SNMP (SNMP not tested)
 ✅ **Stateless design** - Restart-safe, no data loss
 ✅ **Beautiful Grafana dashboards** - Pre-built, ready to import
 ✅ **Zero configuration start** - Works out of the box
+✅ **Integration tested** - Core data flow validated: monitor → Elasticsearch → Grafana, Prometheus
 
 ## Documentation
 
 - **[QUICKSTART.md](QUICKSTART.md)** - Get started in 30 seconds
 - **[DESIGN.md](DESIGN.md)** - Architecture, technology stack, implementation details
 - **[ELASTICSEARCH_AND_GRAFANA.md](ELASTICSEARCH_AND_GRAFANA.md)** - JSON schema, Grafana queries, dashboard guide
+- **[TESTING.md](TESTING.md)** - Test coverage, known gaps, and testing philosophy
 - **[TROUBLESHOOTING.md](TROUBLESHOOTING.md)** - Common issues and solutions
 - **[deployments/README.md](deployments/README.md)** - Deployment guide, configuration options
 - **[Makefile](Makefile)** - Run `make help` to see all commands
@@ -94,6 +96,9 @@ The monitor runs **continuously**, testing sites one at a time (like a real pers
 ```bash
 # Quick test (30 seconds)
 make quick-test
+
+# Run integration tests
+make test-integration       # Full end-to-end test suite
 
 # Run and watch live
 make quick-start            # Build & run
@@ -157,6 +162,24 @@ See [deployments/.env.example](deployments/.env.example) for all options.
 - Docker
 - Docker Compose
 - (Optional) Make for convenient commands
+
+## CI/CD
+
+The project uses GitHub Actions for continuous integration:
+
+- **Integration tests** run on every push and pull request
+- **Docker images** are published to GitHub Container Registry on release
+- **Release tags** follow the pattern: `internet-connection-monitor-v1.0.0`
+
+See [.github/workflows/internet-connection-monitor-ci.yml](../.github/workflows/internet-connection-monitor-ci.yml)
+
+## Testing
+
+See [TESTING.md](TESTING.md) for detailed information about:
+- Integration test coverage
+- Known testing gaps
+- How to run tests
+- Contributing tests
 
 ## License
 

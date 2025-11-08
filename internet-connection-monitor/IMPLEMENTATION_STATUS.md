@@ -1,8 +1,10 @@
 # Internet Connection Monitor - Implementation Status
 
-## ✅ FULLY COMPLETE - Production Ready!
+## ✅ FULLY FUNCTIONAL - Integration Tested
 
-The Internet Connection Monitor has been **successfully completed** with all major features implemented, tested, and verified working. All output modules (Prometheus, Elasticsearch, SNMP), health check endpoint, and advanced browser features are now functional.
+The Internet Connection Monitor has **all major features implemented and integration tested**. All output modules (Prometheus, Elasticsearch, SNMP), health check endpoint, and browser features are functional. The complete data flow from monitor → Elasticsearch → Grafana is validated by automated integration tests.
+
+**Note**: While feature-complete, the project lacks unit tests for internal logic. See [TESTING.md](TESTING.md) for details.
 
 ---
 
@@ -84,11 +86,11 @@ internet-connection-monitor/
 
 ## ✅ Recently Completed
 
-### Output Modules (Fully Implemented)
+### Output Modules
 
 #### Prometheus Exporter ✅
 - **File**: `internal/outputs/prometheus.go`
-- **Status**: ✅ **FULLY IMPLEMENTED**
+- **Status**: ✅ **IMPLEMENTED & INTEGRATION TESTED**
 - **Features**:
   - Complete metrics registration (counters, gauges, histograms)
   - HTTP server on configurable port (default 9090)
@@ -97,11 +99,11 @@ internet-connection-monitor/
   - Configurable histogram buckets
   - Optional Go runtime metrics
 - **Dependencies**: `github.com/prometheus/client_golang@v1.19.1` (Go 1.21 compatible)
-- **Verified**: ✅ Tested and working
+- **Testing**: ✅ Integration tested - metrics endpoint verified in test-integration.sh
 
 #### Elasticsearch Pusher ✅
 - **File**: `internal/outputs/elasticsearch.go`
-- **Status**: ✅ **FULLY IMPLEMENTED**
+- **Status**: ✅ **IMPLEMENTED & INTEGRATION TESTED**
 - **Features**:
   - Elasticsearch v8 client with authentication support (API key or username/password)
   - Bulk indexer for efficient batching
@@ -111,11 +113,11 @@ internet-connection-monitor/
   - TLS support with optional certificate validation
   - Graceful shutdown with statistics
 - **Dependencies**: `github.com/elastic/go-elasticsearch/v8@v8.11.0`
-- **Note**: Enable with `ES_ENABLED=true` and configure endpoint
+- **Testing**: ✅ Integration tested - data flow validated, document structure verified, Grafana queries tested
 
-#### SNMP Agent ✅
+#### SNMP Agent ⚠️
 - **File**: `internal/outputs/snmp.go`
-- **Status**: ✅ **FULLY IMPLEMENTED** (Simplified)
+- **Status**: ⚠️ **IMPLEMENTED BUT NOT TESTED**
 - **Features**:
   - In-memory circular buffer cache (last 100 results)
   - Real-time statistics tracking per site
@@ -124,11 +126,21 @@ internet-connection-monitor/
   - MIB export for documentation
   - Graceful shutdown with final statistics
 - **Dependencies**: `github.com/gosnmp/gosnmp@v1.37.0`
+- **Testing**: ❌ NOT integration tested - no SNMP validation in test suite
 - **Note**: This is a simplified implementation that caches results in memory. For full SNMP agent functionality with OID polling, consider integrating with net-snmp or a dedicated SNMP agent framework.
+
+#### JSON Logger ✅
+- **File**: `internal/outputs/logger.go`
+- **Status**: ✅ **IMPLEMENTED & INTEGRATION TESTED**
+- **Features**:
+  - Structured JSON logging to stdout
+  - All required fields (@timestamp, test_id, site, status, timings)
+  - Error information on failures
+- **Testing**: ✅ Integration tested - log output validated for successful tests
 
 ### Health Check Endpoint ✅
 - **File**: `internal/health/health.go`
-- **Status**: ✅ **FULLY IMPLEMENTED**
+- **Status**: ✅ **IMPLEMENTED & INTEGRATION TESTED**
 - **Features**:
   - HTTP endpoint on configurable port (default 8080)
   - Returns 200 OK if healthy, 503 if unhealthy
@@ -136,6 +148,7 @@ internet-connection-monitor/
   - Automatic unhealthy detection (no tests in 5 minutes)
   - Uptime tracking
   - Thread-safe statistics recording
+- **Testing**: ✅ Integration tested - health endpoint response verified
 - **Used by**: Docker healthcheck, Kubernetes liveness/readiness probes
 
 ## ⏳ Future Enhancements (Optional)
@@ -227,15 +240,14 @@ sites:
 
 ## 📊 Example Output
 
-### Successful Test
+### Successful Test (Actual Output)
 ```json
 {
-  "@timestamp": "2025-11-08T17:15:48.550Z",
-  "test_id": "e1918783-462f-46ba-b669-0fab97486168",
+  "@timestamp": "2025-11-08T19:33:43.649Z",
+  "test_id": "8823bffa-b2a8-4ce3-b3d5-22f6819b6370",
   "site": {
-    "url": "https://www.google.com",
-    "name": "google",
-    "category": "search"
+    "url": "https://google.com",
+    "name": "google"
   },
   "status": {
     "success": true,
@@ -243,20 +255,24 @@ sites:
     "message": "Page loaded successfully"
   },
   "timings": {
-    "dns_lookup_ms": 0,
-    "tcp_connection_ms": 0,
-    "tls_handshake_ms": 0,
-    "time_to_first_byte_ms": 0,
-    "dom_content_loaded_ms": 0,
-    "total_duration_ms": 1001
+    "dns_lookup_ms": 0,              // ⚠️ BUG: Always 0 (extraction broken)
+    "tcp_connection_ms": 0,           // ⚠️ BUG: Always 0 (extraction broken)
+    "tls_handshake_ms": 0,            // ⚠️ BUG: Always 0 (extraction broken)
+    "time_to_first_byte_ms": 64,     // ✅ Working
+    "dom_content_loaded_ms": 702,    // ✅ Working
+    "full_page_load_ms": 841,         // ✅ Working
+    "network_idle_ms": 841,           // ✅ Working
+    "total_duration_ms": 1022         // ✅ Working
   },
   "metadata": {
-    "hostname": "monitor-01",
+    "hostname": "eb58939525f0",
     "version": "0.1.0-dev",
-    "user_agent": "Mozilla/5.0..."
+    "user_agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
   }
 }
 ```
+
+**⚠️ Known Issue**: DNS, TCP, and TLS timing fields currently always return 0, even though extraction logic exists in `controller_impl.go:210-230`. The Performance Navigation Timing API either isn't populating these fields in headless Chrome, or they need to be queried differently. This is not tested and needs investigation.
 
 ### Failed Test
 ```json
@@ -339,19 +355,47 @@ All major features have been successfully implemented:
 
 ---
 
+## 🧪 Testing Status
+
+### ✅ Integration Tests
+- **Status**: Implemented and passing
+- **Location**: `test-integration.sh`
+- **Coverage**: Core data flow (Monitor → Elasticsearch → Grafana)
+- **What IS tested**:
+  - ✅ Docker build and container startup
+  - ✅ Service health (Elasticsearch, Grafana, Prometheus, Monitor)
+  - ✅ Test results generation (JSON logs)
+  - ✅ Elasticsearch data storage and document structure
+  - ✅ Grafana datasource configuration and queries
+  - ✅ Prometheus metrics endpoint
+  - ✅ Health check endpoint
+- **What is NOT tested**:
+  - ❌ SNMP agent functionality
+  - ❌ SNMP data export
+  - ❌ All code paths and edge cases
+
+### ❌ Unit Tests
+- **Status**: Not implemented
+- **Impact**: Internal logic (especially timing extraction) is not validated
+- **Risk**: Cannot guarantee accuracy of detailed timing metrics (DNS, TCP, TLS)
+
+See [TESTING.md](TESTING.md) for complete testing documentation.
+
+---
+
 ## 📝 Notes
 
 - **CDP warnings** - The "could not unmarshal event" errors from chromedp are harmless. They're from Chrome DevTools Protocol events that chromedp v0.9.5 doesn't fully support. The application works correctly despite these warnings.
 
-- **Timing metrics** - Some granular timing fields (DNS, TCP, TLS) show 0 because performance.timing extraction needs refinement. Total duration is accurate.
+- **Timing metrics** - Timing fields are collected from browser Performance API. Total duration, TTFB, DOM loaded, and page load metrics work correctly. DNS, TCP, and TLS breakdown timings are currently broken (always return 0) - extraction logic exists but the Performance API isn't populating these fields correctly. Needs investigation and testing.
 
-- **Grafana dashboard** - Pre-built dashboard JSON exists, will work once Elasticsearch output is implemented.
+- **Grafana dashboard** - Pre-built dashboard JSON exists and works with the Elasticsearch output.
 
-- **Ready for production** - Core monitoring functionality works. Optional outputs (Prometheus, ES, SNMP) can be added as needed.
+- **Production use** - Core monitoring functionality is tested end-to-end. All outputs work. Unit tests recommended before production use.
 
 ---
 
-**Status**: ✅ **FULLY COMPLETE** - All major features implemented and tested
+**Status**: ✅ **FUNCTIONAL** - Integration tested, unit tests needed
 **Version**: 0.1.0-dev
 **Last Updated**: 2025-11-08
-**Completion**: All planned output modules, health check, and browser features are fully functional
+**Testing**: Integration tests passing, no unit test coverage

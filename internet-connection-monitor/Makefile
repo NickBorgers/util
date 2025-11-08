@@ -278,6 +278,10 @@ env-example: ## 📄 Create .env file from example
 
 ##@ Monitoring and Testing
 
+test-integration: ## 🧪 Run full integration test suite (Docker + Elasticsearch + Grafana)
+	@echo "$(CYAN)Running integration tests...$(NC)"
+	@./test-integration.sh
+
 test-monitor: ## 🧪 Run a quick test to verify monitor is working
 	@echo "$(CYAN)Testing monitor connectivity...$(NC)"
 	@echo ""
