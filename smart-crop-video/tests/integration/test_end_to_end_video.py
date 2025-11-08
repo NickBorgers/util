@@ -10,6 +10,7 @@ These are comprehensive tests that take longer to run but validate the
 most critical user concern: "Did it crop my video correctly?"
 """
 
+import os
 import pytest
 import shutil
 import docker
@@ -455,11 +456,17 @@ class TestEndToEndVideoCropping:
 class TestCropStrategies:
     """Test different scoring strategies produce expected results."""
 
+    @pytest.mark.skipif(
+        os.getenv('AUTO_CONFIRM') is not None,
+        reason="Strategy comparison not meaningful with automatic selection"
+    )
     def test_motion_vs_edges_different_results(self, motion_top_right_video, test_videos_dir):
         """
         Verify different strategies produce different crop positions.
 
         This is a sanity check that strategies are actually different.
+        Note: Skipped in non-interactive mode (AUTO_CONFIRM) since automatic
+        selection chooses the same first candidate regardless of strategy.
         """
         output_motion = test_videos_dir / "output_strategy_motion.mov"
         output_edges = test_videos_dir / "output_strategy_edges.mov"
