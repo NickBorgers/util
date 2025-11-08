@@ -2,6 +2,63 @@
 
 This directory contains deployment configurations for the Internet Connection Monitor.
 
+## Important: Host Networking for Accurate DNS Measurements
+
+**The Internet Connection Monitor uses host networking mode for maximum measurement accuracy.**
+
+### Why Host Networking?
+
+The monitor measures DNS resolution time as a key metric. With Docker's default bridge networking:
+- Docker's embedded DNS proxy (at 127.0.0.11) sits between the container and your actual DNS servers
+- This DNS proxy can cache responses, making measurements artificially fast
+- The cached timings don't reflect what users actually experience on the network
+
+With host networking:
+- The container uses the host's DNS servers directly
+- DNS resolution times match real user experience
+- TCP/IP stack behavior is identical to the host system
+- Measurements are realistic and actionable
+
+### Implications of Host Networking
+
+**Port binding:**
+- The monitor binds directly to host ports (no port mapping needed)
+- Default ports: 161/udp (SNMP), 9090 (Prometheus), 8080 (health check)
+- Ensure these ports are available on your host
+
+**Service connectivity:**
+- When connecting to Elasticsearch/Prometheus on the same host, use `localhost:port`
+- Example: `ES_ENDPOINT=http://localhost:9200` (not `http://elasticsearch:9200`)
+
+**Security:**
+- The container shares the host's network namespace (less isolation)
+- The monitor runs as a non-root user for security
+- Only uses outbound connections to test sites
+
+**Compatibility:**
+- Works on Linux, macOS, and Windows with Docker Desktop
+- Some cloud platforms may restrict host networking (use bridge mode as fallback)
+
+### Alternative: Bridge Networking
+
+If you need bridge networking (e.g., cloud platform restrictions), you can configure custom DNS servers in `docker-compose.yml`:
+
+```yaml
+services:
+  internet-monitor:
+    # Remove network_mode: host
+    dns:
+      - 8.8.8.8      # Google DNS
+      - 1.1.1.1      # Cloudflare DNS
+    networks:
+      - default
+    ports:
+      - "161:161/udp"
+      - "9090:9090"
+```
+
+**Note:** This maintains some isolation but still has Docker's DNS proxy layer. For most home/enterprise deployments, host networking is recommended.
+
 ## Quick Start
 
 ### Option 1: Standalone Monitor (You Have Existing Infrastructure)
@@ -169,17 +226,27 @@ To monitor via Zabbix:
 
 ## Port Conflicts
 
-If default ports are already in use on your host:
+**With host networking (default):**
 
+The monitor binds directly to host ports. If ports 161, 9090, or 8080 are already in use:
+
+**Option 1: Change the application ports** (edit environment variables):
 ```bash
-# In .env file, change:
-SNMP_HOST_PORT=1161    # Instead of 161
-PROM_HOST_PORT=9190    # Instead of 9090
+# In .env file or docker-compose.yml
+SNMP_PORT=1161          # Change from default 161
+PROM_PORT=9190          # Change from default 9090
+# Health check runs on 8080 (less likely to conflict)
 ```
 
-Then access at the new ports:
-- SNMP: `localhost:1161`
-- Prometheus: `localhost:9190/metrics`
+**Option 2: Switch to bridge networking** (see Alternative: Bridge Networking section above):
+```yaml
+# Remove network_mode: host
+ports:
+  - "1161:161/udp"      # Map host port 1161 to container port 161
+  - "9190:9090"         # Map host port 9190 to container port 9090
+```
+
+**Note:** Option 2 reduces DNS measurement accuracy but provides more port flexibility.
 
 ## Verifying It's Working
 
@@ -312,9 +379,30 @@ prometheus:
 ## Upgrading
 
 ### Monitor Container
+
+**Using pre-built images from GHCR:**
+
+First, update your `docker-compose.yml` to use the GHCR image:
+```yaml
+services:
+  internet-monitor:
+    image: ghcr.io/nickborgers/internet-connection-monitor:latest
+```
+
+Then upgrade:
 ```bash
 # Pull latest image
 docker-compose pull internet-monitor
+
+# Recreate container
+docker-compose up -d internet-monitor
+```
+
+**Using locally built images:**
+
+```bash
+# Rebuild the image
+docker build -t internet-connection-monitor:latest ../
 
 # Recreate container
 docker-compose up -d internet-monitor

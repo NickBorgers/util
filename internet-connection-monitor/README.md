@@ -73,13 +73,18 @@ The monitor runs **continuously**, testing sites one at a time (like a real pers
 ## Features
 
 ✅ **Real browser testing** - Uses headless Chrome via CDP
-⚠️ **Timing metrics** - Total duration, TTFB, DOM loaded, page load (working); DNS/TCP/TLS breakdowns currently broken (always 0)
+✅ **Comprehensive timing metrics** - DNS, TCP, TLS, TTFB, DOM loaded, page load, network idle
+✅ **Accurate DNS measurements** - Uses host networking to measure real DNS resolution times (not Docker's cached DNS)
 ✅ **Continuous monitoring** - Serial testing, natural traffic patterns
 ✅ **Multiple outputs** - Logs, Elasticsearch, Prometheus, SNMP (SNMP not tested)
 ✅ **Stateless design** - Restart-safe, no data loss
 ✅ **Beautiful Grafana dashboards** - Pre-built, ready to import
 ✅ **Zero configuration start** - Works out of the box
 ✅ **Integration tested** - Core data flow validated: monitor → Elasticsearch → Grafana, Prometheus
+
+**Networking Architecture**: The monitor uses **host networking mode** to ensure DNS resolution times match real user experience. With Docker's default bridge networking, Docker's embedded DNS proxy can cache responses and skew measurements. Host networking provides direct access to your network's DNS servers for accurate timing data. See [deployments/README.md](deployments/README.md) for details and alternatives.
+
+**Note**: DNS/TCP/TLS timings may show 0ms when browsers optimize (cached DNS, reused connections, HTTP/2). This is **correct behavior** per W3C spec and indicates efficient browser operation. First requests to sites typically show non-zero values.
 
 ## Documentation
 
@@ -97,8 +102,11 @@ The monitor runs **continuously**, testing sites one at a time (like a real pers
 # Quick test (30 seconds)
 make quick-test
 
-# Run integration tests
+# Run tests
+make test                   # Unit tests
+make test-coverage          # Unit tests with coverage
 make test-integration       # Full end-to-end test suite
+make test-all               # All tests (unit + integration)
 
 # Run and watch live
 make quick-start            # Build & run
@@ -155,6 +163,42 @@ See [deployments/.env.example](deployments/.env.example) for all options.
     "total_duration_ms": 1456
   }
 }
+```
+
+## Installation
+
+### Option 1: Use Pre-built Docker Image (Recommended)
+
+Pull the latest release from GitHub Container Registry:
+
+```bash
+docker pull ghcr.io/nickborgers/internet-connection-monitor:latest
+
+# Or pull a specific version
+docker pull ghcr.io/nickborgers/internet-connection-monitor:1.0.0
+```
+
+Then update your `docker-compose.yml` to use the GHCR image:
+
+```yaml
+services:
+  internet-monitor:
+    image: ghcr.io/nickborgers/internet-connection-monitor:latest
+    # ... rest of your configuration
+```
+
+### Option 2: Build from Source
+
+```bash
+# Clone the repository
+git clone https://github.com/nickborgers/monorepo.git
+cd monorepo/internet-connection-monitor
+
+# Build the Docker image
+docker build -t internet-connection-monitor:latest .
+
+# Or use make
+make build
 ```
 
 ## Requirements
