@@ -5,7 +5,10 @@
 # No Python, Playwright, or other dependencies needed.
 #
 # Usage:
-#   ./run-tests.sh                    # Run all tests
+#   ./run-tests.sh                    # Run all tests (fast only, not comprehensive)
+#   ./run-tests.sh fast               # Run fast tests only (unit + basic integration)
+#   ./run-tests.sh comprehensive      # Run comprehensive end-to-end tests
+#   ./run-tests.sh all-with-e2e       # Run ALL tests including comprehensive
 #   ./run-tests.sh container          # Run container tests only
 #   ./run-tests.sh quick              # Run quick validation
 #   ./run-tests.sh shell              # Open test container shell
@@ -36,20 +39,32 @@ print_usage() {
     echo "Usage: $0 [command]"
     echo ""
     echo "Commands:"
-    echo "  all          Run all tests (default)"
-    echo "  container    Run container integration tests (fast, reliable)"
-    echo "  api          Run API tests"
-    echo "  ui           Run web UI tests"
-    echo "  focused      Run focused web UI tests"
-    echo "  quick        Run quick validation (container + diagnostic)"
-    echo "  shell        Open a shell in the test container"
-    echo "  build        Build the test container image"
-    echo "  clean        Remove test artifacts"
+    echo "  all              Run fast tests only (default) - unit, integration, API"
+    echo "  fast             Run fast tests explicitly (same as 'all')"
+    echo "  comprehensive    Run comprehensive end-to-end tests (10-15 min)"
+    echo "  all-with-e2e     Run ALL tests including comprehensive"
+    echo "  e2e              Run end-to-end video validation tests only"
+    echo "  acceleration     Run acceleration feature tests only"
+    echo "  container        Run container integration tests (fast, reliable)"
+    echo "  api              Run API tests"
+    echo "  ui               Run web UI tests"
+    echo "  focused          Run focused web UI tests"
+    echo "  quick            Run quick validation (container + diagnostic)"
+    echo "  shell            Open a shell in the test container"
+    echo "  build            Build the test container image"
+    echo "  clean            Remove test artifacts"
+    echo ""
+    echo "Test Categories:"
+    echo "  Fast (< 5 min):  Unit, integration, container, API tests"
+    echo "  Comprehensive:   End-to-end crop validation + acceleration features"
     echo ""
     echo "Examples:"
-    echo "  $0 container    # Quick validation (15 tests, ~40s)"
-    echo "  $0 quick        # Fast smoke test"
-    echo "  $0 all          # Full test suite"
+    echo "  $0                  # Run fast tests (default)"
+    echo "  $0 fast             # Run fast tests explicitly"
+    echo "  $0 comprehensive    # Run comprehensive tests only"
+    echo "  $0 all-with-e2e     # Run everything (15-20 min)"
+    echo "  $0 e2e              # Test crop accuracy only"
+    echo "  $0 quick            # Fastest smoke test"
 }
 
 # Check if Docker is available
@@ -74,9 +89,49 @@ cd "$(dirname "$0")"
 
 case "$COMMAND" in
     all)
-        print_info "Running all tests..."
+        print_info "Running fast tests (unit, integration, API)..."
+        print_info "Note: Use 'all-with-e2e' to include comprehensive tests"
         docker-compose -f docker-compose.test.yml build tests
-        docker-compose -f docker-compose.test.yml run --rm tests
+        docker-compose -f docker-compose.test.yml run --rm tests \
+            pytest tests/ -m "not comprehensive" -v
+        ;;
+
+    fast)
+        print_info "Running fast tests explicitly..."
+        docker-compose -f docker-compose.test.yml build tests
+        docker-compose -f docker-compose.test.yml run --rm tests \
+            pytest tests/ -m "not comprehensive" -v
+        ;;
+
+    comprehensive)
+        print_info "Running comprehensive end-to-end tests..."
+        print_info "This will take 10-15 minutes..."
+        docker-compose -f docker-compose.test.yml build tests
+        docker-compose -f docker-compose.test.yml run --rm tests \
+            pytest tests/integration/test_end_to_end_video.py tests/integration/test_acceleration.py \
+            -m comprehensive -v --tb=short
+        ;;
+
+    all-with-e2e)
+        print_info "Running ALL tests including comprehensive..."
+        print_info "This will take 15-20 minutes..."
+        docker-compose -f docker-compose.test.yml build tests
+        docker-compose -f docker-compose.test.yml run --rm tests \
+            pytest tests/ -v --tb=short
+        ;;
+
+    e2e)
+        print_info "Running end-to-end video validation tests only..."
+        docker-compose -f docker-compose.test.yml build tests
+        docker-compose -f docker-compose.test.yml run --rm tests \
+            pytest tests/integration/test_end_to_end_video.py -m comprehensive -v --tb=short
+        ;;
+
+    acceleration)
+        print_info "Running acceleration feature tests only..."
+        docker-compose -f docker-compose.test.yml build tests
+        docker-compose -f docker-compose.test.yml run --rm tests \
+            pytest tests/integration/test_acceleration.py -m comprehensive -v --tb=short
         ;;
 
     container)
