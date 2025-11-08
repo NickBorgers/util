@@ -2,7 +2,7 @@
 # Based on chromedp/headless-shell for headless Chrome support
 
 # Stage 1: Build the Go application
-FROM golang:1.21-alpine AS builder
+FROM golang:1.25-alpine AS builder
 
 WORKDIR /build
 
