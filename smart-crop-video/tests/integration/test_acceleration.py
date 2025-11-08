@@ -117,7 +117,8 @@ def run_smart_crop_with_acceleration(
         "ENABLE_ACCELERATION": "true",
         "ACCELERATION_FACTOR": str(acceleration_factor),
         "PRESET": "ultrafast",
-        "ANALYSIS_FRAMES": "10"
+        "ANALYSIS_FRAMES": "10",
+        "AUTO_CONFIRM": "true"  # Non-interactive mode for tests
     }
 
     if scene_selections:
@@ -319,7 +320,8 @@ class TestAccelerationFeature:
         env = {
             "ENABLE_ACCELERATION": "false",
             "PRESET": "ultrafast",
-            "ANALYSIS_FRAMES": "10"
+            "ANALYSIS_FRAMES": "10",
+            "AUTO_CONFIRM": "true"  # Non-interactive mode for tests
         }
 
         smart_crop_script = Path(__file__).parent.parent.parent / "smart-crop-video.py"

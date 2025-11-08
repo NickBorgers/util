@@ -1371,10 +1371,14 @@ def main():
         print()
 
         # Interactive selection with web UI awareness
-        # First check if already selected via web UI before we got here
-        web_selection = state.get('selected_index')
-
-        if web_selection is not None:
+        # First check for non-interactive mode (used by tests and automated workflows)
+        if os.getenv('AUTO_CONFIRM'):
+            print("AUTO_CONFIRM enabled, using automatic selection")
+            selected = unique_candidates[0]
+            print(f"Using automatic selection: Position (x={selected.x}, y={selected.y}) with score: {selected.score:.2f}")
+            print(f"Strategy: {selected.strategy}")
+        # Then check if already selected via web UI before we got here
+        elif (web_selection := state.get('selected_index')) is not None:
             selected = unique_candidates[web_selection - 1]
             print(f"Using web UI selection #{web_selection}: Position (x={selected.x}, y={selected.y}) with score: {selected.score:.2f}")
             print(f"Strategy: {selected.strategy}")
@@ -1481,10 +1485,12 @@ def main():
     print("="*70)
     print()
 
+    # Check for non-interactive mode first
+    if os.getenv('AUTO_CONFIRM'):
+        print("AUTO_CONFIRM enabled, defaulting to no acceleration")
+        enable_speedup = False
     # Check if web UI already made the choice
-    web_acceleration_choice = state.get('enable_acceleration')
-
-    if web_acceleration_choice is not None:
+    elif (web_acceleration_choice := state.get('enable_acceleration')) is not None:
         # Web UI made the choice
         print(f"Using web UI choice: {'Yes' if web_acceleration_choice else 'No'}")
         enable_speedup = web_acceleration_choice

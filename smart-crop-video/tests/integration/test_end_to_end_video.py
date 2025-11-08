@@ -151,7 +151,7 @@ def run_smart_crop(
         "CROP_SCALE": str(crop_scale),
         "ANALYSIS_FRAMES": str(analysis_frames),
         "PRESET": "ultrafast",  # Fast encoding for tests
-        "ENABLE_ACCELERATION": "false"  # Disable for basic tests
+        "AUTO_CONFIRM": "true"  # Non-interactive mode for tests
     }
 
     # Run container
