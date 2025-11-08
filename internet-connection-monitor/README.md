@@ -4,7 +4,21 @@
 
 ## 🚀 Quick Start
 
-**Try the full Grafana dashboard demo in one command:**
+**Try it in 30 seconds:**
+
+```bash
+make quick-test
+```
+
+**Or run and watch live results:**
+
+```bash
+make quick-start    # Build & run
+# Ctrl+C to stop viewing
+make quick-stop     # Stop the monitor
+```
+
+**Full Grafana dashboard demo:**
 
 ```bash
 make grafana-dashboard-demo
@@ -12,7 +26,7 @@ make grafana-dashboard-demo
 
 Then visit http://localhost:3000 (admin/admin) to see the dashboard!
 
-See [QUICKSTART.md](QUICKSTART.md) for details.
+See [QUICKSTART.md](QUICKSTART.md) for details or run `make help` for all commands.
 
 ## User Story
 As an engineer who runs an arguably over-complicated home network, I have device-level monitoring but occasionally we see perceptible network problems that do not show up in the monitoring. The ultimate signal of "is Internet working as expected" is how it behaves for us meatsacks. The monitoring approaches I'm already using:
@@ -71,32 +85,35 @@ The monitor runs **continuously**, testing sites one at a time (like a real pers
 - **[QUICKSTART.md](QUICKSTART.md)** - Get started in 30 seconds
 - **[DESIGN.md](DESIGN.md)** - Architecture, technology stack, implementation details
 - **[ELASTICSEARCH_AND_GRAFANA.md](ELASTICSEARCH_AND_GRAFANA.md)** - JSON schema, Grafana queries, dashboard guide
-- **[deployments/README.md](deployments/README.md)** - Deployment guide, configuration options, troubleshooting
+- **[TROUBLESHOOTING.md](TROUBLESHOOTING.md)** - Common issues and solutions
+- **[deployments/README.md](deployments/README.md)** - Deployment guide, configuration options
 - **[Makefile](Makefile)** - Run `make help` to see all commands
 
 ## Common Commands
 
 ```bash
-# Start the full demo stack
-make grafana-dashboard-demo
+# Quick test (30 seconds)
+make quick-test
 
-# Check status
-make demo-status
+# Run and watch live
+make quick-start            # Build & run
+make quick-stop             # Stop
 
-# View test results
-make monitor-logs
+# Full demo stack
+make grafana-dashboard-demo # Start everything
+make demo-status            # Check health
+make monitor-logs           # View test results
+make demo-stop              # Stop (keeps data)
 
-# View sample data from Elasticsearch
-make es-sample
+# Local development
+make build-binary           # Build Go binary
+make dev                    # Build & run locally
 
-# Stop demo (keeps data)
-make demo-stop
-
-# Clean up everything
-make demo-clean
+# Watch formatted output
+make watch-json             # Pretty-print results
 ```
 
-See `make help` for all 40+ commands.
+See `make help` for all 50+ commands and workflows.
 
 ## Configuration
 

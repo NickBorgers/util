@@ -1,0 +1,230 @@
+# Internet Connection Monitor - Example Configuration
+# This file demonstrates all available configuration options.
+# In production, most settings can be overridden via environment variables.
+
+# General Settings
+general:
+  # Delay between tests to smooth traffic patterns
+  # Mimics natural browsing behavior
+  inter_test_delay: 2s
+
+  # Global timeout for page loads
+  # Tests exceeding this will be marked as failed
+  global_timeout: 30s
+
+  # Number of recent results to cache in memory for SNMP polling
+  # This cache is ephemeral and resets on restart
+  cache_size: 100
+
+# Sites to Monitor
+# The monitor will test these sites continuously in round-robin fashion
+sites:
+  # List of sites to test
+  # Each site can be:
+  # 1. A simple string (URL or domain)
+  # 2. A detailed configuration object
+  list:
+    # Simple format: just the domain (HTTPS assumed)
+    - google.com
+    - github.com
+    - cloudflare.com
+
+    # Detailed format: full control over test parameters
+    - url: https://www.wikipedia.org
+      name: wikipedia
+      category: reference
+      timeout_seconds: 30
+      wait_for_network_idle: true
+      # Optional: Check for specific DOM elements to verify page loaded correctly
+      expected_elements:
+        - "#searchInput"
+        - ".central-textlogo"
+      # Optional: Custom headers for this site
+      custom_headers:
+        User-Agent: "Mozilla/5.0 (compatible; InternetMonitor/1.0)"
+
+    - url: https://example.com
+      name: example
+      category: test
+      timeout_seconds: 10
+      wait_for_network_idle: false
+
+    # You can test any public website
+    - url: https://www.amazon.com
+      name: amazon
+      category: ecommerce
+      timeout_seconds: 45  # Some sites take longer
+
+    - url: https://www.reddit.com
+      name: reddit
+      category: social
+
+    - url: https://www.youtube.com
+      name: youtube
+      category: media
+
+# Browser Settings
+browser:
+  # Run in headless mode (no GUI)
+  headless: true
+
+  # User agent string
+  # Default mimics a real browser to avoid bot detection
+  user_agent: "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+
+  # Browser window size (even in headless mode, affects rendering)
+  window_width: 1920
+  window_height: 1080
+
+  # Disable images to speed up tests (optional)
+  disable_images: false
+
+  # Disable JavaScript (not recommended for real-world testing)
+  disable_javascript: false
+
+  # Clear cookies between tests
+  clear_cookies: true
+
+# Output: Logging
+logging:
+  # Log level: debug, info, warn, error
+  level: info
+
+  # Log format: json or text
+  # JSON recommended for production (parseable)
+  format: json
+
+  # Include browser console logs in output
+  include_browser_console: false
+
+# Output: Elasticsearch
+elasticsearch:
+  # Enable Elasticsearch push
+  enabled: true
+
+  # Elasticsearch endpoint URL
+  endpoint: "http://localhost:9200"
+
+  # Index pattern (supports date formatting)
+  # %{+yyyy.MM.dd} creates daily indices
+  index_pattern: "internet-connection-monitor-%{+yyyy.MM.dd}"
+
+  # Authentication (if required)
+  username: ""
+  password: ""
+
+  # API key authentication (alternative to username/password)
+  api_key: ""
+
+  # Bulk indexing settings
+  bulk_size: 50          # Number of documents to batch
+  flush_interval: 10s    # Force flush after this duration
+
+  # Retry settings
+  max_retries: 3
+  retry_backoff: 1s
+
+  # TLS settings
+  tls_enabled: false
+  tls_skip_verify: false  # Don't use in production
+  tls_cert_file: ""
+  tls_key_file: ""
+  tls_ca_file: ""
+
+# Output: SNMP Agent
+snmp:
+  # Enable SNMP agent for Zabbix polling
+  enabled: true
+
+  # SNMP listen port (default: 161)
+  port: 161
+
+  # SNMP community string (SNMPv2c)
+  community: "public"
+
+  # Listen address (0.0.0.0 for all interfaces)
+  listen_address: "0.0.0.0"
+
+  # Enterprise OID base
+  # Default: .1.3.6.1.4.1.99999 (unregistered)
+  enterprise_oid: ".1.3.6.1.4.1.99999"
+
+# Output: Prometheus Exporter
+prometheus:
+  # Enable Prometheus metrics endpoint
+  enabled: true
+
+  # HTTP port for /metrics endpoint
+  port: 9090
+
+  # Metrics path
+  path: "/metrics"
+
+  # Listen address (0.0.0.0 for all interfaces)
+  listen_address: "0.0.0.0"
+
+  # Include Go runtime metrics
+  include_go_metrics: true
+
+  # Histogram buckets for latency metrics (milliseconds)
+  latency_buckets:
+    - 10
+    - 50
+    - 100
+    - 250
+    - 500
+    - 1000
+    - 2500
+    - 5000
+    - 10000
+
+# Advanced Settings
+advanced:
+  # Enable profiling endpoint (for debugging)
+  pprof_enabled: false
+  pprof_port: 6060
+
+  # Health check endpoint
+  health_check_enabled: true
+  health_check_port: 8080
+  health_check_path: "/health"
+
+  # Graceful shutdown timeout
+  shutdown_timeout: 30s
+
+  # Maximum concurrent browser instances
+  # Set to 1 for serial testing (recommended)
+  max_concurrent_browsers: 1
+
+  # Enable screenshot capture on failures
+  capture_screenshots: false
+  screenshot_path: "/tmp/screenshots"
+
+  # DNS resolver settings
+  dns_servers: []  # Empty = use system default
+  # Example:
+  # dns_servers:
+  #   - "8.8.8.8"
+  #   - "1.1.1.1"
+
+# Environment Variable Overrides
+# All settings can be overridden via environment variables using the pattern:
+# SECTION_SETTING (uppercase, underscores)
+#
+# Examples:
+#   GENERAL_INTER_TEST_DELAY=5s
+#   ES_ENABLED=false
+#   SITES=google.com,github.com,example.com
+#   LOG_LEVEL=debug
+#   PROM_PORT=9090
+#   SNMP_COMMUNITY=private
+#   BROWSER_HEADLESS=true
+#
+# For nested settings, use underscores:
+#   ES_ENDPOINT=http://es.example.com:9200
+#   SNMP_LISTEN_ADDRESS=127.0.0.1
+#
+# Simple comma-separated list for sites:
+#   SITES=site1.com,site2.com,site3.com
+#
+# Priority: Environment Variables > Config File > Defaults

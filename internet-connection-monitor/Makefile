@@ -1,6 +1,7 @@
 .PHONY: help grafana-dashboard-demo demo-start demo-stop demo-logs demo-status demo-clean \
         build run test clean setup-es verify-grafana open-grafana open-prometheus \
-        es-health es-indices es-sample monitor-logs es-logs grafana-logs all-logs
+        es-health es-indices es-sample monitor-logs es-logs grafana-logs all-logs \
+        quick-start quick-test quick-stop build-binary run-binary dev watch-json
 
 # Default target
 .DEFAULT_GOAL := help
@@ -11,6 +12,69 @@ GREEN := \033[0;32m
 YELLOW := \033[0;33m
 RED := \033[0;31m
 NC := \033[0m # No Color
+
+##@ Quick Start Commands
+
+quick-start: build ## ⚡ Quick start: Build image and run monitor (fastest way to test)
+	@echo "$(CYAN)╔════════════════════════════════════════════════════════════════╗$(NC)"
+	@echo "$(CYAN)║  Quick Start - Internet Connection Monitor                    ║$(NC)"
+	@echo "$(CYAN)╚════════════════════════════════════════════════════════════════╝$(NC)"
+	@echo ""
+	@echo "$(YELLOW)Starting monitor in standalone mode...$(NC)"
+	@docker run --rm --name quick-monitor \
+		-e INTER_TEST_DELAY=3s \
+		-e LOG_FORMAT=json \
+		internet-connection-monitor:latest &
+	@sleep 3
+	@echo ""
+	@echo "$(GREEN)✓ Monitor is running!$(NC)"
+	@echo ""
+	@echo "$(YELLOW)Viewing test results (Ctrl+C to stop):$(NC)"
+	@echo "$(CYAN)────────────────────────────────────────────────────────────────$(NC)"
+	@docker logs -f quick-monitor 2>&1 | grep -v "ERROR: could not unmarshal"
+
+quick-test: build ## 🧪 Quick test: Run monitor for 30 seconds and show results
+	@echo "$(CYAN)Running quick 30-second test...$(NC)"
+	@timeout 30 docker run --rm \
+		-e INTER_TEST_DELAY=5s \
+		-e SITES="google.com,github.com,example.com" \
+		internet-connection-monitor:latest 2>&1 \
+		| grep -v "ERROR: could not unmarshal" || true
+	@echo ""
+	@echo "$(GREEN)✓ Test complete$(NC)"
+
+quick-stop: ## 🛑 Stop quick-start monitor
+	@docker stop quick-monitor 2>/dev/null || echo "$(YELLOW)No quick-monitor running$(NC)"
+
+watch-json: ## 👀 Watch test results in real-time (formatted JSON)
+	@echo "$(CYAN)Watching test results (Ctrl+C to stop)...$(NC)"
+	@echo "$(CYAN)────────────────────────────────────────────────────────────────$(NC)"
+	@docker logs -f internet-monitor 2>&1 \
+		| grep -v "ERROR: could not unmarshal" \
+		| grep "^{" \
+		| jq -C '.' || docker logs -f quick-monitor 2>&1 | grep "^{"
+
+##@ Local Development Commands
+
+build-binary: ## 🔧 Build Go binary locally (to build/ directory)
+	@echo "$(YELLOW)Building Go binary...$(NC)"
+	@mkdir -p build
+	@go build -o build/internet-monitor ./cmd/monitor
+	@echo "$(GREEN)✓ Binary built: build/internet-monitor$(NC)"
+	@ls -lh build/internet-monitor
+
+run-binary: build-binary ## ▶️  Run locally built binary (requires Chrome installed)
+	@echo "$(YELLOW)Running locally built binary...$(NC)"
+	@echo "$(YELLOW)Note: Requires Chrome/Chromium installed on system$(NC)"
+	@echo ""
+	@./build/internet-monitor
+
+dev: ## 🔄 Development mode: Build and run with quick reload
+	@echo "$(CYAN)Development mode - Building and running...$(NC)"
+	@$(MAKE) build-binary
+	@echo ""
+	@echo "$(YELLOW)Starting monitor (Ctrl+C to stop)...$(NC)"
+	@SITES="example.com,google.com" INTER_TEST_DELAY=5s ./build/internet-monitor
 
 ##@ Demo Commands
 
@@ -96,14 +160,15 @@ demo-status: ## 📊 Show status of all demo services
 	@echo -n "  Monitor:       "
 	@curl -s -o /dev/null -w "%{http_code}" http://localhost:9090/metrics 2>/dev/null | grep -q 200 && echo "$(GREEN)✓ Healthy$(NC)" || echo "$(RED)✗ Not responding$(NC)"
 
-demo-logs: ## 📜 View logs from all demo services
-	@cd deployments && docker-compose -f docker-compose.with-stack.yml logs -f
+demo-logs: ## 📜 View logs from all demo services (monitor logs filtered)
+	@cd deployments && docker-compose -f docker-compose.with-stack.yml logs -f 2>&1 | grep -v "ERROR: could not unmarshal"
 
 ##@ Logs and Debugging
 
-monitor-logs: ## 📝 View internet-monitor test results (JSON output)
+monitor-logs: ## 📝 View internet-monitor test results (filtered, clean output)
 	@echo "$(CYAN)Monitoring test results (Ctrl+C to exit):$(NC)"
-	@cd deployments && docker-compose -f docker-compose.with-stack.yml logs -f internet-monitor
+	@echo "$(YELLOW)Filtering out harmless CDP warnings...$(NC)"
+	@cd deployments && docker-compose -f docker-compose.with-stack.yml logs -f internet-monitor 2>&1 | grep -v "ERROR: could not unmarshal"
 
 es-logs: ## 📝 View Elasticsearch logs
 	@cd deployments && docker-compose -f docker-compose.with-stack.yml logs -f elasticsearch
@@ -179,8 +244,9 @@ run: ## ▶️  Run monitor in standalone mode (no Elasticsearch)
 stop: ## ⏹️  Stop standalone monitor
 	@cd deployments && docker-compose stop
 
-logs-standalone: ## 📜 View standalone monitor logs
-	@cd deployments && docker-compose logs -f internet-monitor
+logs-standalone: ## 📜 View standalone monitor logs (filtered)
+	@echo "$(CYAN)Viewing monitor logs (CDP warnings filtered)...$(NC)"
+	@cd deployments && docker-compose logs -f internet-monitor 2>&1 | grep -v "ERROR: could not unmarshal"
 
 clean-standalone: ## 🗑️  Stop and remove standalone monitor
 	@cd deployments && docker-compose down
@@ -282,9 +348,28 @@ help: ## 📚 Show this help message
 	@echo ""
 	@awk 'BEGIN {FS = ":.*##"; printf ""} /^[a-zA-Z_-]+:.*?##/ { printf "  $(CYAN)%-20s$(NC) %s\n", $$1, $$2 } /^##@/ { printf "\n$(YELLOW)%s$(NC)\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
 	@echo ""
-	@echo "$(YELLOW)Quick Start:$(NC)"
-	@echo "  make grafana-dashboard-demo    # Start the full demo stack"
-	@echo "  make demo-status               # Check if everything is running"
-	@echo "  make monitor-logs              # Watch test results"
-	@echo "  make open-grafana              # Open Grafana in browser"
+	@echo "$(YELLOW)╔══════════════════════════════════════════════════════════════════╗$(NC)"
+	@echo "$(YELLOW)║  Quick Start Workflows                                          ║$(NC)"
+	@echo "$(YELLOW)╚══════════════════════════════════════════════════════════════════╝$(NC)"
+	@echo ""
+	@echo "$(GREEN)1. Just test it quickly (30 seconds):$(NC)"
+	@echo "   $(CYAN)make quick-test$(NC)"
+	@echo ""
+	@echo "$(GREEN)2. Run and watch live results:$(NC)"
+	@echo "   $(CYAN)make quick-start$(NC)          # Build & run in background"
+	@echo "   $(CYAN)Ctrl+C to stop$(NC)            # Stops viewing (keeps running)"
+	@echo "   $(CYAN)make quick-stop$(NC)           # Stop the monitor"
+	@echo ""
+	@echo "$(GREEN)3. Full stack with Grafana dashboard:$(NC)"
+	@echo "   $(CYAN)make grafana-dashboard-demo$(NC)  # Start everything"
+	@echo "   $(CYAN)make demo-status$(NC)             # Check health"
+	@echo "   $(CYAN)make monitor-logs$(NC)            # View test results"
+	@echo "   Open $(GREEN)http://localhost:3000$(NC)    (admin/admin)"
+	@echo ""
+	@echo "$(GREEN)4. Local development (requires Chrome):$(NC)"
+	@echo "   $(CYAN)make build-binary$(NC)         # Build Go binary"
+	@echo "   $(CYAN)make dev$(NC)                  # Build & run locally"
+	@echo ""
+	@echo "$(GREEN)5. Watch formatted JSON output:$(NC)"
+	@echo "   $(CYAN)make watch-json$(NC)           # Pretty-print test results"
 	@echo ""
