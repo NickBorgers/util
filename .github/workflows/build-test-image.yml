@@ -20,7 +20,8 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}/smart-crop-video-test
+  # Docker requires lowercase repository names
+  IMAGE_NAME: ${{ github.repository_owner }}/util/smart-crop-video-test
 
 jobs:
   build:

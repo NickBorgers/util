@@ -27,6 +27,7 @@ services:
   # Base test service (shared configuration)
   tests:
     # Use pre-built image from GHCR if available, otherwise build locally
+    # Note: GitHub Container Registry requires lowercase names
     image: ${TEST_IMAGE:-ghcr.io/nickborgers/util/smart-crop-video-test:latest}
     build:
       context: .
