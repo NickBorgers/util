@@ -14,10 +14,9 @@ import (
 
 // ControllerImpl is the concrete implementation of the browser controller
 type ControllerImpl struct {
-	config      *config.BrowserConfig
-	allocCtx    context.Context
-	cancelAlloc context.CancelFunc
-	hostname    string
+	config        *config.BrowserConfig
+	allocatorOpts []chromedp.ExecAllocatorOption
+	hostname      string
 }
 
 // NewControllerImpl creates a new browser controller with chromedp
@@ -28,7 +27,9 @@ func NewControllerImpl(cfg *config.BrowserConfig) (*ControllerImpl, error) {
 		hostname = "unknown"
 	}
 
-	// Create allocator context with suppressed CDP warnings
+	// Build allocator options that will be used for each test
+	// Note: We don't create the allocator here - we create a fresh one for each test
+	// to force DNS, TCP, and TLS to be refreshed on every test
 	opts := []chromedp.ExecAllocatorOption{
 		chromedp.NoFirstRun,
 		chromedp.NoDefaultBrowserCheck,
@@ -37,6 +38,12 @@ func NewControllerImpl(cfg *config.BrowserConfig) (*ControllerImpl, error) {
 		chromedp.UserAgent(cfg.UserAgent),
 		chromedp.WindowSize(cfg.WindowWidth, cfg.WindowHeight),
 		chromedp.Flag("log-level", "3"), // Suppress Chrome warnings
+		// Disable caches to force fresh connections on each test
+		chromedp.Flag("disable-cache", "true"),
+		chromedp.Flag("disable-application-cache", "true"),
+		chromedp.Flag("disable-offline-load-stale-cache", "true"),
+		chromedp.Flag("disk-cache-size", "0"),
+		chromedp.Flag("media-cache-size", "0"),
 	}
 
 	if cfg.Headless {
@@ -47,25 +54,27 @@ func NewControllerImpl(cfg *config.BrowserConfig) (*ControllerImpl, error) {
 		opts = append(opts, chromedp.Flag("blink-settings", "imagesEnabled=false"))
 	}
 
-	allocCtx, cancelAlloc := chromedp.NewExecAllocator(context.Background(), opts...)
-
 	// Note: The CDP "could not unmarshal event" errors are harmless warnings
 	// from chromedp v0.9.5 not supporting newer Chrome protocol events.
 	// They don't affect functionality. To suppress them, we'd need to upgrade
 	// chromedp or filter stderr. For now, Makefile commands filter them.
 
 	return &ControllerImpl{
-		config:      cfg,
-		allocCtx:    allocCtx,
-		cancelAlloc: cancelAlloc,
-		hostname:    hostname,
+		config:        cfg,
+		allocatorOpts: opts,
+		hostname:      hostname,
 	}, nil
 }
 
 // TestSite navigates to a site and collects metrics
 func (c *ControllerImpl) TestSite(ctx context.Context, site models.SiteDefinition) (*models.TestResult, error) {
-	// Create a new browser context for this test
-	taskCtx, cancel := chromedp.NewContext(c.allocCtx)
+	// Create a fresh allocator context for this test
+	// This ensures DNS, TCP, and TLS connections are all refreshed (not cached/reused)
+	allocCtx, cancelAlloc := chromedp.NewExecAllocator(context.Background(), c.allocatorOpts...)
+	defer cancelAlloc()
+
+	// Create a new browser context using the fresh allocator
+	taskCtx, cancel := chromedp.NewContext(allocCtx)
 	defer cancel()
 
 	// Apply site-specific timeout
@@ -158,10 +167,11 @@ func (c *ControllerImpl) TestSite(ctx context.Context, site models.SiteDefinitio
 }
 
 // Close shuts down the browser controller
+// Note: Each test now creates and cleans up its own browser instance,
+// so there's no persistent browser to shut down
 func (c *ControllerImpl) Close() error {
-	if c.cancelAlloc != nil {
-		c.cancelAlloc()
-	}
+	// No persistent browser allocator to clean up
+	// Each TestSite() call creates and disposes of its own browser instance
 	return nil
 }
 
