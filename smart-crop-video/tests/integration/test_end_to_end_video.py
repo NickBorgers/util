@@ -457,7 +457,7 @@ class TestCropStrategies:
     """Test different scoring strategies produce expected results."""
 
     @pytest.mark.skipif(
-        os.getenv('AUTO_CONFIRM') is not None,
+        bool(os.getenv('AUTO_CONFIRM')),
         reason="Strategy comparison not meaningful with automatic selection"
     )
     def test_motion_vs_edges_different_results(self, motion_top_right_video, test_videos_dir):
