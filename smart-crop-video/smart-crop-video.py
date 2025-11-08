@@ -1587,40 +1587,55 @@ def main():
                                           selected_strategy, base_name, state)
 
         if scenes:
-            # Wait for user to select scenes (from web UI or text interface)
-            print()
-            print(f"Waiting for scene selection via web UI or text input...")
-            print(f"  - Web UI: Open http://localhost:{port} to select scenes visually")
-            print(f"  - Text: Scene thumbnails saved as {base_name}_scene_*_first.jpg and *_last.jpg")
-            print()
-
-            # Check if web UI already made selections
-            web_scene_selections = state.get('scene_selections')
-
-            if web_scene_selections is not None:
-                print(f"Using web UI selections: {len(web_scene_selections)} scenes to accelerate")
-                scene_selections = web_scene_selections
+            # Check for scene selections from environment variable first (used by tests)
+            scene_selections_env = os.getenv('SCENE_SELECTIONS')
+            if scene_selections_env:
+                # Parse format: "0:1.0,1:2.0,2:1.0" -> {1: 1.0, 2: 2.0, 3: 1.0} (convert to 1-based)
+                scene_selections = {}
+                for selection in scene_selections_env.split(','):
+                    idx_str, speed_str = selection.split(':')
+                    # Add 1 to convert from 0-based (test format) to 1-based (UI format)
+                    scene_selections[int(idx_str) + 1] = float(speed_str)
+                print(f"Using SCENE_SELECTIONS from environment: {len(scene_selections)} scenes to accelerate")
+            # Check for non-interactive mode
+            elif os.getenv('AUTO_CONFIRM'):
+                print("AUTO_CONFIRM enabled, skipping scene selection (no acceleration)")
+                scene_selections = None
             else:
-                # Wait for web UI selection
-                max_wait = 600  # 10 minutes
-                poll_interval = 0.5
-                elapsed = 0
+                # Wait for user to select scenes (from web UI or text interface)
+                print()
+                print(f"Waiting for scene selection via web UI or text input...")
+                print(f"  - Web UI: Open http://localhost:{port} to select scenes visually")
+                print(f"  - Text: Scene thumbnails saved as {base_name}_scene_*_first.jpg and *_last.jpg")
+                print()
 
-                print("Waiting for scene selections from web UI...")
-                print(f"(Timeout in {max_wait}s)")
+                # Check if web UI already made selections
+                web_scene_selections = state.get('scene_selections')
 
-                while elapsed < max_wait:
-                    web_selections = state.get('scene_selections')
-                    if web_selections is not None:
-                        print(f"\n✓ Selections received from web UI: {len(web_selections)} scenes to accelerate")
-                        scene_selections = web_selections
-                        break
+                if web_scene_selections is not None:
+                    print(f"Using web UI selections: {len(web_scene_selections)} scenes to accelerate")
+                    scene_selections = web_scene_selections
+                else:
+                    # Wait for web UI selection
+                    max_wait = 600  # 10 minutes
+                    poll_interval = 0.5
+                    elapsed = 0
 
-                    time.sleep(poll_interval)
-                    elapsed += poll_interval
+                    print("Waiting for scene selections from web UI...")
+                    print(f"(Timeout in {max_wait}s)")
 
-                if scene_selections is None:
-                    print("\n\nNo scene selections made, skipping acceleration")
+                    while elapsed < max_wait:
+                        web_selections = state.get('scene_selections')
+                        if web_selections is not None:
+                            print(f"\n✓ Selections received from web UI: {len(web_selections)} scenes to accelerate")
+                            scene_selections = web_selections
+                            break
+
+                        time.sleep(poll_interval)
+                        elapsed += poll_interval
+
+                    if scene_selections is None:
+                        print("\n\nNo scene selections made, skipping acceleration")
 
     # Convert scene selections to boring_sections format for encoding
     boring_sections = []
