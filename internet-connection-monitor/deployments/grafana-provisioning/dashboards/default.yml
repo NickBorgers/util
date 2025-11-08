@@ -1,0 +1,14 @@
+# Grafana dashboard provisioning
+apiVersion: 1
+
+providers:
+  - name: 'Internet Monitor Dashboards'
+    orgId: 1
+    folder: 'Internet Monitoring'
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 10
+    allowUiUpdates: true
+    options:
+      path: /etc/grafana/provisioning/dashboards/json
+      foldersFromFilesStructure: false

@@ -1,0 +1,18 @@
+# Grafana datasource provisioning for Elasticsearch
+apiVersion: 1
+
+datasources:
+  - name: Elasticsearch
+    type: elasticsearch
+    access: proxy
+    url: http://elasticsearch:9200
+    database: "internet-connection-monitor-*"
+    jsonData:
+      timeField: "@timestamp"
+      esVersion: "8.0.0"
+      interval: Daily
+      logMessageField: status.error.message
+      logLevelField: log_level
+      maxConcurrentShardRequests: 5
+    editable: true
+    isDefault: true

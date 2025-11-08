@@ -1,0 +1,690 @@
+# Elasticsearch and Grafana Integration
+
+## Test Result JSON Document Structure
+
+Each test produces a single JSON document that is:
+1. Written to stdout as a JSON line (for Docker logs)
+2. Pushed to Elasticsearch (if enabled)
+3. Used to update Prometheus metrics
+4. Cached in memory for SNMP polling
+
+### Complete JSON Document Example
+
+```json
+{
+  "@timestamp": "2025-01-08T15:23:45.123Z",
+  "test_id": "550e8400-e29b-41d4-a716-446655440000",
+  "site": {
+    "url": "https://www.google.com",
+    "name": "google",
+    "category": "search"
+  },
+  "status": {
+    "success": true,
+    "http_status": 200,
+    "error": null
+  },
+  "timings": {
+    "dns_lookup_ms": 12,
+    "tcp_connection_ms": 45,
+    "tls_handshake_ms": 89,
+    "time_to_first_byte_ms": 156,
+    "dom_content_loaded_ms": 432,
+    "network_idle_ms": 1234,
+    "total_duration_ms": 1456
+  },
+  "browser": {
+    "user_agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36...",
+    "viewport": "1920x1080"
+  },
+  "environment": {
+    "monitor_hostname": "internet-monitor-01",
+    "monitor_version": "1.0.0"
+  }
+}
+```
+
+### Failed Test Example
+
+```json
+{
+  "@timestamp": "2025-01-08T15:25:12.456Z",
+  "test_id": "660e8400-e29b-41d4-a716-446655440001",
+  "site": {
+    "url": "https://example-down-site.com",
+    "name": "example-site",
+    "category": "test"
+  },
+  "status": {
+    "success": false,
+    "http_status": 0,
+    "error": {
+      "type": "timeout",
+      "message": "Navigation timeout of 30000ms exceeded",
+      "timestamp": "2025-01-08T15:25:12.456Z"
+    }
+  },
+  "timings": {
+    "dns_lookup_ms": 45,
+    "tcp_connection_ms": null,
+    "tls_handshake_ms": null,
+    "time_to_first_byte_ms": null,
+    "dom_content_loaded_ms": null,
+    "network_idle_ms": null,
+    "total_duration_ms": 30000
+  },
+  "browser": {
+    "user_agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36...",
+    "viewport": "1920x1080"
+  },
+  "environment": {
+    "monitor_hostname": "internet-monitor-01",
+    "monitor_version": "1.0.0"
+  }
+}
+```
+
+## Elasticsearch Index Template
+
+### Index Naming Pattern
+```
+internet-connection-monitor-YYYY.MM.DD
+```
+
+Daily indices allow for easy data lifecycle management (delete old indices after N days).
+
+### Index Mapping
+
+```json
+{
+  "mappings": {
+    "properties": {
+      "@timestamp": {
+        "type": "date"
+      },
+      "test_id": {
+        "type": "keyword"
+      },
+      "site": {
+        "properties": {
+          "url": {
+            "type": "keyword"
+          },
+          "name": {
+            "type": "keyword"
+          },
+          "category": {
+            "type": "keyword"
+          }
+        }
+      },
+      "status": {
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "http_status": {
+            "type": "integer"
+          },
+          "error": {
+            "properties": {
+              "type": {
+                "type": "keyword"
+              },
+              "message": {
+                "type": "text"
+              },
+              "timestamp": {
+                "type": "date"
+              }
+            }
+          }
+        }
+      },
+      "timings": {
+        "properties": {
+          "dns_lookup_ms": {
+            "type": "integer"
+          },
+          "tcp_connection_ms": {
+            "type": "integer"
+          },
+          "tls_handshake_ms": {
+            "type": "integer"
+          },
+          "time_to_first_byte_ms": {
+            "type": "integer"
+          },
+          "dom_content_loaded_ms": {
+            "type": "integer"
+          },
+          "network_idle_ms": {
+            "type": "integer"
+          },
+          "total_duration_ms": {
+            "type": "integer"
+          }
+        }
+      },
+      "browser": {
+        "properties": {
+          "user_agent": {
+            "type": "text"
+          },
+          "viewport": {
+            "type": "keyword"
+          }
+        }
+      },
+      "environment": {
+        "properties": {
+          "monitor_hostname": {
+            "type": "keyword"
+          },
+          "monitor_version": {
+            "type": "keyword"
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+## Grafana Dashboard Design
+
+### Dashboard Overview
+
+**Dashboard Name**: Internet Connection Monitor
+**Purpose**: Monitor real-world Internet connectivity from user perspective
+**Time Range**: Default last 24 hours, support up to 90 days
+
+### Panel Layout
+
+```
++------------------------------------------+
+|  Success Rate (Last Hour) - Single Stat |
++------------------------------------------+
+|  Avg Latency (Last Hour)  - Single Stat |
++------------------------------------------+
+
++--------------------+---------------------+
+| Success Rate       | Total Duration      |
+| (Time Series)      | (Time Series)       |
+|                    |                     |
+|                    |                     |
++--------------------+---------------------+
+
++--------------------+---------------------+
+| DNS Lookup Times   | TLS Handshake       |
+| (Time Series)      | (Time Series)       |
+|                    |                     |
++--------------------+---------------------+
+
++------------------------------------------+
+| Success Rate by Site (Bar Gauge)         |
++------------------------------------------+
+
++------------------------------------------+
+| Error Types (Pie Chart)                  |
++------------------------------------------+
+
++------------------------------------------+
+| Recent Failures (Table)                  |
++------------------------------------------+
+```
+
+### Panel Definitions
+
+#### 1. Success Rate (Single Stat)
+**Query**:
+```
+{
+  "query": {
+    "bool": {
+      "filter": [
+        { "range": { "@timestamp": { "gte": "now-1h" } } }
+      ]
+    }
+  },
+  "aggs": {
+    "success_rate": {
+      "avg": {
+        "field": "status.success"
+      }
+    }
+  }
+}
+```
+
+**Visualization**: Single Stat showing percentage (0-100%)
+**Thresholds**: Green >99%, Yellow 95-99%, Red <95%
+
+#### 2. Average Latency (Single Stat)
+**Query**:
+```
+{
+  "query": {
+    "bool": {
+      "filter": [
+        { "range": { "@timestamp": { "gte": "now-1h" } } },
+        { "term": { "status.success": true } }
+      ]
+    }
+  },
+  "aggs": {
+    "avg_latency": {
+      "avg": {
+        "field": "timings.total_duration_ms"
+      }
+    }
+  }
+}
+```
+
+**Visualization**: Single Stat showing milliseconds
+**Thresholds**: Green <2000ms, Yellow 2000-5000ms, Red >5000ms
+
+#### 3. Success Rate Over Time (Time Series)
+**Query**:
+```
+{
+  "query": {
+    "bool": {
+      "filter": [
+        { "range": { "@timestamp": { "gte": "$__timeFrom", "lte": "$__timeTo" } } }
+      ]
+    }
+  },
+  "aggs": {
+    "time_buckets": {
+      "date_histogram": {
+        "field": "@timestamp",
+        "fixed_interval": "5m"
+      },
+      "aggs": {
+        "success_rate": {
+          "avg": {
+            "field": "status.success"
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+**Visualization**: Line chart, percentage (0-100%)
+**Y-Axis**: Success Rate %
+**Legend**: Show average, min, max
+
+#### 4. Total Duration Over Time (Time Series)
+**Query**:
+```
+{
+  "query": {
+    "bool": {
+      "filter": [
+        { "range": { "@timestamp": { "gte": "$__timeFrom", "lte": "$__timeTo" } } },
+        { "term": { "status.success": true } }
+      ]
+    }
+  },
+  "aggs": {
+    "time_buckets": {
+      "date_histogram": {
+        "field": "@timestamp",
+        "fixed_interval": "5m"
+      },
+      "aggs": {
+        "avg_duration": {
+          "avg": {
+            "field": "timings.total_duration_ms"
+          }
+        },
+        "p95_duration": {
+          "percentiles": {
+            "field": "timings.total_duration_ms",
+            "percents": [95]
+          }
+        },
+        "p99_duration": {
+          "percentiles": {
+            "field": "timings.total_duration_ms",
+            "percents": [99]
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+**Visualization**: Multi-line chart showing avg, p95, p99
+**Y-Axis**: Duration (ms)
+**Legend**: Show all percentiles
+
+#### 5. DNS Lookup Times (Time Series)
+**Query**: Similar to #4 but for `timings.dns_lookup_ms`
+
+**Visualization**: Line chart with percentiles
+**Purpose**: Identify DNS resolution issues
+
+#### 6. TLS Handshake Times (Time Series)
+**Query**: Similar to #4 but for `timings.tls_handshake_ms`
+
+**Visualization**: Line chart with percentiles
+**Purpose**: Identify TLS/SSL issues
+
+#### 7. Success Rate by Site (Bar Gauge)
+**Query**:
+```
+{
+  "query": {
+    "bool": {
+      "filter": [
+        { "range": { "@timestamp": { "gte": "now-24h" } } }
+      ]
+    }
+  },
+  "aggs": {
+    "by_site": {
+      "terms": {
+        "field": "site.name",
+        "size": 20
+      },
+      "aggs": {
+        "success_rate": {
+          "avg": {
+            "field": "status.success"
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+**Visualization**: Horizontal bar gauge
+**Purpose**: Quick comparison across sites
+**Thresholds**: Same as single stat
+
+#### 8. Error Types (Pie Chart)
+**Query**:
+```
+{
+  "query": {
+    "bool": {
+      "filter": [
+        { "range": { "@timestamp": { "gte": "now-24h" } } },
+        { "term": { "status.success": false } }
+      ]
+    }
+  },
+  "aggs": {
+    "error_types": {
+      "terms": {
+        "field": "status.error.type",
+        "size": 10
+      }
+    }
+  }
+}
+```
+
+**Visualization**: Pie chart or donut chart
+**Purpose**: Understand failure modes (timeout, DNS, connection refused, etc.)
+
+#### 9. Recent Failures (Table)
+**Query**:
+```
+{
+  "query": {
+    "bool": {
+      "filter": [
+        { "range": { "@timestamp": { "gte": "now-24h" } } },
+        { "term": { "status.success": false } }
+      ]
+    }
+  },
+  "sort": [
+    { "@timestamp": { "order": "desc" } }
+  ],
+  "size": 50
+}
+```
+
+**Visualization**: Table showing:
+- Timestamp
+- Site Name
+- Error Type
+- Error Message
+- Duration (if available)
+
+**Purpose**: Detailed debugging of failures
+
+## Is This Easily Rendered in Grafana?
+
+### ✅ YES - This Structure is Grafana-Friendly
+
+**Reasons:**
+
+1. **Time-series data**: `@timestamp` field is standard for Elasticsearch time-series
+2. **Keyword fields**: Site names, error types, etc. are perfect for aggregations
+3. **Numeric metrics**: All timing fields are integers, easy to aggregate (avg, percentile, etc.)
+4. **Boolean success flag**: Simple averaging gives success rate percentage
+5. **Nested structure**: Grafana handles nested objects well with dot notation (`site.name`, `timings.dns_lookup_ms`)
+6. **Standard patterns**: The document structure follows Elasticsearch/Grafana best practices
+
+### Grafana Features We Can Use
+
+- **Date Histogram**: Automatic time bucketing for time-series charts
+- **Terms Aggregations**: Group by site, error type, etc.
+- **Percentiles**: Built-in p50, p95, p99 calculations
+- **Filters**: Easy to filter by success/failure, site, time range
+- **Variables**: Create dashboard variables for site selection, time window
+- **Alerts**: Set up alert rules on success rate, latency thresholds
+- **Transformations**: Calculate rates, deltas, moving averages
+
+### Sample Grafana Variables
+
+```
+$site_name    - Multi-select dropdown from site.name field
+$category     - Multi-select dropdown from site.category field
+$interval     - Auto-interval for time buckets (1m, 5m, 15m, 1h)
+```
+
+### Sample Alert Rules
+
+1. **Success Rate Alert**:
+   - Condition: Success rate < 95% for 15 minutes
+   - Notification: Slack, Email, PagerDuty
+
+2. **High Latency Alert**:
+   - Condition: P95 latency > 5000ms for 10 minutes
+   - Notification: Slack, Email
+
+3. **Site Down Alert**:
+   - Condition: Specific site has 0% success rate for 5 minutes
+   - Notification: PagerDuty
+
+## Grafana Dashboard JSON Export
+
+A complete Grafana dashboard JSON is quite large. Here's the structure:
+
+```json
+{
+  "dashboard": {
+    "title": "Internet Connection Monitor",
+    "tags": ["internet", "monitoring", "connectivity"],
+    "timezone": "browser",
+    "refresh": "1m",
+    "time": {
+      "from": "now-24h",
+      "to": "now"
+    },
+    "templating": {
+      "list": [
+        {
+          "name": "site_name",
+          "type": "query",
+          "datasource": "Elasticsearch",
+          "query": "{\"find\": \"terms\", \"field\": \"site.name\"}",
+          "multi": true,
+          "includeAll": true
+        }
+      ]
+    },
+    "panels": [
+      // Panel definitions as described above
+    ]
+  }
+}
+```
+
+## Data Flow Diagram
+
+```mermaid
+graph LR
+    Monitor[Internet Connection Monitor]
+
+    subgraph "Data Outputs"
+        Stdout[Docker Stdout]
+        ES[Elasticsearch]
+        Prom[Prometheus]
+        SNMP[SNMP Cache]
+    end
+
+    subgraph "Visualization"
+        Grafana[Grafana]
+        Zabbix[Zabbix]
+    end
+
+    Monitor -->|JSON Lines| Stdout
+    Monitor -->|Bulk Index| ES
+    Monitor -->|Metrics| Prom
+    Monitor -->|In-Memory| SNMP
+
+    ES -->|Elasticsearch Data Source| Grafana
+    Prom -->|Prometheus Data Source| Grafana
+    SNMP -->|SNMP Polling| Zabbix
+
+    Grafana -->|Alerts| Notifications[Slack/Email/PagerDuty]
+    Zabbix -->|Alerts| Notifications
+
+    style Monitor fill:#4a90e2
+    style ES fill:#85dcb0
+    style Grafana fill:#e27d60
+```
+
+## Example Grafana Queries by Use Case
+
+### "Is my Internet working right now?"
+**Panel**: Single stat with 5-minute success rate
+```
+Last 5 minutes success rate across all sites
+Green = 100%, Red = <100%
+```
+
+### "Which site is having problems?"
+**Panel**: Bar gauge of success rate by site (last hour)
+```
+One bar per site, sorted by success rate (lowest first)
+```
+
+### "How fast is my Internet compared to yesterday?"
+**Panel**: Time series with compare to yesterday
+```
+Average total_duration_ms with timeshift -24h overlay
+```
+
+### "What's causing failures?"
+**Panel**: Pie chart of error types
+```
+Distribution of timeout, DNS, connection refused, etc.
+```
+
+### "Detailed failure investigation"
+**Panel**: Table of recent failures with expandable error messages
+```
+Show timestamp, site, error type, full error message
+```
+
+## Retention and Performance
+
+### Elasticsearch Settings
+
+- **Index per day**: `internet-connection-monitor-2025.01.08`
+- **Retention**: 90 days (configurable via ILM policy)
+- **Rollover**: Daily at midnight
+- **Replicas**: 1 (for redundancy)
+- **Shards**: 1 per index (low data volume)
+
+### Expected Data Volume
+
+With default configuration:
+- **5 sites** tested continuously
+- **~3 seconds** average load time + 2s delay = 5s per test
+- **720 tests/hour** (one full cycle every 25s)
+- **~17,280 tests/day**
+- **~1 KB per document**
+- **~17 MB/day** raw data
+- **~1.5 GB** for 90-day retention
+
+This is very manageable for Elasticsearch.
+
+## Setup Instructions
+
+### 1. Create Elasticsearch Index Template
+
+```bash
+curl -X PUT "http://elasticsearch:9200/_index_template/internet-connection-monitor" \
+  -H 'Content-Type: application/json' \
+  -d @elasticsearch-index-template.json
+```
+
+### 2. Configure Monitor
+
+```yaml
+# config.yaml
+outputs:
+  elasticsearch:
+    enabled: true
+    endpoint: "http://elasticsearch:9200"
+    index_pattern: "internet-connection-monitor-%{+yyyy.MM.dd}"
+    username: "monitor_user"
+    password: "secret"
+    bulk_size: 50
+    flush_interval: 10s
+```
+
+### 3. Import Grafana Dashboard
+
+1. Go to Grafana → Dashboards → Import
+2. Upload `grafana-dashboard.json`
+3. Select Elasticsearch data source
+4. Click Import
+
+### 4. Set Up Alerts (Optional)
+
+Configure notification channels in Grafana:
+- Slack webhook
+- Email SMTP
+- PagerDuty integration
+
+Then enable alert rules on relevant panels.
+
+## Conclusion
+
+**The JSON document structure is highly optimized for Grafana rendering:**
+
+✅ Flat-enough structure for easy querying
+✅ Keyword fields for aggregations
+✅ Integer timing fields for statistics
+✅ Boolean success flag for rate calculations
+✅ Timestamp field for time-series
+✅ Standard Elasticsearch patterns
+✅ Supports all common Grafana visualizations
+✅ Efficient queries (no complex joins or transforms needed)
+
+**The data will render beautifully in Grafana with minimal effort.**

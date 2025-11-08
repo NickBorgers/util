@@ -1,0 +1,125 @@
+{
+  "index_patterns": ["internet-connection-monitor-*"],
+  "template": {
+    "settings": {
+      "number_of_shards": 1,
+      "number_of_replicas": 1,
+      "index.refresh_interval": "5s",
+      "index.lifecycle.name": "internet-monitor-ilm-policy",
+      "index.lifecycle.rollover_alias": "internet-connection-monitor"
+    },
+    "mappings": {
+      "properties": {
+        "@timestamp": {
+          "type": "date",
+          "format": "strict_date_optional_time||epoch_millis"
+        },
+        "test_id": {
+          "type": "keyword"
+        },
+        "site": {
+          "properties": {
+            "url": {
+              "type": "keyword"
+            },
+            "name": {
+              "type": "keyword"
+            },
+            "category": {
+              "type": "keyword"
+            }
+          }
+        },
+        "status": {
+          "properties": {
+            "success": {
+              "type": "boolean"
+            },
+            "http_status": {
+              "type": "integer"
+            },
+            "error": {
+              "properties": {
+                "type": {
+                  "type": "keyword"
+                },
+                "message": {
+                  "type": "text",
+                  "fields": {
+                    "keyword": {
+                      "type": "keyword",
+                      "ignore_above": 256
+                    }
+                  }
+                },
+                "timestamp": {
+                  "type": "date",
+                  "format": "strict_date_optional_time||epoch_millis"
+                }
+              }
+            }
+          }
+        },
+        "timings": {
+          "properties": {
+            "dns_lookup_ms": {
+              "type": "integer"
+            },
+            "tcp_connection_ms": {
+              "type": "integer"
+            },
+            "tls_handshake_ms": {
+              "type": "integer"
+            },
+            "time_to_first_byte_ms": {
+              "type": "integer"
+            },
+            "dom_content_loaded_ms": {
+              "type": "integer"
+            },
+            "network_idle_ms": {
+              "type": "integer"
+            },
+            "total_duration_ms": {
+              "type": "integer"
+            }
+          }
+        },
+        "browser": {
+          "properties": {
+            "user_agent": {
+              "type": "text",
+              "fields": {
+                "keyword": {
+                  "type": "keyword",
+                  "ignore_above": 256
+                }
+              }
+            },
+            "viewport": {
+              "type": "keyword"
+            }
+          }
+        },
+        "environment": {
+          "properties": {
+            "monitor_hostname": {
+              "type": "keyword"
+            },
+            "monitor_version": {
+              "type": "keyword"
+            }
+          }
+        }
+      }
+    }
+  },
+  "priority": 500,
+  "composed_of": [],
+  "version": 1,
+  "_meta": {
+    "description": "Index template for Internet Connection Monitor test results",
+    "created_by": "internet-connection-monitor",
+    "created_at": "2025-01-08"
+  }
+}
