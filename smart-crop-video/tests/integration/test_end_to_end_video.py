@@ -100,10 +100,17 @@ def run_smart_crop(
     """
     client = docker.from_env()
 
-    # Get the working directory (parent of input video)
-    work_dir = input_video.parent
+    # Use output directory as working directory and copy input there
+    # This handles the case where input (fixtures) and output (temp) are in different directories
+    work_dir = output_video.parent
     input_name = input_video.name
     output_name = output_video.name
+
+    # Copy input video to working directory if it's not already there
+    work_input_path = work_dir / input_name
+    if work_input_path != input_video:
+        import shutil
+        shutil.copy2(input_video, work_input_path)
 
     # Convert container path to host path for Docker-in-Docker
     # When running tests in Docker, we need to mount the actual host path

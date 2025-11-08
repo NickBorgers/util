@@ -16,7 +16,6 @@ import pytest
 import shutil
 import docker
 import tempfile
-import subprocess
 from pathlib import Path
 from typing import List, Dict, Any
 
@@ -112,10 +111,17 @@ def run_smart_crop_with_acceleration(
     """
     client = docker.from_env()
 
-    # Get the working directory
-    work_dir = input_video.parent
+    # Use output directory as working directory and copy input there
+    # This handles the case where input (fixtures) and output (temp) are in different directories
+    work_dir = output_video.parent
     input_name = input_video.name
     output_name = output_video.name
+
+    # Copy input video to working directory if it's not already there
+    work_input_path = work_dir / input_name
+    if work_input_path != input_video:
+        import shutil
+        shutil.copy2(input_video, work_input_path)
 
     # Convert container path to host path for Docker-in-Docker
     # When running tests in Docker, we need to mount the actual host path
@@ -335,34 +341,15 @@ class TestAccelerationFeature:
         """
         output_video = accel_test_videos_dir / "output_no_accel.mov"
 
-        # Run without acceleration
-        env = {
-            "ENABLE_ACCELERATION": "false",
-            "PRESET": "ultrafast",
-            "ANALYSIS_FRAMES": "10",
-            "AUTO_CONFIRM": "true"  # Non-interactive mode for tests
-        }
-
-        smart_crop_script = Path(__file__).parent.parent.parent / "smart-crop-video.py"
-
-        cmd = [
-            "python3",
-            str(smart_crop_script),
-            str(multi_scene_video["path"]),
-            str(output_video),
-            "1:1"
-        ]
-
-        result = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            env={**subprocess.os.environ, **env},
-            timeout=180
+        # Use acceleration_factor=1.0 which effectively disables acceleration
+        result = run_smart_crop_with_acceleration(
+            multi_scene_video["path"],
+            output_video,
+            acceleration_factor=1.0  # 1x = no acceleration
         )
 
-        assert result.returncode == 0
-        assert output_video.exists()
+        assert result["returncode"] == 0, f"Processing failed: {result['stderr']}"
+        assert output_video.exists(), "Output video not created"
 
         # Durations should match (within tolerance for encoding)
         input_duration = fa.get_video_metadata(multi_scene_video["path"])["duration"]
