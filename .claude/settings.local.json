@@ -41,13 +41,15 @@
       "Bash(docker inspect:*)",
       "Bash(docker rm:*)",
       "Bash(docker:*)",
-      "Bash(./test-integration.sh:*)"
+      "Bash(./test-integration.sh:*)",
+      "Bash(python3:*)",
+      "mcp__playwright__browser_navigate"
     ],
     "deny": [],
     "ask": []
   },
+  "enableAllProjectMcpServers": true,
   "enabledMcpjsonServers": [
     "playwright"
-  ],
-  "enableAllProjectMcpServers": true
+  ]
 }

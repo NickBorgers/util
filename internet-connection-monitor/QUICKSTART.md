@@ -105,7 +105,17 @@ make demo-logs
 ```
 
 ### Port conflicts?
-If ports 3000, 9090, 9091, or 9200 are already in use, edit `deployments/docker-compose.with-stack.yml` to change the host ports.
+
+The monitor uses **host networking** for accurate DNS measurements, which means it binds directly to ports on your host:
+- Port 161/udp (SNMP)
+- Port 9090 (Prometheus)
+- Port 8080 (health check)
+
+If these ports are already in use:
+1. **Change the monitor's ports**: Edit environment variables `SNMP_PORT` and `PROM_PORT` in the docker-compose file
+2. **Or use bridge networking**: See [deployments/README.md](deployments/README.md#alternative-bridge-networking) (note: reduces DNS measurement accuracy)
+
+For Grafana/Elasticsearch/Prometheus port conflicts (3000, 9091, 9200), edit the port mappings in `deployments/docker-compose.with-stack.yml`.
 
 ### No data in Grafana?
 ```bash
@@ -115,6 +125,10 @@ make es-count
 # Wait a few minutes for initial data
 # The monitor tests continuously, so data accumulates quickly
 ```
+
+### Why host networking?
+
+The monitor measures DNS resolution time as a key metric. Host networking ensures these measurements reflect real user experience, not Docker's cached DNS responses. See [deployments/README.md](deployments/README.md#important-host-networking-for-accurate-dns-measurements) for full details.
 
 ## Stop the Demo
 

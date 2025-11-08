@@ -11,6 +11,13 @@ services:
     container_name: internet-monitor
     hostname: internet-monitor-01
     restart: unless-stopped
+
+    # Use host networking for accurate DNS measurements
+    # This ensures the container uses the same DNS servers and network stack as the host,
+    # providing realistic DNS resolution timing that matches user experience.
+    # With bridge networking, Docker's embedded DNS proxy can cache responses and skew measurements.
+    network_mode: host
+
     environment:
       # General Settings
       INTER_TEST_DELAY: "2s"
@@ -21,8 +28,9 @@ services:
       SITES: "google.com,github.com,cloudflare.com,wikipedia.org,example.com"
 
       # Elasticsearch Output
+      # With host networking, connect to Elasticsearch via localhost and its exposed port
       ES_ENABLED: "true"
-      ES_ENDPOINT: "http://elasticsearch:9200"
+      ES_ENDPOINT: "http://localhost:9200"
       ES_INDEX_PATTERN: "internet-connection-monitor-%{+yyyy.MM.dd}"
       ES_BULK_SIZE: "50"
       ES_FLUSH_INTERVAL: "10s"
@@ -40,15 +48,17 @@ services:
       # Logging
       LOG_LEVEL: "info"
       LOG_FORMAT: "json"
-    ports:
-      - "8080:8080"    # Health check endpoint
-      - "161:161/udp"  # SNMP
-      - "9090:9090"    # Prometheus metrics
+
+    # Note: Port mapping is not needed with host networking
+    # The container directly binds to ports on the host:
+    #   - Port 161/udp for SNMP
+    #   - Port 9090 for Prometheus metrics
+    #   - Port 8080 for health checks
+
     depends_on:
       elasticsearch:
         condition: service_healthy
-    networks:
-      - monitor-net
+
     # No volume mounts - stateless container
     labels:
       com.docker.description: "Internet Connection Monitor - Real-world connectivity testing"
@@ -125,6 +135,9 @@ services:
       - internet-monitor
     networks:
       - monitor-net
+    # Allow Prometheus to reach services on host network
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     labels:
       com.docker.description: "Prometheus for Internet Monitor metrics"
 

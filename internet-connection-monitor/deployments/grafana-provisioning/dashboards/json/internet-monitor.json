@@ -174,7 +174,13 @@
         "textMode": "value_and_name",
         "colorMode": "background",
         "graphMode": "area",
-        "justifyMode": "auto"
+        "justifyMode": "auto",
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "mean"
+          ]
+        }
       }
     },
     {
@@ -242,7 +248,13 @@
         "textMode": "value_and_name",
         "colorMode": "background",
         "graphMode": "area",
-        "justifyMode": "auto"
+        "justifyMode": "auto",
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "mean"
+          ]
+        }
       }
     },
     {
@@ -315,7 +327,13 @@
         "textMode": "value_and_name",
         "colorMode": "background",
         "graphMode": "area",
-        "justifyMode": "auto"
+        "justifyMode": "auto",
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "mean"
+          ]
+        }
       }
     },
     {
@@ -373,7 +391,13 @@
         "textMode": "value_and_name",
         "colorMode": "background",
         "graphMode": "area",
-        "justifyMode": "auto"
+        "justifyMode": "auto",
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "sum"
+          ]
+        }
       }
     },
     {
@@ -626,7 +650,8 @@
             "uid": "elasticsearch-datasource"
           },
           "query": "status.success:true AND site.name.keyword:$site_name",
-          "alias": "Avg DNS",
+          "alias": "Average",
+          "refId": "A",
           "metrics": [
             {
               "id": "1",
@@ -641,7 +666,74 @@
               "type": "date_histogram",
               "field": "@timestamp",
               "settings": {
-                "interval": "$interval"
+                "interval": "$interval",
+                "min_doc_count": 0
+              }
+            }
+          ]
+        },
+        {
+          "datasource": {
+            "type": "elasticsearch",
+            "uid": "elasticsearch-datasource"
+          },
+          "query": "status.success:true AND site.name.keyword:$site_name",
+          "alias": "P95",
+          "refId": "B",
+          "metrics": [
+            {
+              "id": "1",
+              "type": "percentiles",
+              "field": "timings.dns_lookup_ms",
+              "settings": {
+                "percents": [
+                  "95"
+                ]
+              }
+            }
+          ],
+          "timeField": "@timestamp",
+          "bucketAggs": [
+            {
+              "id": "2",
+              "type": "date_histogram",
+              "field": "@timestamp",
+              "settings": {
+                "interval": "$interval",
+                "min_doc_count": 0
+              }
+            }
+          ]
+        },
+        {
+          "datasource": {
+            "type": "elasticsearch",
+            "uid": "elasticsearch-datasource"
+          },
+          "query": "status.success:true AND site.name.keyword:$site_name",
+          "alias": "P99",
+          "refId": "C",
+          "metrics": [
+            {
+              "id": "1",
+              "type": "percentiles",
+              "field": "timings.dns_lookup_ms",
+              "settings": {
+                "percents": [
+                  "99"
+                ]
+              }
+            }
+          ],
+          "timeField": "@timestamp",
+          "bucketAggs": [
+            {
+              "id": "2",
+              "type": "date_histogram",
+              "field": "@timestamp",
+              "settings": {
+                "interval": "$interval",
+                "min_doc_count": 0
               }
             }
           ]
@@ -652,8 +744,42 @@
           "unit": "ms",
           "custom": {
             "drawStyle": "line",
-            "fillOpacity": 20
+            "lineInterpolation": "smooth",
+            "fillOpacity": 0,
+            "spanNulls": false,
+            "showPoints": "never"
           }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "P99"
+            },
+            "properties": [
+              {
+                "id": "custom.lineStyle",
+                "value": {
+                  "dash": [
+                    10,
+                    10
+                  ],
+                  "fill": "dash"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        },
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
         }
       }
     },
@@ -674,7 +800,8 @@
             "uid": "elasticsearch-datasource"
           },
           "query": "status.success:true AND site.name.keyword:$site_name",
-          "alias": "Avg TCP",
+          "alias": "Average",
+          "refId": "A",
           "metrics": [
             {
               "id": "1",
@@ -689,7 +816,74 @@
               "type": "date_histogram",
               "field": "@timestamp",
               "settings": {
-                "interval": "$interval"
+                "interval": "$interval",
+                "min_doc_count": 0
+              }
+            }
+          ]
+        },
+        {
+          "datasource": {
+            "type": "elasticsearch",
+            "uid": "elasticsearch-datasource"
+          },
+          "query": "status.success:true AND site.name.keyword:$site_name",
+          "alias": "P95",
+          "refId": "B",
+          "metrics": [
+            {
+              "id": "1",
+              "type": "percentiles",
+              "field": "timings.tcp_connection_ms",
+              "settings": {
+                "percents": [
+                  "95"
+                ]
+              }
+            }
+          ],
+          "timeField": "@timestamp",
+          "bucketAggs": [
+            {
+              "id": "2",
+              "type": "date_histogram",
+              "field": "@timestamp",
+              "settings": {
+                "interval": "$interval",
+                "min_doc_count": 0
+              }
+            }
+          ]
+        },
+        {
+          "datasource": {
+            "type": "elasticsearch",
+            "uid": "elasticsearch-datasource"
+          },
+          "query": "status.success:true AND site.name.keyword:$site_name",
+          "alias": "P99",
+          "refId": "C",
+          "metrics": [
+            {
+              "id": "1",
+              "type": "percentiles",
+              "field": "timings.tcp_connection_ms",
+              "settings": {
+                "percents": [
+                  "99"
+                ]
+              }
+            }
+          ],
+          "timeField": "@timestamp",
+          "bucketAggs": [
+            {
+              "id": "2",
+              "type": "date_histogram",
+              "field": "@timestamp",
+              "settings": {
+                "interval": "$interval",
+                "min_doc_count": 0
               }
             }
           ]
@@ -700,8 +894,42 @@
           "unit": "ms",
           "custom": {
             "drawStyle": "line",
-            "fillOpacity": 20
+            "lineInterpolation": "smooth",
+            "fillOpacity": 0,
+            "spanNulls": false,
+            "showPoints": "never"
           }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "P99"
+            },
+            "properties": [
+              {
+                "id": "custom.lineStyle",
+                "value": {
+                  "dash": [
+                    10,
+                    10
+                  ],
+                  "fill": "dash"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        },
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
         }
       }
     },
@@ -722,7 +950,8 @@
             "uid": "elasticsearch-datasource"
           },
           "query": "status.success:true AND site.name.keyword:$site_name",
-          "alias": "Avg TLS",
+          "alias": "Average",
+          "refId": "A",
           "metrics": [
             {
               "id": "1",
@@ -737,7 +966,74 @@
               "type": "date_histogram",
               "field": "@timestamp",
               "settings": {
-                "interval": "$interval"
+                "interval": "$interval",
+                "min_doc_count": 0
+              }
+            }
+          ]
+        },
+        {
+          "datasource": {
+            "type": "elasticsearch",
+            "uid": "elasticsearch-datasource"
+          },
+          "query": "status.success:true AND site.name.keyword:$site_name",
+          "alias": "P95",
+          "refId": "B",
+          "metrics": [
+            {
+              "id": "1",
+              "type": "percentiles",
+              "field": "timings.tls_handshake_ms",
+              "settings": {
+                "percents": [
+                  "95"
+                ]
+              }
+            }
+          ],
+          "timeField": "@timestamp",
+          "bucketAggs": [
+            {
+              "id": "2",
+              "type": "date_histogram",
+              "field": "@timestamp",
+              "settings": {
+                "interval": "$interval",
+                "min_doc_count": 0
+              }
+            }
+          ]
+        },
+        {
+          "datasource": {
+            "type": "elasticsearch",
+            "uid": "elasticsearch-datasource"
+          },
+          "query": "status.success:true AND site.name.keyword:$site_name",
+          "alias": "P99",
+          "refId": "C",
+          "metrics": [
+            {
+              "id": "1",
+              "type": "percentiles",
+              "field": "timings.tls_handshake_ms",
+              "settings": {
+                "percents": [
+                  "99"
+                ]
+              }
+            }
+          ],
+          "timeField": "@timestamp",
+          "bucketAggs": [
+            {
+              "id": "2",
+              "type": "date_histogram",
+              "field": "@timestamp",
+              "settings": {
+                "interval": "$interval",
+                "min_doc_count": 0
               }
             }
           ]
@@ -748,8 +1044,42 @@
           "unit": "ms",
           "custom": {
             "drawStyle": "line",
-            "fillOpacity": 20
+            "lineInterpolation": "smooth",
+            "fillOpacity": 0,
+            "spanNulls": false,
+            "showPoints": "never"
           }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "P99"
+            },
+            "properties": [
+              {
+                "id": "custom.lineStyle",
+                "value": {
+                  "dash": [
+                    10,
+                    10
+                  ],
+                  "fill": "dash"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        },
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
         }
       }
     },
@@ -770,6 +1100,8 @@
             "uid": "elasticsearch-datasource"
           },
           "query": "site.name.keyword:$site_name",
+          "refId": "A",
+          "alias": "",
           "metrics": [
             {
               "id": "1",
@@ -819,7 +1151,11 @@
       "options": {
         "orientation": "horizontal",
         "displayMode": "gradient",
-        "showUnfilled": true
+        "showUnfilled": true,
+        "reduceOptions": {
+          "values": true,
+          "calcs": []
+        }
       }
     },
     {
@@ -839,6 +1175,8 @@
             "uid": "elasticsearch-datasource"
           },
           "query": "status.success:false AND site.name.keyword:$site_name",
+          "refId": "A",
+          "alias": "",
           "metrics": [
             {
               "id": "1",
@@ -850,7 +1188,7 @@
             {
               "id": "2",
               "type": "terms",
-              "field": "status.error.type.keyword",
+              "field": "error.error_type.keyword",
               "settings": {
                 "size": "10",
                 "order": "desc",
@@ -874,7 +1212,11 @@
         "displayLabels": [
           "name",
           "percent"
-        ]
+        ],
+        "reduceOptions": {
+          "values": true,
+          "calcs": []
+        }
       }
     },
     {
@@ -926,16 +1268,16 @@
               "@timestamp": 0,
               "site.name": 1,
               "site.url": 2,
-              "status.error.type": 3,
-              "status.error.message": 4,
+              "error.error_type": 3,
+              "error.error_message": 4,
               "timings.total_duration_ms": 5
             },
             "renameByName": {
               "@timestamp": "Time",
               "site.name": "Site",
               "site.url": "URL",
-              "status.error.type": "Error Type",
-              "status.error.message": "Error Message",
+              "error.error_type": "Error Type",
+              "error.error_message": "Error Message",
               "timings.total_duration_ms": "Duration (ms)"
             }
           }

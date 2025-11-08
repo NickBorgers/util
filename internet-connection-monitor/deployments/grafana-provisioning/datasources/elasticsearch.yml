@@ -12,7 +12,7 @@ datasources:
       timeField: "@timestamp"
       esVersion: "8.0.0"
       interval: Daily
-      logMessageField: status.error.message
+      logMessageField: error.error_message
       logLevelField: log_level
       maxConcurrentShardRequests: 5
     editable: true

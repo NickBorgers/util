@@ -44,6 +44,10 @@ func NewControllerImpl(cfg *config.BrowserConfig) (*ControllerImpl, error) {
 		chromedp.Flag("disable-offline-load-stale-cache", "true"),
 		chromedp.Flag("disk-cache-size", "0"),
 		chromedp.Flag("media-cache-size", "0"),
+		// Force fresh DNS, TCP, and TLS on every test
+		chromedp.Flag("disable-http2", "true"),  // Force HTTP/1.1 (no connection multiplexing)
+		chromedp.Flag("disable-quic", "true"),   // Disable HTTP/3
+		chromedp.Flag("disable-features", "NetworkService,TLSSessionResumption"), // Disable TLS session cache
 	}
 
 	if cfg.Headless {
@@ -171,6 +175,11 @@ func (c *ControllerImpl) Close() error {
 }
 
 // extractTimings converts performance navigation timing data to our metrics structure
+//
+// The browser is configured to force fresh DNS, TCP, and TLS on every test by disabling
+// HTTP/2, QUIC, and TLS session resumption. This ensures accurate timing measurements
+// for every connection phase, allowing us to detect network issues in DNS resolution,
+// TCP handshakes, and TLS negotiation.
 func extractTimings(perfData map[string]interface{}, totalMs int64) models.TimingMetrics {
 	timings := models.TimingMetrics{
 		TotalDurationMs: totalMs,
@@ -203,13 +212,16 @@ func extractTimings(perfData map[string]interface{}, totalMs int64) models.Timin
 	loadEventEnd := getFloat("loadEventEnd")
 
 	// Calculate individual timing components (durations)
+	// The browser is forced to create fresh connections, so these values should be non-zero
+	// for successful requests. Zero values indicate either an error or missing performance data.
+
 	// DNS lookup duration
-	if domainLookupEnd > 0 && domainLookupStart > 0 {
+	if domainLookupEnd > 0 {
 		timings.DNSLookupMs = int64(domainLookupEnd - domainLookupStart)
 	}
 
-	// TCP connection duration (excluding TLS)
-	if connectEnd > 0 && connectStart > 0 {
+	// TCP connection duration
+	if connectEnd > 0 {
 		if secureConnectionStart > 0 {
 			// For HTTPS: TCP time is from connectStart to secureConnectionStart
 			timings.TCPConnectionMs = int64(secureConnectionStart - connectStart)
@@ -219,13 +231,13 @@ func extractTimings(perfData map[string]interface{}, totalMs int64) models.Timin
 		}
 	}
 
-	// TLS handshake duration (HTTPS only)
-	if secureConnectionStart > 0 && connectEnd > 0 && connectEnd > secureConnectionStart {
+	// TLS handshake duration (only for HTTPS connections)
+	if secureConnectionStart > 0 && connectEnd > secureConnectionStart {
 		timings.TLSHandshakeMs = int64(connectEnd - secureConnectionStart)
 	}
 
 	// Time to first byte (TTFB): from request start to response start
-	if responseStart > 0 && requestStart > 0 {
+	if responseStart > 0 {
 		timings.TimeToFirstByteMs = int64(responseStart - requestStart)
 	}
 

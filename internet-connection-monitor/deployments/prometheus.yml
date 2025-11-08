@@ -9,9 +9,10 @@ global:
 
 scrape_configs:
   # Scrape the Internet Connection Monitor metrics endpoint
+  # Note: internet-monitor uses host networking, so we access it via host.docker.internal
   - job_name: 'internet-monitor'
     static_configs:
-      - targets: ['internet-monitor:9090']
+      - targets: ['host.docker.internal:9090']
         labels:
           service: 'internet-connection-monitor'
           instance: 'internet-monitor-01'

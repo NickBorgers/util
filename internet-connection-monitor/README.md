@@ -2,6 +2,31 @@
 
 > Real-world Internet connectivity monitoring from a user's perspective
 
+## User Story
+As an engineer who runs an arguably over-complicated home network, I have device-level monitoring but occasionally we see perceptible network problems that do not show up in the monitoring. The ultimate signal of "is Internet working as expected" is how it behaves for us meatsacks. The monitoring approaches I'm already using:
+* Suricata netflows -> Elasticsearch -> Grafana dashboard
+* Network devices -- SNMP --> Zabbix --> ntfy.sh
+* Uptime Kuma
+
+Are good things, and useful to diagnose many problems. However they are not the test I ultimately run if someone tells me there's "a problem with the wifi": I will open a browser and try to load sites and see how it behaves.
+
+Let's make that the test.
+
+## Design
+This utility is a container (e.g. Docker) you can deploy into your environment which will run a web browser and navigate to pages. It will make itself monitorable in three ways:
+* Logs
+    * JSON documents will describe what succeeded and failed and how long it took, for comparison against previous and future tests
+* API push
+    * Those same JSON documents will be pushed to ElasticSearch, where they can later be rendered such as with Grafana dashboard or even alerted upon if they drift
+* Polling
+    * Zabbix has some solid alerting features and is good at SNMP polling, so let's offer an SNMP interface which is easy to setup for alerting in Zabbix. I already get alerts for an Ethernet port's link going down on my switches from Zabbix, why not this Internet monitor?
+    * The data offered in JSON documents should be readily scrapable, a sort of Internet connection version of Prometheus for a host
+
+## Design Axioms
+* No-dependency container; you should be able to spin this up basically anywhere quickly
+    * With no configuration it should start test a configured list of web sites and generating logs, and offering last report for scrape/poll
+    * If you add Elasticsearch configuration, it pushes to Elasticsearch
+
 ## 🚀 Quick Start
 
 **Try it in 30 seconds:**
@@ -27,31 +52,6 @@ make grafana-dashboard-demo
 Then visit http://localhost:3000 (admin/admin) to see the dashboard!
 
 See [QUICKSTART.md](QUICKSTART.md) for details or run `make help` for all commands.
-
-## User Story
-As an engineer who runs an arguably over-complicated home network, I have device-level monitoring but occasionally we see perceptible network problems that do not show up in the monitoring. The ultimate signal of "is Internet working as expected" is how it behaves for us meatsacks. The monitoring approaches I'm already using:
-* Suricata netflows -> Elasticsearch -> Grafana dashboard
-* Network devices -- SNMP --> Zabbix --> ntfy.sh
-* Uptime Kuma
-
-Are good things, and useful to diagnose many problems. However they are not the test I ultimately run if someone tells me there's "a problem with the wifi": I will open a browser and try to load sites and see how it behaves.
-
-Let's make that the test.
-
-## Design
-This utility is a container (e.g. Docker) you can deploy into your environment which will run a web browser and navigate to pages. It will make itself monitorable in three ways:
-* Logs
-    * JSON documents will describe what succeeded and failed and how long it took, for comparison against previous and future tests
-* API push
-    * Those same JSON documents will be pushed to ElasticSearch, where they can later be rendered such as with Grafana dashboard or even alerted upon if they drift
-* Polling
-    * Zabbix has some solid alerting features and is good at SNMP polling, so let's offer an SNMP interface which is easy to setup for alerting in Zabbix. I already get alerts for an Ethernet port's link going down on my switches from Zabbix, why not this Internet monitor?
-    * The data offered in JSON documents should be readily scrapable, a sort of Internet connection version of Prometheus for a host
-
-## Design Axioms
-* No-dependency container; you should be able to spin this up basically anywhere quickly
-    * With no configuration it should start test a configured list of web sites and generating logs, and offering last report for scrape/poll
-    * If you add Elasticsearch configuration, it pushes to Elasticsearch
 
 ## How It Works
 
