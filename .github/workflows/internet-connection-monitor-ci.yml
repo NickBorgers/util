@@ -119,14 +119,19 @@ jobs:
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "Version: $VERSION"
 
+      - name: Set lowercase repository owner
+        id: repo_owner
+        run: |
+          echo "owner=$(echo ${{ github.repository_owner }} | tr '[:upper:]' '[:lower:]')" >> $GITHUB_OUTPUT
+
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
           context: ./internet-connection-monitor
           push: true
           tags: |
-            ghcr.io/${{ github.repository_owner }}/internet-connection-monitor:latest
-            ghcr.io/${{ github.repository_owner }}/internet-connection-monitor:${{ steps.version.outputs.version }}
+            ghcr.io/${{ steps.repo_owner.outputs.owner }}/internet-connection-monitor:latest
+            ghcr.io/${{ steps.repo_owner.outputs.owner }}/internet-connection-monitor:${{ steps.version.outputs.version }}
           platforms: linux/amd64,linux/arm64
           cache-from: type=gha
           cache-to: type=gha,mode=max
@@ -140,8 +145,8 @@ jobs:
           The Docker image is available at:
 
           \`\`\`bash
-          docker pull ghcr.io/${{ github.repository_owner }}/internet-connection-monitor:${{ steps.version.outputs.version }}
-          docker pull ghcr.io/${{ github.repository_owner }}/internet-connection-monitor:latest
+          docker pull ghcr.io/${{ steps.repo_owner.outputs.owner }}/internet-connection-monitor:${{ steps.version.outputs.version }}
+          docker pull ghcr.io/${{ steps.repo_owner.outputs.owner }}/internet-connection-monitor:latest
           \`\`\`
 
           ### Supported Platforms
