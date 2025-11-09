@@ -199,6 +199,41 @@ Daily indices allow for easy data lifecycle management (delete old indices after
 **Purpose**: Monitor real-world Internet connectivity from user perspective
 **Time Range**: Default last 24 hours, support up to 90 days
 
+### Key Dashboard Features
+
+#### Time Bucketing and Aggregation
+All time series charts use Elasticsearch `date_histogram` aggregations with intelligent bucketing:
+- **Automatic interval selection**: Grafana's `auto` interval adjusts bucket size based on time range (e.g., 1m for 1 hour view, 5m for 6 hours, 1h for 7 days)
+- **Only data points with events**: `min_doc_count: 1` ensures only time buckets containing actual data are returned
+- **Natural aggregation**: Multiple events within each time bucket are automatically aggregated (avg, count, percentiles)
+- **No empty buckets**: Eliminates null values and reduces query overhead
+- **Clear visibility of downtime**: When monitoring stops, you see an actual gap in the line, not a connected line through empty data
+
+#### Handling Data Gaps
+All time series charts use an **11-minute disconnect threshold** (`insertNulls: 660000`):
+- **Short gaps (< 11 minutes)**: Lines connect across the gap (e.g., one missing 10-minute bucket)
+- **Long gaps (≥ 11 minutes)**: Charts show clear breaks in the line (monitoring was down)
+- **Distinguishes from failures**: A gap means monitoring was interrupted; data points at zero/low values mean actual failures
+- **Example**: If monitoring stops for 20+ minutes, you'll see a gap in the chart, making it obvious that monitoring was interrupted
+
+This threshold is set slightly larger than the 10-minute bucket interval to allow for minor timing variations while still showing clear gaps when one or more data buckets are completely missing.
+
+#### Success vs Failure Visualization
+The "Success and Failure Rate Over Time" chart is a **stacked area chart** that always sums to 100%:
+- **Green area (Success Rate)**: Percentage of successful tests
+- **Red area (Failure Rate)**: Percentage of failed tests (calculated as 1 - Success Rate)
+
+Key features:
+- **Always sums to 100%**: When there's test data, success + failure = 100%
+- **Clear failure visibility**: Red area appears when there are failures
+- **Distinguishes missing data**: Gaps in the chart indicate monitoring was down (no test data)
+- **Stacked visualization**: Easy to see the proportion of success vs failure at any point in time
+
+Example interpretations:
+- 100% green: All tests passing
+- 95% green, 5% red: 5% failure rate
+- Gap in chart: Monitoring was not running during that period
+
 ### Panel Layout
 
 ```
@@ -209,8 +244,8 @@ Daily indices allow for easy data lifecycle management (delete old indices after
 +------------------------------------------+
 
 +--------------------+---------------------+
-| Success Rate       | Total Duration      |
-| (Time Series)      | (Time Series)       |
+| Success & Failure  | Total Duration      |
+| Rate (Time Series) | (Time Series)       |
 |                    |                     |
 |                    |                     |
 +--------------------+---------------------+
@@ -287,9 +322,12 @@ Daily indices allow for easy data lifecycle management (delete old indices after
 **Thresholds**: Green <2000ms, Yellow 2000-5000ms, Red >5000ms
 **Note**: Displays the average latency for the selected time range in Grafana
 
-#### 3. Success Rate Over Time (Time Series)
+#### 3. Success and Failure Rate Over Time (Stacked Area Chart)
 **Query**:
-```
+- **Query A (Success Rate)**: Average of `status.success` field (boolean, 0 or 1) across all tests in each time bucket
+- **Query B (Failure Rate)**: Grafana math expression: `1 - $A` (automatically calculates failure percentage)
+
+```elasticsearch
 {
   "query": {
     "bool": {
@@ -302,7 +340,8 @@ Daily indices allow for easy data lifecycle management (delete old indices after
     "time_buckets": {
       "date_histogram": {
         "field": "@timestamp",
-        "fixed_interval": "5m"
+        "interval": "auto",
+        "min_doc_count": 1
       },
       "aggs": {
         "success_rate": {
@@ -316,9 +355,19 @@ Daily indices allow for easy data lifecycle management (delete old indices after
 }
 ```
 
-**Visualization**: Line chart, percentage (0-100%)
-**Y-Axis**: Success Rate %
-**Legend**: Show average, min, max
+**Visualization**: Stacked area chart (percent mode)
+- **Green area (Success Rate)**: Percentage of successful tests
+- **Red area (Failure Rate)**: Percentage of failed tests (1 - Success Rate)
+- **Stacking mode**: Percent (always sums to 100%)
+
+**Key Features**:
+- Data aggregated into time buckets (interval adjusts automatically based on time range)
+- Both metrics shown as percentages that sum to 100%
+- Gaps indicate periods with no monitoring data
+- Clear visual distinction between success (green) and failure (red)
+- Fill opacity: 50% for clear visibility of both areas
+
+**Legend**: Shows mean of each rate
 
 #### 4. Total Duration Over Time (Time Series)
 **Query**:
@@ -365,18 +414,21 @@ Daily indices allow for easy data lifecycle management (delete old indices after
 **Visualization**: Multi-line chart showing avg, p95, p99
 **Y-Axis**: Duration (ms)
 **Legend**: Show all percentiles
+**Note**: Data aggregated into time buckets; gaps indicate periods with no monitoring data
 
 #### 5. DNS Lookup Times (Time Series)
 **Query**: Similar to #4 but for `timings.dns_lookup_ms`
 
 **Visualization**: Line chart with percentiles
 **Purpose**: Identify DNS resolution issues
+**Note**: Data aggregated into time buckets; gaps indicate periods with no monitoring data
 
 #### 6. TLS Handshake Times (Time Series)
 **Query**: Similar to #4 but for `timings.tls_handshake_ms`
 
 **Visualization**: Line chart with percentiles
 **Purpose**: Identify TLS/SSL issues
+**Note**: Data aggregated into time buckets; gaps indicate periods with no monitoring data
 
 #### 7. Success Rate by Site (Bar Gauge)
 **Query**:

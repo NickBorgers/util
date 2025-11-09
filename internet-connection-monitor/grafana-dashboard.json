@@ -41,23 +41,23 @@
           "type": "interval",
           "label": "Interval",
           "auto": true,
-          "auto_count": 30,
-          "auto_min": "1m",
+          "auto_count": 12,
+          "auto_min": "10m",
           "options": [
             {
               "selected": false,
-              "text": "1m",
-              "value": "1m"
-            },
-            {
-              "selected": true,
               "text": "5m",
               "value": "5m"
             },
             {
+              "selected": true,
+              "text": "10m",
+              "value": "10m"
+            },
+            {
               "selected": false,
-              "text": "15m",
-              "value": "15m"
+              "text": "30m",
+              "value": "30m"
             },
             {
               "selected": false,
@@ -325,7 +325,7 @@
           "y": 4
         },
         "type": "timeseries",
-        "title": "Success Rate Over Time",
+        "title": "Success and Failure Rate Over Time",
         "targets": [
           {
             "datasource": {
@@ -333,6 +333,8 @@
               "uid": "${DS_ELASTICSEARCH}"
             },
             "query": "site.name.keyword:($site_name)",
+            "alias": "Success Rate",
+            "refId": "A",
             "metrics": [
               {
                 "id": "1",
@@ -348,10 +350,28 @@
                 "field": "@timestamp",
                 "settings": {
                   "interval": "$interval",
-                  "min_doc_count": 0
+                  "min_doc_count": 1
                 }
               }
             ]
+          },
+          {
+            "datasource": {
+              "type": "__expr__",
+              "uid": "__expr__"
+            },
+            "expression": "1 - $A",
+            "refId": "B",
+            "type": "math"
+          }
+        ],
+        "transformations": [
+          {
+            "id": "renameByRegex",
+            "options": {
+              "regex": "B.*",
+              "renamePattern": "Failure Rate"
+            }
           }
         ],
         "fieldConfig": {
@@ -362,29 +382,69 @@
             "custom": {
               "drawStyle": "line",
               "lineInterpolation": "smooth",
-              "fillOpacity": 20,
+              "fillOpacity": 60,
               "spanNulls": false,
+            "insertNulls": 660000,
               "showPoints": "never",
-              "axisPlacement": "auto"
+              "axisPlacement": "auto",
+              "stacking": {
+                "mode": "percent",
+                "group": "A"
+              },
+              "lineWidth": 1
+            }
+          },
+          "overrides": [
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "Success Rate"
+              },
+              "properties": [
+                {
+                  "id": "color",
+                  "value": {
+                    "mode": "fixed",
+                    "fixedColor": "green"
+                  }
+                }
+              ]
             },
-            "thresholds": {
-              "mode": "absolute",
-              "steps": [
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "Failure Rate"
+              },
+              "properties": [
                 {
-                  "value": null,
-                  "color": "red"
+                  "id": "color",
+                  "value": {
+                    "mode": "fixed",
+                    "fixedColor": "red"
+                  }
+                }
+              ]
+            },
+            {
+              "matcher": {
+                "id": "byRegexp",
+                "options": "B.*"
+              },
+              "properties": [
+                {
+                  "id": "displayName",
+                  "value": "Failure Rate"
                 },
                 {
-                  "value": 0.95,
-                  "color": "yellow"
-                },
-                {
-                  "value": 0.99,
-                  "color": "green"
+                  "id": "color",
+                  "value": {
+                    "mode": "fixed",
+                    "fixedColor": "red"
+                  }
                 }
               ]
             }
-          }
+          ]
         },
         "options": {
           "tooltip": {
@@ -395,7 +455,7 @@
             "displayMode": "list",
             "placement": "bottom",
             "showLegend": true,
-            "calcs": ["mean", "min", "max"]
+            "calcs": ["mean"]
           }
         }
       },
@@ -409,6 +469,7 @@
         },
         "type": "timeseries",
         "title": "Page Load Times (Avg, P95, P99)",
+        "description": "Aggregated into time buckets; gaps indicate monitoring downtime",
         "targets": [
           {
             "datasource": {
@@ -432,7 +493,7 @@
                 "field": "@timestamp",
                 "settings": {
                   "interval": "$interval",
-                  "min_doc_count": 0
+                  "min_doc_count": 1
                 }
               }
             ]
@@ -462,7 +523,7 @@
                 "field": "@timestamp",
                 "settings": {
                   "interval": "$interval",
-                  "min_doc_count": 0
+                  "min_doc_count": 1
                 }
               }
             ]
@@ -492,7 +553,7 @@
                 "field": "@timestamp",
                 "settings": {
                   "interval": "$interval",
-                  "min_doc_count": 0
+                  "min_doc_count": 1
                 }
               }
             ]
@@ -506,6 +567,7 @@
               "lineInterpolation": "smooth",
               "fillOpacity": 0,
               "spanNulls": false,
+            "insertNulls": 660000,
               "showPoints": "never"
             }
           },
