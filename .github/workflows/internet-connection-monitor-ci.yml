@@ -93,6 +93,9 @@ jobs:
     needs: [check-component, integration-test]
     if: needs.check-component.outputs.is-release == 'true'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
     defaults:
       run:
         working-directory: internet-connection-monitor
