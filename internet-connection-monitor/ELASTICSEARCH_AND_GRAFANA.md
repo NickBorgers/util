@@ -203,9 +203,9 @@ Daily indices allow for easy data lifecycle management (delete old indices after
 
 ```
 +------------------------------------------+
-|  Success Rate (Last Hour) - Single Stat |
+|  Success Rate - Single Stat             |
 +------------------------------------------+
-|  Avg Latency (Last Hour)  - Single Stat |
+|  Avg Latency - Single Stat              |
 +------------------------------------------+
 
 +--------------------+---------------------+
@@ -237,13 +237,13 @@ Daily indices allow for easy data lifecycle management (delete old indices after
 ### Panel Definitions
 
 #### 1. Success Rate (Single Stat)
-**Query**:
+**Query**: Uses the dashboard's selected time range
 ```
 {
   "query": {
     "bool": {
       "filter": [
-        { "range": { "@timestamp": { "gte": "now-1h" } } }
+        { "range": { "@timestamp": { "gte": "$__timeFrom", "lte": "$__timeTo" } } }
       ]
     }
   },
@@ -259,15 +259,16 @@ Daily indices allow for easy data lifecycle management (delete old indices after
 
 **Visualization**: Single Stat showing percentage (0-100%)
 **Thresholds**: Green >99%, Yellow 95-99%, Red <95%
+**Note**: Displays the average success rate for the selected time range in Grafana
 
 #### 2. Average Latency (Single Stat)
-**Query**:
+**Query**: Uses the dashboard's selected time range
 ```
 {
   "query": {
     "bool": {
       "filter": [
-        { "range": { "@timestamp": { "gte": "now-1h" } } },
+        { "range": { "@timestamp": { "gte": "$__timeFrom", "lte": "$__timeTo" } } },
         { "term": { "status.success": true } }
       ]
     }
@@ -284,6 +285,7 @@ Daily indices allow for easy data lifecycle management (delete old indices after
 
 **Visualization**: Single Stat showing milliseconds
 **Thresholds**: Green <2000ms, Yellow 2000-5000ms, Red >5000ms
+**Note**: Displays the average latency for the selected time range in Grafana
 
 #### 3. Success Rate Over Time (Time Series)
 **Query**:

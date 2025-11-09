@@ -96,7 +96,7 @@
           "y": 0
         },
         "type": "stat",
-        "title": "Success Rate (Last Hour)",
+        "title": "Success Rate",
         "targets": [
           {
             "datasource": {
@@ -155,7 +155,7 @@
           "y": 0
         },
         "type": "stat",
-        "title": "Avg Latency (Last Hour)",
+        "title": "Avg Latency",
         "targets": [
           {
             "datasource": {
@@ -214,7 +214,7 @@
           "y": 0
         },
         "type": "stat",
-        "title": "P95 Latency (Last Hour)",
+        "title": "P95 Latency",
         "targets": [
           {
             "datasource": {
@@ -276,7 +276,7 @@
           "y": 0
         },
         "type": "stat",
-        "title": "Total Tests (Last Hour)",
+        "title": "Total Tests",
         "targets": [
           {
             "datasource": {
