@@ -28,10 +28,11 @@ RUN CGO_ENABLED=0 GOOS=linux go build \
 # Stage 2: Runtime image with headless Chrome
 FROM chromedp/headless-shell:stable
 
-# Install ca-certificates for HTTPS
+# Install ca-certificates for HTTPS and wget for health checks
 USER root
 RUN apt-get update && apt-get install -y \
     ca-certificates \
+    wget \
     && rm -rf /var/lib/apt/lists/*
 
 # Create non-root user for running the application

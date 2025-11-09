@@ -2,6 +2,7 @@ package browser
 
 import (
 	"context"
+	"errors"
 	"os"
 	"strings"
 	"time"
@@ -11,6 +12,9 @@ import (
 	"github.com/nickborgers/monorepo/internet-connection-monitor/internal/config"
 	"github.com/nickborgers/monorepo/internet-connection-monitor/internal/models"
 )
+
+// ErrChromeStartupFailure indicates Chrome failed to start (not an Internet connectivity issue)
+var ErrChromeStartupFailure = errors.New("chrome failed to start")
 
 // ControllerImpl is the concrete implementation of the browser controller
 type ControllerImpl struct {
@@ -95,7 +99,7 @@ func (c *ControllerImpl) TestSite(ctx context.Context, site models.SiteDefinitio
 		},
 		Metadata: models.TestMetadata{
 			Hostname:  c.hostname,
-			Version:   "0.1.0-dev",
+			Version:   "1.1.0",
 			UserAgent: c.config.UserAgent,
 		},
 	}
@@ -146,6 +150,13 @@ func (c *ControllerImpl) TestSite(ctx context.Context, site models.SiteDefinitio
 
 	// Handle errors
 	if err != nil {
+		// Check if this is a Chrome startup failure (resource exhaustion, not an Internet issue)
+		// These should not be reported as connectivity problems
+		if isChromeStartupFailure(err) {
+			// Return the special error - test loop will not report this
+			return nil, ErrChromeStartupFailure
+		}
+
 		result.Status.Success = false
 		result.Status.Message = "Failed to load page"
 		result.Error = &models.ErrorInfo{
@@ -253,6 +264,17 @@ func extractTimings(perfData map[string]interface{}, totalMs int64) models.Timin
 	}
 
 	return timings
+}
+
+// isChromeStartupFailure detects if Chrome failed to start (not a connectivity issue)
+func isChromeStartupFailure(err error) bool {
+	errStr := strings.ToLower(err.Error())
+
+	// Chrome startup failures typically contain these phrases
+	return strings.Contains(errStr, "chrome failed to start") ||
+		strings.Contains(errStr, "failed to start chrome") ||
+		strings.Contains(errStr, "failed to allocate") ||
+		strings.Contains(errStr, "cannot start chrome")
 }
 
 // categorizeError determines the error type

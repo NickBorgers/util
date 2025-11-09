@@ -8,6 +8,8 @@ services:
     image: internet-connection-monitor:latest
     container_name: internet-monitor
     hostname: internet-monitor-01
+    # Container will self-terminate and restart if Chrome fails repeatedly
+    # This handles resource exhaustion gracefully (e.g., /dev/shm full)
     restart: unless-stopped
 
     # Use host networking for accurate DNS measurements

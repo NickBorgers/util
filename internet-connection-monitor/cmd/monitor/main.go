@@ -17,7 +17,7 @@ import (
 	"github.com/nickborgers/monorepo/internet-connection-monitor/internal/testloop"
 )
 
-const version = "0.1.0-dev"
+const version = "1.1.0"
 
 func main() {
 	// Print banner
