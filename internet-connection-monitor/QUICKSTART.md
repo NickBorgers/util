@@ -18,11 +18,17 @@ That's it! This single command will:
 
 After 30-60 seconds, visit:
 
-**Grafana Dashboard**: http://localhost:3000
+**Grafana Dashboard**: [http://localhost:3000](http://127.0.0.1:3000/d/internet-conn-mon/internet-connection-monitor?orgId=1&from=now-15m&to=now&timezone=browser&var-site_name=$__all&refresh=1m)
 - Username: `admin`
 - Password: `admin`
 
 The dashboard will be automatically imported and ready to view!
+
+### 🔒 Security Note
+
+All services (Grafana, Elasticsearch, Prometheus) are configured to bind to `127.0.0.1` only, meaning they're **only accessible from your local machine**. This prevents network exposure when running the demo for extended periods.
+
+If you need to access these services from other machines on your network, you can modify the port bindings in `deployments/docker-compose.with-stack.yml` from `127.0.0.1:PORT:PORT` to `0.0.0.0:PORT:PORT` or `PORT:PORT`, but be aware this exposes the services to your network.
 
 ## What You'll See
 

@@ -91,7 +91,7 @@ func main() {
 		Enabled:       cfg.Advanced.HealthCheckEnabled,
 		Port:          cfg.Advanced.HealthCheckPort,
 		Path:          cfg.Advanced.HealthCheckPath,
-		ListenAddress: "0.0.0.0",
+		ListenAddress: cfg.Advanced.HealthCheckListenAddress,
 	}
 	healthServer, err := health.NewHealthServer(healthCfg)
 	if err != nil {

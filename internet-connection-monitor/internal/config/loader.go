@@ -159,6 +159,10 @@ func LoadFromEnv(cfg *Config) error {
 		}
 	}
 
+	if v := os.Getenv("HEALTH_CHECK_LISTEN_ADDRESS"); v != "" {
+		cfg.Advanced.HealthCheckListenAddress = v
+	}
+
 	return nil
 }
 

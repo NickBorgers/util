@@ -1,7 +1,9 @@
 package config
 
 import (
+	"os"
 	"testing"
+	"time"
 )
 
 // TestParseSimpleSiteList_BasicDomains tests parsing simple domain names
@@ -354,5 +356,194 @@ func TestParseSimpleSiteList_LongList(t *testing.T) {
 		if !site.WaitForNetworkIdle {
 			t.Errorf("Site %d: expected WaitForNetworkIdle true", i)
 		}
+	}
+}
+
+// TestLoadFromEnv_HealthCheckListenAddress tests loading HEALTH_CHECK_LISTEN_ADDRESS from environment
+func TestLoadFromEnv_HealthCheckListenAddress(t *testing.T) {
+	tests := []struct {
+		name     string
+		envValue string
+		expected string
+	}{
+		{
+			name:     "localhost binding",
+			envValue: "127.0.0.1",
+			expected: "127.0.0.1",
+		},
+		{
+			name:     "all interfaces binding",
+			envValue: "0.0.0.0",
+			expected: "0.0.0.0",
+		},
+		{
+			name:     "specific IP binding",
+			envValue: "192.168.1.100",
+			expected: "192.168.1.100",
+		},
+		{
+			name:     "IPv6 localhost",
+			envValue: "::1",
+			expected: "::1",
+		},
+		{
+			name:     "IPv6 all interfaces",
+			envValue: "::",
+			expected: "::",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Set environment variable
+			os.Setenv("HEALTH_CHECK_LISTEN_ADDRESS", tt.envValue)
+			defer os.Unsetenv("HEALTH_CHECK_LISTEN_ADDRESS")
+
+			// Create default config and load from env
+			cfg := DefaultConfig()
+			err := LoadFromEnv(cfg)
+
+			if err != nil {
+				t.Fatalf("Unexpected error: %v", err)
+			}
+
+			if cfg.Advanced.HealthCheckListenAddress != tt.expected {
+				t.Errorf("Expected HealthCheckListenAddress '%s', got '%s'", tt.expected, cfg.Advanced.HealthCheckListenAddress)
+			}
+		})
+	}
+}
+
+// TestLoadFromEnv_HealthCheckListenAddress_NotSet tests default value when env var not set
+func TestLoadFromEnv_HealthCheckListenAddress_NotSet(t *testing.T) {
+	// Ensure env var is not set
+	os.Unsetenv("HEALTH_CHECK_LISTEN_ADDRESS")
+
+	cfg := DefaultConfig()
+	err := LoadFromEnv(cfg)
+
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	// Should retain default value
+	if cfg.Advanced.HealthCheckListenAddress != "0.0.0.0" {
+		t.Errorf("Expected default HealthCheckListenAddress '0.0.0.0', got '%s'", cfg.Advanced.HealthCheckListenAddress)
+	}
+}
+
+// TestLoadFromEnv_MultipleAdvancedSettings tests loading multiple advanced settings
+func TestLoadFromEnv_MultipleAdvancedSettings(t *testing.T) {
+	os.Setenv("HEALTH_CHECK_ENABLED", "true")
+	os.Setenv("HEALTH_CHECK_PORT", "8888")
+	os.Setenv("HEALTH_CHECK_LISTEN_ADDRESS", "127.0.0.1")
+	defer func() {
+		os.Unsetenv("HEALTH_CHECK_ENABLED")
+		os.Unsetenv("HEALTH_CHECK_PORT")
+		os.Unsetenv("HEALTH_CHECK_LISTEN_ADDRESS")
+	}()
+
+	cfg := DefaultConfig()
+	err := LoadFromEnv(cfg)
+
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	if !cfg.Advanced.HealthCheckEnabled {
+		t.Error("Expected HealthCheckEnabled to be true")
+	}
+
+	if cfg.Advanced.HealthCheckPort != 8888 {
+		t.Errorf("Expected HealthCheckPort 8888, got %d", cfg.Advanced.HealthCheckPort)
+	}
+
+	if cfg.Advanced.HealthCheckListenAddress != "127.0.0.1" {
+		t.Errorf("Expected HealthCheckListenAddress '127.0.0.1', got '%s'", cfg.Advanced.HealthCheckListenAddress)
+	}
+}
+
+// TestLoadFromEnv_PrometheusListenAddress tests Prometheus listen address configuration
+func TestLoadFromEnv_PrometheusListenAddress(t *testing.T) {
+	os.Setenv("PROM_LISTEN_ADDRESS", "127.0.0.1")
+	defer os.Unsetenv("PROM_LISTEN_ADDRESS")
+
+	cfg := DefaultConfig()
+	err := LoadFromEnv(cfg)
+
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	if cfg.Prometheus.ListenAddress != "127.0.0.1" {
+		t.Errorf("Expected Prometheus ListenAddress '127.0.0.1', got '%s'", cfg.Prometheus.ListenAddress)
+	}
+}
+
+// TestLoadFromEnv_SNMPListenAddress tests SNMP listen address configuration
+func TestLoadFromEnv_SNMPListenAddress(t *testing.T) {
+	os.Setenv("SNMP_LISTEN_ADDRESS", "127.0.0.1")
+	defer os.Unsetenv("SNMP_LISTEN_ADDRESS")
+
+	cfg := DefaultConfig()
+	err := LoadFromEnv(cfg)
+
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	if cfg.SNMP.ListenAddress != "127.0.0.1" {
+		t.Errorf("Expected SNMP ListenAddress '127.0.0.1', got '%s'", cfg.SNMP.ListenAddress)
+	}
+}
+
+// TestLoadFromEnv_InterTestDelay tests loading time duration from environment
+func TestLoadFromEnv_InterTestDelay(t *testing.T) {
+	os.Setenv("INTER_TEST_DELAY", "5s")
+	defer os.Unsetenv("INTER_TEST_DELAY")
+
+	cfg := DefaultConfig()
+	err := LoadFromEnv(cfg)
+
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	if cfg.General.InterTestDelay != 5*time.Second {
+		t.Errorf("Expected InterTestDelay 5s, got %v", cfg.General.InterTestDelay)
+	}
+}
+
+// TestLoadFromEnv_InvalidDuration tests error handling for invalid duration
+func TestLoadFromEnv_InvalidDuration(t *testing.T) {
+	os.Setenv("INTER_TEST_DELAY", "invalid")
+	defer os.Unsetenv("INTER_TEST_DELAY")
+
+	cfg := DefaultConfig()
+	err := LoadFromEnv(cfg)
+
+	if err == nil {
+		t.Fatal("Expected error for invalid duration, got nil")
+	}
+}
+
+// TestLoadFromEnv_Sites tests loading sites from environment
+func TestLoadFromEnv_Sites(t *testing.T) {
+	os.Setenv("SITES", "google.com,github.com,example.com")
+	defer os.Unsetenv("SITES")
+
+	cfg := DefaultConfig()
+	err := LoadFromEnv(cfg)
+
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	if len(cfg.Sites.List) != 3 {
+		t.Errorf("Expected 3 sites, got %d", len(cfg.Sites.List))
+	}
+
+	if cfg.Sites.List[0].Name != "google" {
+		t.Errorf("Expected first site name 'google', got '%s'", cfg.Sites.List[0].Name)
 	}
 }
