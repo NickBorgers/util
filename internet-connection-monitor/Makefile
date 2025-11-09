@@ -157,6 +157,10 @@ demo-status: ## 📊 Show status of all demo services
 	@curl -s -o /dev/null -w "%{http_code}" http://localhost:9091/-/healthy 2>/dev/null | grep -q 200 && echo "$(GREEN)✓ Healthy$(NC)" || echo "$(RED)✗ Not responding$(NC)"
 	@echo -n "  Monitor:       "
 	@curl -s -o /dev/null -w "%{http_code}" http://localhost:9090/metrics 2>/dev/null | grep -q 200 && echo "$(GREEN)✓ Healthy$(NC)" || echo "$(RED)✗ Not responding$(NC)"
+	@echo ""
+	@echo "$(YELLOW)Note: Monitor health check only works on Linux (native Docker).$(NC)"
+	@echo "$(YELLOW)      On Docker Desktop (macOS/Windows), the monitor may show as$(NC)"
+	@echo "$(YELLOW)      'Not responding' but still be collecting data. Check monitor logs.$(NC)"
 
 demo-logs: ## 📜 View logs from all demo services
 	@cd deployments && docker compose -f docker-compose.with-stack.yml logs -f

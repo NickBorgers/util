@@ -29,13 +29,7 @@ This utility is a container (e.g. Docker) you can deploy into your environment w
 
 ## 🚀 Quick Start
 
-**Try it in 30 seconds:**
-
-```bash
-make quick-test
-```
-
-**Or run and watch live results:**
+**Run and watch live results:**
 
 ```bash
 make quick-start    # Build & run
@@ -82,19 +76,17 @@ The monitor runs **continuously**, testing sites one at a time (like a real pers
 
 ## Features
 
-✅ **Real browser testing** - Uses headless Chrome via CDP
-✅ **Comprehensive timing metrics** - DNS, TCP, TLS, TTFB, DOM loaded, page load, network idle
-✅ **Accurate DNS measurements** - Uses host networking to measure real DNS resolution times (not Docker's cached DNS)
-✅ **Continuous monitoring** - Serial testing, natural traffic patterns
-✅ **Multiple outputs** - Logs, Elasticsearch, Prometheus, SNMP (SNMP not tested)
-✅ **Stateless design** - Restart-safe, no data loss
-✅ **Beautiful Grafana dashboards** - Pre-built, ready to import
-✅ **Zero configuration start** - Works out of the box
-✅ **Integration tested** - Core data flow validated: monitor → Elasticsearch → Grafana, Prometheus
+* ✅ **Real browser testing** - Uses headless Chrome via CDP
+* ✅ **Comprehensive timing metrics** - DNS, TCP, TLS, TTFB, DOM loaded, page load, network idle
+* ✅ **Accurate DNS measurements** - Uses host networking to measure real DNS resolution times (not Docker's cached DNS)
+* ✅ **Continuous monitoring** - Serial testing, natural traffic patterns
+* ✅ **Multiple outputs** - Logs, Elasticsearch, Prometheus, SNMP (SNMP not tested)
+* ✅ **Stateless design** - Restart-safe, no data loss
+* ✅ **Beautiful Grafana dashboards** - Pre-built, ready to import
+* ✅ **Zero configuration start** - Works out of the box
+* ✅ **Integration tested** - Core data flow validated: monitor → Elasticsearch → Grafana, Prometheus
 
 **Networking Architecture**: The monitor uses **host networking mode** to ensure DNS resolution times match real user experience. With Docker's default bridge networking, Docker's embedded DNS proxy can cache responses and skew measurements. Host networking provides direct access to your network's DNS servers for accurate timing data. See [deployments/README.md](deployments/README.md) for details and alternatives.
-
-**Note**: DNS/TCP/TLS timings may show 0ms when browsers optimize (cached DNS, reused connections, HTTP/2). This is **correct behavior** per W3C spec and indicates efficient browser operation. First requests to sites typically show non-zero values.
 
 ## Documentation
 

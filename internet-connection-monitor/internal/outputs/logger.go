@@ -17,14 +17,11 @@ type Logger struct {
 
 // NewLogger creates a new JSON logger
 func NewLogger(cfg *config.LoggingConfig) (*Logger, error) {
-	// Create a structured logger
+	// Create a structured logger (only used for text format)
+	// For JSON format, we write raw JSON directly in Write() method
 	var logger *slog.Logger
 
-	if cfg.Format == "json" {
-		logger = slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
-			Level: parseLogLevel(cfg.Level),
-		}))
-	} else {
+	if cfg.Format != "json" {
 		logger = slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
 			Level: parseLogLevel(cfg.Level),
 		}))
