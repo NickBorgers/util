@@ -138,27 +138,3 @@ jobs:
           platforms: linux/amd64,linux/arm64
           cache-from: type=gha
           cache-to: type=gha,mode=max
-
-      - name: Update release notes with Docker info
-        run: |
-          cat >> release-notes.md <<EOF
-
-          ## Docker Image
-
-          The Docker image is available at:
-
-          \`\`\`bash
-          docker pull ghcr.io/${{ steps.repo_owner.outputs.owner }}/internet-connection-monitor:${{ steps.version.outputs.version }}
-          docker pull ghcr.io/${{ steps.repo_owner.outputs.owner }}/internet-connection-monitor:latest
-          \`\`\`
-
-          ### Supported Platforms
-          - linux/amd64
-          - linux/arm64
-          EOF
-
-          gh release edit "${{ github.event.release.tag_name }}" \
-            --notes-file release-notes.md \
-            --repo "${{ github.repository }}"
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
