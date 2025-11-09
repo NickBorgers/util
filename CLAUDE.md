@@ -274,6 +274,7 @@ ENTRYPOINT ["/entrypoint.sh"]
 - **Secrets management**: Uses GitHub Secrets for Docker Hub, package managers
 - **Validation steps**: Smoke tests after releases
 - **Automated updates**: Package manager update workflows
+- **Release notes**: CI workflows do NOT edit releases to avoid permission issues; release notes are complete at creation time via `gh release create`
 
 ## Release and Tagging Strategy
 
@@ -443,12 +444,31 @@ This creates a properly formatted GitHub Release with:
 - Release notes that are searchable and linkable
 - Automatic association with the tag
 
+**IMPORTANT for Docker-based utilities**: Always include Docker image information in the initial release notes when using `gh release create`. The CI/CD workflow will build and push Docker images but does NOT update release notes (to avoid permission issues). Example Docker section to include:
+
+```markdown
+## Docker Image
+
+The Docker image is available at:
+
+\`\`\`bash
+docker pull ghcr.io/nickborgers/<utility-name>:1.2.0
+docker pull ghcr.io/nickborgers/<utility-name>:latest
+\`\`\`
+
+### Supported Platforms
+- linux/amd64
+- linux/arm64
+```
+
+This ensures users have complete information immediately without requiring workflow permissions to edit releases.
+
 #### 9. Verify the Release
 After creating the release:
 - Visit the GitHub Releases page to confirm it was created
 - Check GitHub Actions to ensure any CI/CD workflows triggered correctly
 - For network-mapper: confirm Homebrew and Chocolatey packages were updated
-- For Docker-based utilities: confirm images were published to Docker Hub
+- For Docker-based utilities: confirm images were published to GHCR (GitHub Container Registry)
 
 #### Why Use Pull Requests Before Releases?
 
