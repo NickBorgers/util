@@ -384,7 +384,7 @@
               "lineInterpolation": "smooth",
               "fillOpacity": 60,
               "spanNulls": false,
-            "insertNulls": 660000,
+            "insertNulls": 150000,
               "showPoints": "never",
               "axisPlacement": "auto",
               "stacking": {
@@ -567,7 +567,7 @@
               "lineInterpolation": "smooth",
               "fillOpacity": 0,
               "spanNulls": false,
-            "insertNulls": 660000,
+            "insertNulls": 150000,
               "showPoints": "never"
             }
           },

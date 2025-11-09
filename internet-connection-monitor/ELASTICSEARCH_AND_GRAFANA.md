@@ -203,20 +203,26 @@ Daily indices allow for easy data lifecycle management (delete old indices after
 
 #### Time Bucketing and Aggregation
 All time series charts use Elasticsearch `date_histogram` aggregations with intelligent bucketing:
-- **Automatic interval selection**: Grafana's `auto` interval adjusts bucket size based on time range (e.g., 1m for 1 hour view, 5m for 6 hours, 1h for 7 days)
+- **Fixed 2-minute intervals**: Provides smooth charts for both short (15-minute) and long (6-hour+) time ranges
 - **Only data points with events**: `min_doc_count: 1` ensures only time buckets containing actual data are returned
 - **Natural aggregation**: Multiple events within each time bucket are automatically aggregated (avg, count, percentiles)
 - **No empty buckets**: Eliminates null values and reduces query overhead
 - **Clear visibility of downtime**: When monitoring stops, you see an actual gap in the line, not a connected line through empty data
 
-#### Handling Data Gaps
-All time series charts use an **11-minute disconnect threshold** (`insertNulls: 660000`):
-- **Short gaps (< 11 minutes)**: Lines connect across the gap (e.g., one missing 10-minute bucket)
-- **Long gaps (≥ 11 minutes)**: Charts show clear breaks in the line (monitoring was down)
-- **Distinguishes from failures**: A gap means monitoring was interrupted; data points at zero/low values mean actual failures
-- **Example**: If monitoring stops for 20+ minutes, you'll see a gap in the chart, making it obvious that monitoring was interrupted
+With 2-minute buckets:
+- A full test cycle (~25-30 seconds for all 5 sites) fits within one bucket
+- Each bucket contains 4-5 complete test cycles, providing good statistical sampling
+- 15-minute view: ~7-8 data points (smooth)
+- 6-hour view: ~180 data points (very smooth)
 
-This threshold is set slightly larger than the 10-minute bucket interval to allow for minor timing variations while still showing clear gaps when one or more data buckets are completely missing.
+#### Handling Data Gaps
+All time series charts use a **2.5-minute disconnect threshold** (`insertNulls: 150000`):
+- **Short gaps (< 2.5 minutes)**: Lines connect across the gap (e.g., one missing 2-minute bucket)
+- **Long gaps (≥ 2.5 minutes)**: Charts show clear breaks in the line (monitoring was down)
+- **Distinguishes from failures**: A gap means monitoring was interrupted; data points at zero/low values mean actual failures
+- **Example**: If monitoring stops for 5+ minutes, you'll see a gap in the chart, making it obvious that monitoring was interrupted
+
+This threshold is set slightly larger than the 2-minute bucket interval to allow for minor timing variations while still showing clear gaps when one or more data buckets are completely missing.
 
 #### Success vs Failure Visualization
 The "Success and Failure Rate Over Time" chart is a **stacked area chart** that always sums to 100%:

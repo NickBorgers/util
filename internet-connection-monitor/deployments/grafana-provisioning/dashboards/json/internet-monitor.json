@@ -140,7 +140,7 @@
               "type": "date_histogram",
               "field": "@timestamp",
               "settings": {
-                "interval": "10m"
+                "interval": "2m"
               }
             }
           ]
@@ -214,7 +214,7 @@
               "type": "date_histogram",
               "field": "@timestamp",
               "settings": {
-                "interval": "10m"
+                "interval": "2m"
               }
             }
           ]
@@ -293,7 +293,7 @@
               "type": "date_histogram",
               "field": "@timestamp",
               "settings": {
-                "interval": "10m"
+                "interval": "2m"
               }
             }
           ]
@@ -366,7 +366,7 @@
               "type": "date_histogram",
               "field": "@timestamp",
               "settings": {
-                "interval": "10m"
+                "interval": "2m"
               }
             }
           ]
@@ -433,7 +433,7 @@
               "type": "date_histogram",
               "field": "@timestamp",
               "settings": {
-                "interval": "10m",
+                "interval": "2m",
                 "min_doc_count": 1
               }
             }
@@ -468,7 +468,7 @@
             "lineInterpolation": "smooth",
             "fillOpacity": 60,
             "spanNulls": false,
-            "insertNulls": 660000,
+            "insertNulls": 150000,
             "showPoints": "never",
             "axisPlacement": "auto",
             "stacking": {
@@ -578,7 +578,7 @@
               "type": "date_histogram",
               "field": "@timestamp",
               "settings": {
-                "interval": "10m",
+                "interval": "2m",
                 "min_doc_count": 1
               }
             }
@@ -610,7 +610,7 @@
               "type": "date_histogram",
               "field": "@timestamp",
               "settings": {
-                "interval": "10m",
+                "interval": "2m",
                 "min_doc_count": 1
               }
             }
@@ -642,7 +642,7 @@
               "type": "date_histogram",
               "field": "@timestamp",
               "settings": {
-                "interval": "10m",
+                "interval": "2m",
                 "min_doc_count": 1
               }
             }
@@ -657,7 +657,7 @@
             "lineInterpolation": "smooth",
             "fillOpacity": 0,
             "spanNulls": false,
-            "insertNulls": 660000,
+            "insertNulls": 150000,
             "showPoints": "never"
           }
         },
@@ -726,7 +726,7 @@
               "type": "date_histogram",
               "field": "@timestamp",
               "settings": {
-                "interval": "10m",
+                "interval": "2m",
                 "min_doc_count": 1
               }
             }
@@ -759,7 +759,7 @@
               "type": "date_histogram",
               "field": "@timestamp",
               "settings": {
-                "interval": "10m",
+                "interval": "2m",
                 "min_doc_count": 1
               }
             }
@@ -792,7 +792,7 @@
               "type": "date_histogram",
               "field": "@timestamp",
               "settings": {
-                "interval": "10m",
+                "interval": "2m",
                 "min_doc_count": 1
               }
             }
@@ -807,7 +807,7 @@
             "lineInterpolation": "smooth",
             "fillOpacity": 0,
             "spanNulls": false,
-            "insertNulls": 660000,
+            "insertNulls": 150000,
             "showPoints": "never"
           }
         },
@@ -877,7 +877,7 @@
               "type": "date_histogram",
               "field": "@timestamp",
               "settings": {
-                "interval": "10m",
+                "interval": "2m",
                 "min_doc_count": 1
               }
             }
@@ -910,7 +910,7 @@
               "type": "date_histogram",
               "field": "@timestamp",
               "settings": {
-                "interval": "10m",
+                "interval": "2m",
                 "min_doc_count": 1
               }
             }
@@ -943,7 +943,7 @@
               "type": "date_histogram",
               "field": "@timestamp",
               "settings": {
-                "interval": "10m",
+                "interval": "2m",
                 "min_doc_count": 1
               }
             }
@@ -958,7 +958,7 @@
             "lineInterpolation": "smooth",
             "fillOpacity": 0,
             "spanNulls": false,
-            "insertNulls": 660000,
+            "insertNulls": 150000,
             "showPoints": "never"
           }
         },
@@ -1028,7 +1028,7 @@
               "type": "date_histogram",
               "field": "@timestamp",
               "settings": {
-                "interval": "10m",
+                "interval": "2m",
                 "min_doc_count": 1
               }
             }
@@ -1061,7 +1061,7 @@
               "type": "date_histogram",
               "field": "@timestamp",
               "settings": {
-                "interval": "10m",
+                "interval": "2m",
                 "min_doc_count": 1
               }
             }
@@ -1094,7 +1094,7 @@
               "type": "date_histogram",
               "field": "@timestamp",
               "settings": {
-                "interval": "10m",
+                "interval": "2m",
                 "min_doc_count": 1
               }
             }
@@ -1109,7 +1109,7 @@
             "lineInterpolation": "smooth",
             "fillOpacity": 0,
             "spanNulls": false,
-            "insertNulls": 660000,
+            "insertNulls": 150000,
             "showPoints": "never"
           }
         },
@@ -1312,7 +1312,7 @@
               "type": "date_histogram",
               "field": "@timestamp",
               "settings": {
-                "interval": "10m"
+                "interval": "2m"
               }
             }
           ]

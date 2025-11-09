@@ -53,6 +53,16 @@ Then visit http://localhost:3000 (admin/admin) to see the dashboard!
 
 See [QUICKSTART.md](QUICKSTART.md) for details or run `make help` for all commands.
 
+## Dashboard Preview
+
+![Grafana Dashboard](dashboard.png)
+
+The dashboard provides real-time monitoring with:
+- Success/failure rates over time (stacked area chart)
+- Average and P95 latency metrics
+- Clear visualization of monitoring gaps vs actual failures
+- Site-by-site success stats
+
 ## How It Works
 
 The monitor runs **continuously**, testing sites one at a time (like a real person browsing):
