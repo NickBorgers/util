@@ -42,28 +42,28 @@ type StatusInfo struct {
 
 // TimingMetrics contains all timing measurements in milliseconds
 type TimingMetrics struct {
-	// DNSLookupMs is the time spent resolving DNS
-	DNSLookupMs int64 `json:"dns_lookup_ms"`
+	// DNSLookupMs is the time spent resolving DNS (nil if not available)
+	DNSLookupMs *int64 `json:"dns_lookup_ms,omitempty"`
 
-	// TCPConnectionMs is the time to establish TCP connection
-	TCPConnectionMs int64 `json:"tcp_connection_ms"`
+	// TCPConnectionMs is the time to establish TCP connection (nil if not available)
+	TCPConnectionMs *int64 `json:"tcp_connection_ms,omitempty"`
 
-	// TLSHandshakeMs is the time for TLS negotiation
-	TLSHandshakeMs int64 `json:"tls_handshake_ms"`
+	// TLSHandshakeMs is the time for TLS negotiation (nil if not available)
+	TLSHandshakeMs *int64 `json:"tls_handshake_ms,omitempty"`
 
-	// TimeToFirstByteMs is the time until first byte received
-	TimeToFirstByteMs int64 `json:"time_to_first_byte_ms"`
+	// TimeToFirstByteMs is the time until first byte received (nil if not available)
+	TimeToFirstByteMs *int64 `json:"time_to_first_byte_ms,omitempty"`
 
-	// DOMContentLoadedMs is when the DOM is fully loaded
-	DOMContentLoadedMs int64 `json:"dom_content_loaded_ms"`
+	// DOMContentLoadedMs is when the DOM is fully loaded (nil if not available)
+	DOMContentLoadedMs *int64 `json:"dom_content_loaded_ms,omitempty"`
 
-	// FullPageLoadMs is when the page load event fires
-	FullPageLoadMs int64 `json:"full_page_load_ms,omitempty"`
+	// FullPageLoadMs is when the page load event fires (nil if not available)
+	FullPageLoadMs *int64 `json:"full_page_load_ms,omitempty"`
 
-	// NetworkIdleMs is when network activity has stopped
-	NetworkIdleMs int64 `json:"network_idle_ms,omitempty"`
+	// NetworkIdleMs is when network activity has stopped (nil if not available)
+	NetworkIdleMs *int64 `json:"network_idle_ms,omitempty"`
 
-	// TotalDurationMs is the total time from start to completion
+	// TotalDurationMs is the total time from start to completion (always present)
 	TotalDurationMs int64 `json:"total_duration_ms"`
 }
 
