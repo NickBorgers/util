@@ -88,16 +88,17 @@ type PrometheusConfig struct {
 
 // AdvancedConfig contains advanced/debugging settings
 type AdvancedConfig struct {
-	PProfEnabled          bool          `yaml:"pprof_enabled"`
-	PProfPort             int           `yaml:"pprof_port"`
-	HealthCheckEnabled    bool          `yaml:"health_check_enabled"`
-	HealthCheckPort       int           `yaml:"health_check_port"`
-	HealthCheckPath       string        `yaml:"health_check_path"`
-	ShutdownTimeout       time.Duration `yaml:"shutdown_timeout"`
-	MaxConcurrentBrowsers int           `yaml:"max_concurrent_browsers"`
-	CaptureScreenshots    bool          `yaml:"capture_screenshots"`
-	ScreenshotPath        string        `yaml:"screenshot_path"`
-	DNSServers            []string      `yaml:"dns_servers"`
+	PProfEnabled             bool          `yaml:"pprof_enabled"`
+	PProfPort                int           `yaml:"pprof_port"`
+	HealthCheckEnabled       bool          `yaml:"health_check_enabled"`
+	HealthCheckPort          int           `yaml:"health_check_port"`
+	HealthCheckPath          string        `yaml:"health_check_path"`
+	HealthCheckListenAddress string        `yaml:"health_check_listen_address"`
+	ShutdownTimeout          time.Duration `yaml:"shutdown_timeout"`
+	MaxConcurrentBrowsers    int           `yaml:"max_concurrent_browsers"`
+	CaptureScreenshots       bool          `yaml:"capture_screenshots"`
+	ScreenshotPath           string        `yaml:"screenshot_path"`
+	DNSServers               []string      `yaml:"dns_servers"`
 }
 
 // Load loads configuration from file and environment variables
@@ -169,12 +170,13 @@ func DefaultConfig() *Config {
 			LatencyBuckets:   []float64{10, 50, 100, 250, 500, 1000, 2500, 5000, 10000},
 		},
 		Advanced: AdvancedConfig{
-			HealthCheckEnabled:    true,
-			HealthCheckPort:       8080,
-			HealthCheckPath:       "/health",
-			ShutdownTimeout:       30 * time.Second,
-			MaxConcurrentBrowsers: 1,
-			ScreenshotPath:        "/tmp/screenshots",
+			HealthCheckEnabled:       true,
+			HealthCheckPort:          8080,
+			HealthCheckPath:          "/health",
+			HealthCheckListenAddress: "0.0.0.0",
+			ShutdownTimeout:          30 * time.Second,
+			MaxConcurrentBrowsers:    1,
+			ScreenshotPath:           "/tmp/screenshots",
 		},
 	}
 }

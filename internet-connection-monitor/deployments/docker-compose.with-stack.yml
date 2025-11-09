@@ -75,7 +75,7 @@ services:
       - xpack.security.enabled=false
       - xpack.security.enrollment.enabled=false
     ports:
-      - "9200:9200"
+      - "127.0.0.1:9200:9200"
     volumes:
       - es-data:/usr/share/elasticsearch/data
     networks:
@@ -103,7 +103,7 @@ services:
       - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
       - GF_AUTH_DISABLE_LOGIN_FORM=true
     ports:
-      - "3000:3000"
+      - "127.0.0.1:3000:3000"
     volumes:
       - grafana-data:/var/lib/grafana
       - ./grafana-provisioning:/etc/grafana/provisioning
@@ -127,7 +127,7 @@ services:
       - '--web.console.libraries=/usr/share/prometheus/console_libraries'
       - '--web.console.templates=/usr/share/prometheus/consoles'
     ports:
-      - "9091:9090"  # 9091 to avoid conflict with monitor's metrics endpoint
+      - "127.0.0.1:9091:9090"  # 9091 to avoid conflict with monitor's metrics endpoint
     volumes:
       - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus-data:/prometheus

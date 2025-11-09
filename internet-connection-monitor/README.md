@@ -43,7 +43,9 @@ make quick-stop     # Stop the monitor
 make grafana-dashboard-demo
 ```
 
-Then visit http://localhost:3000 (admin/admin) to see the dashboard!
+Then visit [http://localhost:3000](http://127.0.0.1:3000/d/internet-conn-mon/internet-connection-monitor?orgId=1&from=now-15m&to=now&timezone=browser&var-site_name=$__all&refresh=1m) (admin/admin) to see the dashboard!
+
+> **🔒 Security Note**: All demo services (Grafana, Elasticsearch, Prometheus) bind to `127.0.0.1` only, preventing network exposure when running for extended periods.
 
 See [QUICKSTART.md](QUICKSTART.md) for details or run `make help` for all commands.
 
