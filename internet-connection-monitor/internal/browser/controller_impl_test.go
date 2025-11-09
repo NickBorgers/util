@@ -69,38 +69,38 @@ func TestExtractTimings_HTTPS(t *testing.T) {
 
 	// Verify extraction logic is mathematically correct
 	// DNS lookup: domainLookupEnd - domainLookupStart = 10.5 - 0 = 10ms
-	if timings.DNSLookupMs != 10 {
-		t.Errorf("Expected DNS lookup 10ms, got %d", timings.DNSLookupMs)
+	if timings.DNSLookupMs == nil || *timings.DNSLookupMs != 10 {
+		t.Errorf("Expected DNS lookup 10ms, got %v", timings.DNSLookupMs)
 	}
 
 	// TCP connection: secureConnectionStart - connectStart = 30.1 - 10.5 = 19ms (for HTTPS)
-	if timings.TCPConnectionMs != 19 {
-		t.Errorf("Expected TCP connection 19ms, got %d", timings.TCPConnectionMs)
+	if timings.TCPConnectionMs == nil || *timings.TCPConnectionMs != 19 {
+		t.Errorf("Expected TCP connection 19ms, got %v", timings.TCPConnectionMs)
 	}
 
 	// TLS handshake: connectEnd - secureConnectionStart = 50.2 - 30.1 = 20ms
-	if timings.TLSHandshakeMs != 20 {
-		t.Errorf("Expected TLS handshake 20ms, got %d", timings.TLSHandshakeMs)
+	if timings.TLSHandshakeMs == nil || *timings.TLSHandshakeMs != 20 {
+		t.Errorf("Expected TLS handshake 20ms, got %v", timings.TLSHandshakeMs)
 	}
 
 	// TTFB: responseStart - requestStart
-	if timings.TimeToFirstByteMs != 50 {
-		t.Errorf("Expected TTFB 50ms, got %d", timings.TimeToFirstByteMs)
+	if timings.TimeToFirstByteMs == nil || *timings.TimeToFirstByteMs != 50 {
+		t.Errorf("Expected TTFB 50ms, got %v", timings.TimeToFirstByteMs)
 	}
 
 	// DOM content loaded
-	if timings.DOMContentLoadedMs != 200 {
-		t.Errorf("Expected DOM content loaded 200ms, got %d", timings.DOMContentLoadedMs)
+	if timings.DOMContentLoadedMs == nil || *timings.DOMContentLoadedMs != 200 {
+		t.Errorf("Expected DOM content loaded 200ms, got %v", timings.DOMContentLoadedMs)
 	}
 
 	// Full page load
-	if timings.FullPageLoadMs != 250 {
-		t.Errorf("Expected full page load 250ms, got %d", timings.FullPageLoadMs)
+	if timings.FullPageLoadMs == nil || *timings.FullPageLoadMs != 250 {
+		t.Errorf("Expected full page load 250ms, got %v", timings.FullPageLoadMs)
 	}
 
 	// Network idle (same as load event end)
-	if timings.NetworkIdleMs != 250 {
-		t.Errorf("Expected network idle 250ms, got %d", timings.NetworkIdleMs)
+	if timings.NetworkIdleMs == nil || *timings.NetworkIdleMs != 250 {
+		t.Errorf("Expected network idle 250ms, got %v", timings.NetworkIdleMs)
 	}
 
 	// Total duration (from parameter)
@@ -127,24 +127,24 @@ func TestExtractTimings_HTTP(t *testing.T) {
 	timings := extractTimings(perfData, 220)
 
 	// DNS lookup: 8.3 - 0 = 8ms
-	if timings.DNSLookupMs != 8 {
-		t.Errorf("Expected DNS lookup 8ms, got %d", timings.DNSLookupMs)
+	if timings.DNSLookupMs == nil || *timings.DNSLookupMs != 8 {
+		t.Errorf("Expected DNS lookup 8ms, got %v", timings.DNSLookupMs)
 	}
 
 	// TCP connection: full connection time for HTTP (no TLS)
 	// 25.7 - 8.3 = 17ms
-	if timings.TCPConnectionMs != 17 {
-		t.Errorf("Expected TCP connection 17ms, got %d", timings.TCPConnectionMs)
+	if timings.TCPConnectionMs == nil || *timings.TCPConnectionMs != 17 {
+		t.Errorf("Expected TCP connection 17ms, got %v", timings.TCPConnectionMs)
 	}
 
-	// TLS handshake: should be 0 for HTTP
-	if timings.TLSHandshakeMs != 0 {
-		t.Errorf("Expected TLS handshake 0ms for HTTP, got %d", timings.TLSHandshakeMs)
+	// TLS handshake: should be nil for HTTP (no TLS)
+	if timings.TLSHandshakeMs != nil {
+		t.Errorf("Expected TLS handshake nil for HTTP, got %v", timings.TLSHandshakeMs)
 	}
 
 	// TTFB
-	if timings.TimeToFirstByteMs != 49 {
-		t.Errorf("Expected TTFB 49ms, got %d", timings.TimeToFirstByteMs)
+	if timings.TimeToFirstByteMs == nil || *timings.TimeToFirstByteMs != 49 {
+		t.Errorf("Expected TTFB 49ms, got %v", timings.TimeToFirstByteMs)
 	}
 }
 
@@ -152,18 +152,18 @@ func TestExtractTimings_HTTP(t *testing.T) {
 func TestExtractTimings_NullData(t *testing.T) {
 	timings := extractTimings(nil, 500)
 
-	// All timings should be 0 except total duration
-	if timings.DNSLookupMs != 0 {
-		t.Errorf("Expected DNS lookup 0ms for nil data, got %d", timings.DNSLookupMs)
+	// All timings should be nil for missing data (not 0)
+	if timings.DNSLookupMs != nil {
+		t.Errorf("Expected DNS lookup nil for nil data, got %v", timings.DNSLookupMs)
 	}
-	if timings.TCPConnectionMs != 0 {
-		t.Errorf("Expected TCP connection 0ms for nil data, got %d", timings.TCPConnectionMs)
+	if timings.TCPConnectionMs != nil {
+		t.Errorf("Expected TCP connection nil for nil data, got %v", timings.TCPConnectionMs)
 	}
-	if timings.TLSHandshakeMs != 0 {
-		t.Errorf("Expected TLS handshake 0ms for nil data, got %d", timings.TLSHandshakeMs)
+	if timings.TLSHandshakeMs != nil {
+		t.Errorf("Expected TLS handshake nil for nil data, got %v", timings.TLSHandshakeMs)
 	}
-	if timings.TimeToFirstByteMs != 0 {
-		t.Errorf("Expected TTFB 0ms for nil data, got %d", timings.TimeToFirstByteMs)
+	if timings.TimeToFirstByteMs != nil {
+		t.Errorf("Expected TTFB nil for nil data, got %v", timings.TimeToFirstByteMs)
 	}
 
 	// Total duration should still be set
@@ -177,9 +177,9 @@ func TestExtractTimings_EmptyData(t *testing.T) {
 	perfData := map[string]interface{}{}
 	timings := extractTimings(perfData, 100)
 
-	// All timings should be 0 except total duration
-	if timings.DNSLookupMs != 0 {
-		t.Errorf("Expected DNS lookup 0ms for empty data, got %d", timings.DNSLookupMs)
+	// All timings should be nil for empty data (not 0)
+	if timings.DNSLookupMs != nil {
+		t.Errorf("Expected DNS lookup nil for empty data, got %v", timings.DNSLookupMs)
 	}
 	if timings.TotalDurationMs != 100 {
 		t.Errorf("Expected total duration 100ms, got %d", timings.TotalDurationMs)
@@ -198,16 +198,16 @@ func TestExtractTimings_PartialData(t *testing.T) {
 	timings := extractTimings(perfData, 200)
 
 	// TTFB should be calculated correctly
-	if timings.TimeToFirstByteMs != 70 {
-		t.Errorf("Expected TTFB 70ms, got %d", timings.TimeToFirstByteMs)
+	if timings.TimeToFirstByteMs == nil || *timings.TimeToFirstByteMs != 70 {
+		t.Errorf("Expected TTFB 70ms, got %v", timings.TimeToFirstByteMs)
 	}
 
-	// Missing fields should be 0
-	if timings.DNSLookupMs != 0 {
-		t.Errorf("Expected DNS lookup 0ms for missing data, got %d", timings.DNSLookupMs)
+	// Missing fields should be nil
+	if timings.DNSLookupMs != nil {
+		t.Errorf("Expected DNS lookup nil for missing data, got %v", timings.DNSLookupMs)
 	}
-	if timings.TCPConnectionMs != 0 {
-		t.Errorf("Expected TCP connection 0ms for missing data, got %d", timings.TCPConnectionMs)
+	if timings.TCPConnectionMs != nil {
+		t.Errorf("Expected TCP connection nil for missing data, got %v", timings.TCPConnectionMs)
 	}
 }
 
@@ -225,12 +225,13 @@ func TestExtractTimings_ZeroValues(t *testing.T) {
 
 	timings := extractTimings(perfData, 50)
 
-	// All durations should be 0 when start/end are the same
-	if timings.DNSLookupMs != 0 {
-		t.Errorf("Expected DNS lookup 0ms for zero values, got %d", timings.DNSLookupMs)
+	// All durations should be nil when end values are 0 (not set)
+	// Note: domainLookupEnd is 0, so the condition `if domainLookupEnd > 0` fails
+	if timings.DNSLookupMs != nil {
+		t.Errorf("Expected DNS lookup nil for zero values, got %v", timings.DNSLookupMs)
 	}
-	if timings.TCPConnectionMs != 0 {
-		t.Errorf("Expected TCP connection 0ms for zero values, got %d", timings.TCPConnectionMs)
+	if timings.TCPConnectionMs != nil {
+		t.Errorf("Expected TCP connection nil for zero values, got %v", timings.TCPConnectionMs)
 	}
 }
 
@@ -247,12 +248,12 @@ func TestExtractTimings_InvalidTypes(t *testing.T) {
 
 	// Function is resilient - invalid types default to 0, valid values are used
 	// So DNS = 10.5 - 0 = 10ms (still calculates correctly with valid end value)
-	if timings.DNSLookupMs != 10 {
-		t.Errorf("Expected DNS lookup 10ms (invalid start=0, valid end=10.5), got %d", timings.DNSLookupMs)
+	if timings.DNSLookupMs == nil || *timings.DNSLookupMs != 10 {
+		t.Errorf("Expected DNS lookup 10ms (invalid start=0, valid end=10.5), got %v", timings.DNSLookupMs)
 	}
 	// TCP = 50.2 - 0 = 50ms (still calculates correctly with valid end value)
-	if timings.TCPConnectionMs != 50 {
-		t.Errorf("Expected TCP connection 50ms (nil start=0, valid end=50.2), got %d", timings.TCPConnectionMs)
+	if timings.TCPConnectionMs == nil || *timings.TCPConnectionMs != 50 {
+		t.Errorf("Expected TCP connection 50ms (nil start=0, valid end=50.2), got %v", timings.TCPConnectionMs)
 	}
 }
 
@@ -269,11 +270,11 @@ func TestExtractTimings_NegativeValues(t *testing.T) {
 	timings := extractTimings(perfData, 100)
 
 	// Should calculate negative duration (indicates data issue)
-	if timings.DNSLookupMs != -5 {
-		t.Errorf("Expected DNS lookup -5ms for reversed values, got %d", timings.DNSLookupMs)
+	if timings.DNSLookupMs == nil || *timings.DNSLookupMs != -5 {
+		t.Errorf("Expected DNS lookup -5ms for reversed values, got %v", timings.DNSLookupMs)
 	}
-	if timings.TimeToFirstByteMs != -5 {
-		t.Errorf("Expected TTFB -5ms for reversed values, got %d", timings.TimeToFirstByteMs)
+	if timings.TimeToFirstByteMs == nil || *timings.TimeToFirstByteMs != -5 {
+		t.Errorf("Expected TTFB -5ms for reversed values, got %v", timings.TimeToFirstByteMs)
 	}
 }
 
@@ -299,23 +300,23 @@ func TestExtractTimings_RealWorldHTTPS(t *testing.T) {
 
 	// Validate extraction logic produces correct values
 	// DNS: 15.3 - 0 = 15ms
-	if timings.DNSLookupMs < 10 || timings.DNSLookupMs > 20 {
-		t.Errorf("DNS lookup outside expected range (10-20ms): %d", timings.DNSLookupMs)
+	if timings.DNSLookupMs == nil || *timings.DNSLookupMs < 10 || *timings.DNSLookupMs > 20 {
+		t.Errorf("DNS lookup outside expected range (10-20ms): %v", timings.DNSLookupMs)
 	}
 
 	// TCP: 45.8 - 15.3 = 30ms (for HTTPS, only until TLS starts)
-	if timings.TCPConnectionMs < 25 || timings.TCPConnectionMs > 35 {
-		t.Errorf("TCP connection outside expected range (25-35ms): %d", timings.TCPConnectionMs)
+	if timings.TCPConnectionMs == nil || *timings.TCPConnectionMs < 25 || *timings.TCPConnectionMs > 35 {
+		t.Errorf("TCP connection outside expected range (25-35ms): %v", timings.TCPConnectionMs)
 	}
 
 	// TLS: 102.7 - 45.8 = 56ms
-	if timings.TLSHandshakeMs < 55 || timings.TLSHandshakeMs > 60 {
-		t.Errorf("TLS handshake outside expected range (55-60ms): %d", timings.TLSHandshakeMs)
+	if timings.TLSHandshakeMs == nil || *timings.TLSHandshakeMs < 55 || *timings.TLSHandshakeMs > 60 {
+		t.Errorf("TLS handshake outside expected range (55-60ms): %v", timings.TLSHandshakeMs)
 	}
 
 	// TTFB: 245.1 - 102.7 = 142ms
-	if timings.TimeToFirstByteMs < 140 || timings.TimeToFirstByteMs > 145 {
-		t.Errorf("TTFB outside expected range (140-145ms): %d", timings.TimeToFirstByteMs)
+	if timings.TimeToFirstByteMs == nil || *timings.TimeToFirstByteMs < 140 || *timings.TimeToFirstByteMs > 145 {
+		t.Errorf("TTFB outside expected range (140-145ms): %v", timings.TimeToFirstByteMs)
 	}
 }
 

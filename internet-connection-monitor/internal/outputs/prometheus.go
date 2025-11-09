@@ -189,18 +189,18 @@ func (p *PrometheusOutput) Write(result *models.TestResult) error {
 		p.lastSuccessTimestamp.WithLabelValues(siteName).Set(float64(result.Timestamp.Unix()))
 	}
 
-	// Update detailed timing metrics
-	if result.Timings.DNSLookupMs > 0 {
-		p.dnsLookupMs.WithLabelValues(siteName).Set(float64(result.Timings.DNSLookupMs))
+	// Update detailed timing metrics (only if available)
+	if result.Timings.DNSLookupMs != nil {
+		p.dnsLookupMs.WithLabelValues(siteName).Set(float64(*result.Timings.DNSLookupMs))
 	}
-	if result.Timings.TCPConnectionMs > 0 {
-		p.tcpConnectionMs.WithLabelValues(siteName).Set(float64(result.Timings.TCPConnectionMs))
+	if result.Timings.TCPConnectionMs != nil {
+		p.tcpConnectionMs.WithLabelValues(siteName).Set(float64(*result.Timings.TCPConnectionMs))
 	}
-	if result.Timings.TLSHandshakeMs > 0 {
-		p.tlsHandshakeMs.WithLabelValues(siteName).Set(float64(result.Timings.TLSHandshakeMs))
+	if result.Timings.TLSHandshakeMs != nil {
+		p.tlsHandshakeMs.WithLabelValues(siteName).Set(float64(*result.Timings.TLSHandshakeMs))
 	}
-	if result.Timings.TimeToFirstByteMs > 0 {
-		p.timeToFirstByteMs.WithLabelValues(siteName).Set(float64(result.Timings.TimeToFirstByteMs))
+	if result.Timings.TimeToFirstByteMs != nil {
+		p.timeToFirstByteMs.WithLabelValues(siteName).Set(float64(*result.Timings.TimeToFirstByteMs))
 	}
 
 	return nil

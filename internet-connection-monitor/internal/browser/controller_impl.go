@@ -185,6 +185,11 @@ func (c *ControllerImpl) Close() error {
 	return nil
 }
 
+// int64Ptr is a helper function to create a pointer to an int64 value
+func int64Ptr(val int64) *int64 {
+	return &val
+}
+
 // extractTimings converts performance navigation timing data to our metrics structure
 //
 // The browser is configured to force fresh DNS, TCP, and TLS on every test by disabling
@@ -228,39 +233,39 @@ func extractTimings(perfData map[string]interface{}, totalMs int64) models.Timin
 
 	// DNS lookup duration
 	if domainLookupEnd > 0 {
-		timings.DNSLookupMs = int64(domainLookupEnd - domainLookupStart)
+		timings.DNSLookupMs = int64Ptr(int64(domainLookupEnd - domainLookupStart))
 	}
 
 	// TCP connection duration
 	if connectEnd > 0 {
 		if secureConnectionStart > 0 {
 			// For HTTPS: TCP time is from connectStart to secureConnectionStart
-			timings.TCPConnectionMs = int64(secureConnectionStart - connectStart)
+			timings.TCPConnectionMs = int64Ptr(int64(secureConnectionStart - connectStart))
 		} else {
 			// For HTTP: TCP time is the full connection time
-			timings.TCPConnectionMs = int64(connectEnd - connectStart)
+			timings.TCPConnectionMs = int64Ptr(int64(connectEnd - connectStart))
 		}
 	}
 
 	// TLS handshake duration (only for HTTPS connections)
 	if secureConnectionStart > 0 && connectEnd > secureConnectionStart {
-		timings.TLSHandshakeMs = int64(connectEnd - secureConnectionStart)
+		timings.TLSHandshakeMs = int64Ptr(int64(connectEnd - secureConnectionStart))
 	}
 
 	// Time to first byte (TTFB): from request start to response start
 	if responseStart > 0 {
-		timings.TimeToFirstByteMs = int64(responseStart - requestStart)
+		timings.TimeToFirstByteMs = int64Ptr(int64(responseStart - requestStart))
 	}
 
 	// DOM content loaded (when HTML is parsed and DOM is ready)
 	if domContentLoadedEventEnd > 0 {
-		timings.DOMContentLoadedMs = int64(domContentLoadedEventEnd)
+		timings.DOMContentLoadedMs = int64Ptr(int64(domContentLoadedEventEnd))
 	}
 
 	// Full page load (when all resources are loaded)
 	if loadEventEnd > 0 {
-		timings.FullPageLoadMs = int64(loadEventEnd)
-		timings.NetworkIdleMs = int64(loadEventEnd) // Network idle ≈ load complete
+		timings.FullPageLoadMs = int64Ptr(int64(loadEventEnd))
+		timings.NetworkIdleMs = int64Ptr(int64(loadEventEnd)) // Network idle ≈ load complete
 	}
 
 	return timings
