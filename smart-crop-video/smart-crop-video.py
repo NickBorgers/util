@@ -579,6 +579,13 @@ def get_video_dimensions(input_file: str) -> Tuple[int, int]:
         input_file
     ]
     result = subprocess.run(cmd, capture_output=True, text=True)
+
+    if not result.stdout.strip():
+        raise ValueError(
+            f"ffprobe returned empty output for {input_file}. "
+            f"stderr: {result.stderr}, returncode: {result.returncode}"
+        )
+
     width, height = map(int, result.stdout.strip().split(','))
     return width, height
 
@@ -840,6 +847,9 @@ def identify_boring_sections(scenes: List[Scene], percentile_threshold: float = 
     """Identify boring sections based on metric values
 
     Returns list of (scene_index, speedup_factor) tuples
+
+    NOTE: Currently non-functional because Scene.metric_value is never populated
+    by analyze_temporal_patterns(). Scene metric calculation needs to be implemented.
     """
     if not scenes:
         return []
