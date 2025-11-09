@@ -6,6 +6,8 @@ FROM python:3.11-slim
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
+    # FFmpeg for video processing and comprehensive tests
+    ffmpeg \
     # Docker client (for running containers from tests)
     ca-certificates \
     curl \
