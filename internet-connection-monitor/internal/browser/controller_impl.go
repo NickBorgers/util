@@ -99,7 +99,7 @@ func (c *ControllerImpl) TestSite(ctx context.Context, site models.SiteDefinitio
 		},
 		Metadata: models.TestMetadata{
 			Hostname:  c.hostname,
-			Version:   "1.2.0",
+			Version:   "1.2.1",
 			UserAgent: c.config.UserAgent,
 		},
 	}
