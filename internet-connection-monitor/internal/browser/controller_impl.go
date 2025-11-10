@@ -163,7 +163,9 @@ func (c *ControllerImpl) TestSite(ctx context.Context, site models.SiteDefinitio
 			ErrorType:    categorizeError(err),
 			ErrorMessage: err.Error(),
 		}
-		result.Timings.TotalDurationMs = totalDuration
+		// Extract whatever timing data is available, even on error
+		// For example, if an HTTP timeout occurs, we may still have DNS and TLS timing data
+		result.Timings = extractTimings(navigationEntry, totalDuration)
 		return result, nil // Return result even on error (for logging)
 	}
 
