@@ -1,6 +1,7 @@
 package outputs
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -494,14 +495,8 @@ func TestSNMPOutputExportMIBData(t *testing.T) {
 	}
 
 	for _, expected := range expectedStrings {
-		if !contains(mib, expected) {
+		if !strings.Contains(mib, expected) {
 			t.Errorf("Expected MIB to contain '%s'", expected)
 		}
 	}
-}
-
-// Helper function to check if string contains substring
-func contains(s, substr string) bool {
-	return len(s) >= len(substr) && (s == substr || len(s) > len(substr) &&
-		(s[:len(substr)] == substr || contains(s[1:], substr)))
 }
