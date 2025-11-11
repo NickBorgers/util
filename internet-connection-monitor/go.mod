@@ -1,6 +1,6 @@
 module github.com/nickborgers/monorepo/internet-connection-monitor
 
-go 1.25
+go 1.24
 
 require (
 	github.com/chromedp/chromedp v0.14.2

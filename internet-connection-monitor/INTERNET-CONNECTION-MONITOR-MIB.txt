@@ -1,0 +1,429 @@
+INTERNET-CONNECTION-MONITOR-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+    MODULE-IDENTITY, OBJECT-TYPE, NOTIFICATION-TYPE,
+    Integer32, Counter64, Gauge32, enterprises
+        FROM SNMPv2-SMI
+    TEXTUAL-CONVENTION, DisplayString, TimeStamp
+        FROM SNMPv2-TC
+    MODULE-COMPLIANCE, OBJECT-GROUP, NOTIFICATION-GROUP
+        FROM SNMPv2-CONF;
+
+internetConnectionMonitorMIB MODULE-IDENTITY
+    LAST-UPDATED "202511110000Z"
+    ORGANIZATION "Personal Utility Repository"
+    CONTACT-INFO
+        "Repository: https://github.com/nickborgers/monorepo
+         Email: See GitHub repository"
+    DESCRIPTION
+        "MIB module for the Internet Connection Monitor utility.
+
+         This MIB provides monitoring data for Internet connectivity tests,
+         including timing metrics, success/failure statistics, and per-site
+         performance data.
+
+         The monitor continuously tests configured websites from a user's
+         perspective, measuring DNS resolution, TCP connection, TLS handshake,
+         and page load times."
+    REVISION "202511110000Z"
+    DESCRIPTION
+        "Initial version of the Internet Connection Monitor MIB."
+    ::= { enterprises 99999 }
+
+-- Enterprise OID: .1.3.6.1.4.1.99999
+-- Note: This is an example OID. For production use, you should obtain
+-- a registered enterprise number from IANA: https://www.iana.org/assignments/enterprise-numbers
+
+-- Top-level structure
+icmObjects       OBJECT IDENTIFIER ::= { internetConnectionMonitorMIB 1 }
+icmStats         OBJECT IDENTIFIER ::= { internetConnectionMonitorMIB 2 }
+icmTests         OBJECT IDENTIFIER ::= { internetConnectionMonitorMIB 3 }
+icmNotifications OBJECT IDENTIFIER ::= { internetConnectionMonitorMIB 4 }
+icmConformance   OBJECT IDENTIFIER ::= { internetConnectionMonitorMIB 5 }
+
+-- =====================================================================
+-- General Statistics (Branch 1)
+-- =====================================================================
+
+icmCacheSize OBJECT-TYPE
+    SYNTAX      Integer32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Current number of test results cached in memory.
+         This is an in-memory circular buffer that resets on restart."
+    ::= { icmObjects 1 }
+
+icmMaxCacheSize OBJECT-TYPE
+    SYNTAX      Integer32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Maximum number of test results that can be cached.
+         Default is 100. Older results are discarded when the cache is full."
+    ::= { icmObjects 2 }
+
+icmMonitoredSitesCount OBJECT-TYPE
+    SYNTAX      Integer32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Number of sites currently being monitored."
+    ::= { icmObjects 3 }
+
+icmTotalTestsRun OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Total number of tests executed across all monitored sites
+         since the monitor started. Resets on restart."
+    ::= { icmObjects 4 }
+
+icmTotalSuccesses OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Total number of successful tests across all sites.
+         A test is successful if the site loads without errors."
+    ::= { icmObjects 5 }
+
+icmTotalFailures OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Total number of failed tests across all sites.
+         Failures include DNS errors, connection timeouts, TLS errors,
+         and HTTP errors."
+    ::= { icmObjects 6 }
+
+-- =====================================================================
+-- Per-Site Statistics Table (Branch 2)
+-- =====================================================================
+
+icmSiteStatsTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF IcmSiteStatsEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "Table of per-site statistics. Each monitored site has an entry
+         containing test counts, timing metrics, and success/failure data."
+    ::= { icmStats 1 }
+
+icmSiteStatsEntry OBJECT-TYPE
+    SYNTAX      IcmSiteStatsEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "An entry containing statistics for a single monitored site."
+    INDEX       { icmSiteIndex }
+    ::= { icmSiteStatsTable 1 }
+
+IcmSiteStatsEntry ::= SEQUENCE {
+    icmSiteIndex            Integer32,
+    icmSiteName             DisplayString,
+    icmSiteTotalTests       Counter64,
+    icmSiteSuccessfulTests  Counter64,
+    icmSiteFailedTests      Counter64,
+    icmSiteLastDuration     Gauge32,
+    icmSiteAvgDuration      Gauge32,
+    icmSiteMinDuration      Gauge32,
+    icmSiteMaxDuration      Gauge32,
+    icmSiteLastSuccessTime  TimeStamp,
+    icmSiteLastFailureTime  TimeStamp
+}
+
+icmSiteIndex OBJECT-TYPE
+    SYNTAX      Integer32 (1..2147483647)
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "A unique index for each monitored site."
+    ::= { icmSiteStatsEntry 1 }
+
+icmSiteName OBJECT-TYPE
+    SYNTAX      DisplayString (SIZE (0..255))
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The name or URL of the monitored site."
+    ::= { icmSiteStatsEntry 2 }
+
+icmSiteTotalTests OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Total number of tests executed for this site."
+    ::= { icmSiteStatsEntry 3 }
+
+icmSiteSuccessfulTests OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Number of successful tests for this site."
+    ::= { icmSiteStatsEntry 4 }
+
+icmSiteFailedTests OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Number of failed tests for this site."
+    ::= { icmSiteStatsEntry 5 }
+
+icmSiteLastDuration OBJECT-TYPE
+    SYNTAX      Gauge32
+    UNITS       "milliseconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Duration of the most recent test for this site, in milliseconds."
+    ::= { icmSiteStatsEntry 6 }
+
+icmSiteAvgDuration OBJECT-TYPE
+    SYNTAX      Gauge32
+    UNITS       "milliseconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Average test duration for this site across all tests, in milliseconds."
+    ::= { icmSiteStatsEntry 7 }
+
+icmSiteMinDuration OBJECT-TYPE
+    SYNTAX      Gauge32
+    UNITS       "milliseconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Minimum test duration observed for this site, in milliseconds."
+    ::= { icmSiteStatsEntry 8 }
+
+icmSiteMaxDuration OBJECT-TYPE
+    SYNTAX      Gauge32
+    UNITS       "milliseconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Maximum test duration observed for this site, in milliseconds."
+    ::= { icmSiteStatsEntry 9 }
+
+icmSiteLastSuccessTime OBJECT-TYPE
+    SYNTAX      TimeStamp
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Timestamp of the last successful test for this site.
+         Value is Unix timestamp (seconds since epoch)."
+    ::= { icmSiteStatsEntry 10 }
+
+icmSiteLastFailureTime OBJECT-TYPE
+    SYNTAX      TimeStamp
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Timestamp of the last failed test for this site.
+         Value is Unix timestamp (seconds since epoch)."
+    ::= { icmSiteStatsEntry 11 }
+
+-- =====================================================================
+-- Recent Test Results Table (Branch 3)
+-- =====================================================================
+
+icmRecentTestsTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF IcmRecentTestEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "Table of recent test results. Contains the last N test results
+         (default 100) from the in-memory cache. This data is ephemeral
+         and resets on monitor restart."
+    ::= { icmTests 1 }
+
+icmRecentTestEntry OBJECT-TYPE
+    SYNTAX      IcmRecentTestEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "An entry containing a single test result."
+    INDEX       { icmTestIndex }
+    ::= { icmRecentTestsTable 1 }
+
+IcmRecentTestEntry ::= SEQUENCE {
+    icmTestIndex       Integer32,
+    icmTestSiteName    DisplayString,
+    icmTestTimestamp   TimeStamp,
+    icmTestSuccess     INTEGER,
+    icmTestDuration    Gauge32,
+    icmTestHTTPStatus  Integer32
+}
+
+icmTestIndex OBJECT-TYPE
+    SYNTAX      Integer32 (1..2147483647)
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "Index of the test result in the cache."
+    ::= { icmRecentTestEntry 1 }
+
+icmTestSiteName OBJECT-TYPE
+    SYNTAX      DisplayString (SIZE (0..255))
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Name or URL of the site that was tested."
+    ::= { icmRecentTestEntry 2 }
+
+icmTestTimestamp OBJECT-TYPE
+    SYNTAX      TimeStamp
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Timestamp when the test was executed.
+         Value is Unix timestamp (seconds since epoch)."
+    ::= { icmRecentTestEntry 3 }
+
+icmTestSuccess OBJECT-TYPE
+    SYNTAX      INTEGER { failure(0), success(1) }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Indicates whether the test was successful.
+         1 = success, 0 = failure"
+    ::= { icmRecentTestEntry 4 }
+
+icmTestDuration OBJECT-TYPE
+    SYNTAX      Gauge32
+    UNITS       "milliseconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Total duration of the test, from start to network idle,
+         in milliseconds."
+    ::= { icmRecentTestEntry 5 }
+
+icmTestHTTPStatus OBJECT-TYPE
+    SYNTAX      Integer32 (0..999)
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "HTTP status code returned by the site.
+         0 indicates a failure before receiving an HTTP response
+         (e.g., DNS or connection error)."
+    ::= { icmRecentTestEntry 6 }
+
+-- =====================================================================
+-- Notifications (Traps) (Branch 4)
+-- =====================================================================
+
+icmTestFailureTrap NOTIFICATION-TYPE
+    OBJECTS     { icmSiteName }
+    STATUS      current
+    DESCRIPTION
+        "This trap is sent when a test fails for a monitored site.
+         Failures include DNS errors, connection timeouts, TLS errors,
+         HTTP errors, and page load failures."
+    ::= { icmNotifications 1 }
+
+icmServiceDegradedTrap NOTIFICATION-TYPE
+    OBJECTS     { icmSiteName, icmSiteFailedTests, icmSiteTotalTests }
+    STATUS      current
+    DESCRIPTION
+        "This trap is sent when a site shows signs of degradation,
+         defined as a failure rate exceeding 50% over the last 10+ tests.
+         This indicates persistent connectivity or performance issues."
+    ::= { icmNotifications 2 }
+
+icmServiceRecoveredTrap NOTIFICATION-TYPE
+    OBJECTS     { icmSiteName, icmSiteSuccessfulTests }
+    STATUS      current
+    DESCRIPTION
+        "This trap is sent when a previously degraded site recovers,
+         with successful tests resuming."
+    ::= { icmNotifications 3 }
+
+-- =====================================================================
+-- Conformance Information (Branch 5)
+-- =====================================================================
+
+icmCompliances  OBJECT IDENTIFIER ::= { icmConformance 1 }
+icmGroups       OBJECT IDENTIFIER ::= { icmConformance 2 }
+
+-- Compliance statement
+icmCompliance MODULE-COMPLIANCE
+    STATUS      current
+    DESCRIPTION
+        "The compliance statement for entities implementing the
+         Internet Connection Monitor MIB."
+    MODULE  -- this module
+    MANDATORY-GROUPS {
+        icmGeneralStatsGroup,
+        icmSiteStatsGroup,
+        icmRecentTestsGroup,
+        icmNotificationsGroup
+    }
+    ::= { icmCompliances 1 }
+
+-- Object groups
+icmGeneralStatsGroup OBJECT-GROUP
+    OBJECTS {
+        icmCacheSize,
+        icmMaxCacheSize,
+        icmMonitoredSitesCount,
+        icmTotalTestsRun,
+        icmTotalSuccesses,
+        icmTotalFailures
+    }
+    STATUS      current
+    DESCRIPTION
+        "A collection of objects providing general statistics about
+         the Internet Connection Monitor."
+    ::= { icmGroups 1 }
+
+icmSiteStatsGroup OBJECT-GROUP
+    OBJECTS {
+        icmSiteName,
+        icmSiteTotalTests,
+        icmSiteSuccessfulTests,
+        icmSiteFailedTests,
+        icmSiteLastDuration,
+        icmSiteAvgDuration,
+        icmSiteMinDuration,
+        icmSiteMaxDuration,
+        icmSiteLastSuccessTime,
+        icmSiteLastFailureTime
+    }
+    STATUS      current
+    DESCRIPTION
+        "A collection of objects providing per-site statistics."
+    ::= { icmGroups 2 }
+
+icmRecentTestsGroup OBJECT-GROUP
+    OBJECTS {
+        icmTestSiteName,
+        icmTestTimestamp,
+        icmTestSuccess,
+        icmTestDuration,
+        icmTestHTTPStatus
+    }
+    STATUS      current
+    DESCRIPTION
+        "A collection of objects providing recent test results."
+    ::= { icmGroups 3 }
+
+icmNotificationsGroup NOTIFICATION-GROUP
+    NOTIFICATIONS {
+        icmTestFailureTrap,
+        icmServiceDegradedTrap,
+        icmServiceRecoveredTrap
+    }
+    STATUS      current
+    DESCRIPTION
+        "A collection of notifications for alerting about test
+         failures and service degradation."
+    ::= { icmGroups 4 }
+
+END

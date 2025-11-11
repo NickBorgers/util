@@ -285,6 +285,90 @@ else
 fi
 echo ""
 
+# Step 13: Verify SNMP HTTP API endpoint
+log_info "Step 13: Verifying SNMP HTTP API endpoint..."
+SNMP_HTTP_PORT=162  # Default SNMP port + 1
+SNMP_DATA_RESPONSE=$(curl -s "http://localhost:${SNMP_HTTP_PORT}/snmp/data")
+if [ $? -eq 0 ]; then
+    # Check if response is valid JSON
+    if echo "$SNMP_DATA_RESPONSE" | jq . > /dev/null 2>&1; then
+        log_success "SNMP HTTP API endpoint is working"
+
+        # Verify data structure
+        CACHE_SIZE=$(echo "$SNMP_DATA_RESPONSE" | jq -r '.cache_size')
+        MONITORED_SITES=$(echo "$SNMP_DATA_RESPONSE" | jq -r '.monitored_sites')
+
+        if [ -n "$CACHE_SIZE" ] && [ "$CACHE_SIZE" != "null" ]; then
+            log_info "SNMP cache size: $CACHE_SIZE"
+        fi
+
+        if [ -n "$MONITORED_SITES" ] && [ "$MONITORED_SITES" != "null" ]; then
+            log_info "SNMP monitored sites: $MONITORED_SITES"
+        fi
+
+        # Verify sites data exists
+        SITES_DATA=$(echo "$SNMP_DATA_RESPONSE" | jq -r '.sites')
+        if [ "$SITES_DATA" != "null" ]; then
+            log_success "SNMP per-site statistics available"
+        else
+            log_warning "No per-site statistics in SNMP data yet"
+        fi
+    else
+        log_error "SNMP HTTP API returned invalid JSON"
+        echo "$SNMP_DATA_RESPONSE"
+        exit 1
+    fi
+else
+    log_error "SNMP HTTP API endpoint not accessible"
+    exit 1
+fi
+echo ""
+
+# Step 14: Verify SNMP MIB endpoint
+log_info "Step 14: Verifying SNMP MIB endpoint..."
+SNMP_MIB_RESPONSE=$(curl -s "http://localhost:${SNMP_HTTP_PORT}/snmp/mib")
+if [ $? -eq 0 ] && [ -n "$SNMP_MIB_RESPONSE" ]; then
+    # Check if MIB contains expected information
+    if echo "$SNMP_MIB_RESPONSE" | grep -q "Internet Connection Monitor MIB"; then
+        log_success "SNMP MIB endpoint is working"
+
+        # Count number of lines in MIB (should be non-trivial)
+        MIB_LINES=$(echo "$SNMP_MIB_RESPONSE" | wc -l)
+        log_info "MIB contains $MIB_LINES lines"
+    else
+        log_error "SNMP MIB endpoint returned invalid data"
+        echo "$SNMP_MIB_RESPONSE" | head -20
+        exit 1
+    fi
+else
+    log_error "SNMP MIB endpoint not accessible"
+    exit 1
+fi
+echo ""
+
+# Step 15: Verify SNMP OID list endpoint
+log_info "Step 15: Verifying SNMP OID list endpoint..."
+SNMP_OIDS_RESPONSE=$(curl -s "http://localhost:${SNMP_HTTP_PORT}/snmp/oids")
+if [ $? -eq 0 ]; then
+    # Check if response is valid JSON array
+    if echo "$SNMP_OIDS_RESPONSE" | jq . > /dev/null 2>&1; then
+        OID_COUNT=$(echo "$SNMP_OIDS_RESPONSE" | jq '. | length')
+        if [ "$OID_COUNT" -gt 0 ]; then
+            log_success "SNMP OID list endpoint is working ($OID_COUNT OIDs available)"
+        else
+            log_warning "SNMP OID list is empty (may need more test data)"
+        fi
+    else
+        log_error "SNMP OID list endpoint returned invalid JSON"
+        echo "$SNMP_OIDS_RESPONSE"
+        exit 1
+    fi
+else
+    log_error "SNMP OID list endpoint not accessible"
+    exit 1
+fi
+echo ""
+
 # Final summary
 echo -e "${CYAN}╔════════════════════════════════════════════════════════════════╗${NC}"
 echo -e "${CYAN}║  Integration Test Results                                      ║${NC}"
@@ -298,6 +382,9 @@ log_success "✓ Grafana datasource is configured"
 log_success "✓ Grafana can query data from Elasticsearch"
 log_success "✓ Prometheus metrics endpoint is working"
 log_success "✓ Health endpoint is working"
+log_success "✓ SNMP HTTP API endpoint is working"
+log_success "✓ SNMP MIB endpoint is working"
+log_success "✓ SNMP OID list endpoint is working"
 echo ""
 echo -e "${GREEN}╔════════════════════════════════════════════════════════════════╗${NC}"
 echo -e "${GREEN}║  ALL INTEGRATION TESTS PASSED                                  ║${NC}"

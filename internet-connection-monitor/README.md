@@ -74,7 +74,7 @@ The monitor runs **continuously**, testing sites one at a time (like a real pers
 - **JSON logs** (stdout) - Always on, zero config
 - **Elasticsearch** - Optional, for Grafana dashboards and long-term analysis
 - **Prometheus** - Optional, for metrics scraping
-- **SNMP** - Optional, for Zabbix polling
+- **SNMP** - Optional, full SNMP v2c agent with MIB for Zabbix/network monitoring systems
 
 ## Features
 
@@ -82,11 +82,12 @@ The monitor runs **continuously**, testing sites one at a time (like a real pers
 * ✅ **Comprehensive timing metrics** - DNS, TCP, TLS, TTFB, DOM loaded, page load, network idle
 * ✅ **Accurate DNS measurements** - Uses host networking to measure real DNS resolution times (not Docker's cached DNS)
 * ✅ **Continuous monitoring** - Serial testing, natural traffic patterns
-* ✅ **Multiple outputs** - Logs, Elasticsearch, Prometheus, SNMP (SNMP not tested)
+* ✅ **Multiple outputs** - Logs, Elasticsearch, Prometheus, SNMP
+* ✅ **SNMP agent** - Full SNMP v2c agent with MIB, OID tree, traps, and HTTP API
 * ✅ **Stateless design** - Restart-safe, no data loss
 * ✅ **Beautiful Grafana dashboards** - Pre-built, ready to import
 * ✅ **Zero configuration start** - Works out of the box
-* ✅ **Integration tested** - Core data flow validated: monitor → Elasticsearch → Grafana, Prometheus
+* ✅ **Integration tested** - Core data flow validated: monitor → Elasticsearch → Grafana, Prometheus, SNMP
 
 **Networking Architecture**: The monitor uses **host networking mode** to ensure DNS resolution times match real user experience. With Docker's default bridge networking, Docker's embedded DNS proxy can cache responses and skew measurements. Host networking provides direct access to your network's DNS servers for accurate timing data. See [deployments/README.md](deployments/README.md) for details and alternatives.
 
@@ -95,6 +96,7 @@ The monitor runs **continuously**, testing sites one at a time (like a real pers
 - **[QUICKSTART.md](QUICKSTART.md)** - Get started in 30 seconds
 - **[DESIGN.md](DESIGN.md)** - Architecture, technology stack, implementation details
 - **[ELASTICSEARCH_AND_GRAFANA.md](ELASTICSEARCH_AND_GRAFANA.md)** - JSON schema, Grafana queries, dashboard guide
+- **[SNMP_GUIDE.md](SNMP_GUIDE.md)** - SNMP monitoring setup, OID reference, Zabbix integration
 - **[TESTING.md](TESTING.md)** - Test coverage, known gaps, and testing philosophy
 - **[TROUBLESHOOTING.md](TROUBLESHOOTING.md)** - Common issues and solutions
 - **[deployments/README.md](deployments/README.md)** - Deployment guide, configuration options

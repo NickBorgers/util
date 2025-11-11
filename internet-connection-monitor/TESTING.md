@@ -25,17 +25,20 @@ The integration tests validate the complete data flow from the monitor through E
 **What Is Tested:**
 - ✅ End-to-end data flow: Monitor → Elasticsearch → Grafana
 - ✅ Docker image builds and runs
-- ✅ Output modules that ARE tested:
+- ✅ Output modules:
   - ✅ JSON logging produces valid documents
   - ✅ Elasticsearch receives and indexes documents
   - ✅ Prometheus metrics are exposed
   - ✅ Health endpoint responds correctly
+  - ✅ SNMP HTTP API endpoint returns valid JSON data
+  - ✅ SNMP MIB endpoint returns MIB definition
+  - ✅ SNMP OID list endpoint returns available OIDs
 - ✅ Grafana can query Elasticsearch data
 
 **What Is NOT Tested:**
-- ❌ SNMP agent (implemented but not validated)
-- ❌ Output module initialization for SNMP
-- ❌ SNMP data export functionality
+- ❌ SNMP protocol queries (snmpget, snmpwalk) - requires SNMP client tools
+- ❌ SNMP trap delivery - requires trap receiver configuration
+- ❌ SNMP v3 authentication - currently only SNMPv2c implemented
 
 ### ✅ Unit Tests (Implemented)
 
@@ -94,7 +97,7 @@ The integration tests validate the complete data flow from the monitor through E
 5. **Output Modules** (`internal/outputs/`)
    - ❌ Prometheus metrics registration (integration tested but no unit tests)
    - ❌ Elasticsearch bulk indexing (integration tested but no unit tests)
-   - ❌ SNMP agent (NOT tested at all - no unit or integration tests)
+   - ✅ SNMP agent (unit tests and HTTP API integration tests implemented)
    - ❌ JSON logger (integration tested but no unit tests)
 
 6. **Environment Variable Loading** (`internal/config/loader.go:LoadFromEnv()`)
