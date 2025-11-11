@@ -24,7 +24,7 @@
           "label": "Site",
           "datasource": {
             "type": "elasticsearch",
-            "uid": "elasticsearch-datasource"
+            "uid": "${DS_ELASTICSEARCH}"
           },
           "query": "{\"find\": \"terms\", \"field\": \"site.name.keyword\"}",
           "multi": true,
@@ -77,7 +77,7 @@
         {
           "datasource": {
             "type": "elasticsearch",
-            "uid": "elasticsearch-datasource"
+            "uid": "${DS_ELASTICSEARCH}"
           },
           "enable": true,
           "name": "Deployment Events",
@@ -101,7 +101,7 @@
           {
             "datasource": {
               "type": "elasticsearch",
-              "uid": "elasticsearch-datasource"
+              "uid": "${DS_ELASTICSEARCH}"
             },
             "query": "site.name.keyword:($site_name)",
             "metrics": [
@@ -160,7 +160,7 @@
           {
             "datasource": {
               "type": "elasticsearch",
-              "uid": "elasticsearch-datasource"
+              "uid": "${DS_ELASTICSEARCH}"
             },
             "query": "status.success:true AND site.name.keyword:($site_name)",
             "metrics": [
@@ -219,7 +219,7 @@
           {
             "datasource": {
               "type": "elasticsearch",
-              "uid": "elasticsearch-datasource"
+              "uid": "${DS_ELASTICSEARCH}"
             },
             "query": "status.success:true AND site.name.keyword:($site_name)",
             "metrics": [
@@ -281,7 +281,7 @@
           {
             "datasource": {
               "type": "elasticsearch",
-              "uid": "elasticsearch-datasource"
+              "uid": "${DS_ELASTICSEARCH}"
             },
             "query": "site.name.keyword:($site_name)",
             "metrics": [
@@ -330,7 +330,7 @@
           {
             "datasource": {
               "type": "elasticsearch",
-              "uid": "elasticsearch-datasource"
+              "uid": "${DS_ELASTICSEARCH}"
             },
             "query": "site.name.keyword:($site_name)",
             "alias": "Success Rate",
@@ -474,7 +474,7 @@
           {
             "datasource": {
               "type": "elasticsearch",
-              "uid": "elasticsearch-datasource"
+              "uid": "${DS_ELASTICSEARCH}"
             },
             "query": "status.success:true AND site.name.keyword:($site_name)",
             "alias": "Average",
@@ -501,7 +501,7 @@
           {
             "datasource": {
               "type": "elasticsearch",
-              "uid": "elasticsearch-datasource"
+              "uid": "${DS_ELASTICSEARCH}"
             },
             "query": "status.success:true AND site.name.keyword:($site_name)",
             "alias": "P95",
@@ -531,7 +531,7 @@
           {
             "datasource": {
               "type": "elasticsearch",
-              "uid": "elasticsearch-datasource"
+              "uid": "${DS_ELASTICSEARCH}"
             },
             "query": "status.success:true AND site.name.keyword:($site_name)",
             "alias": "P99",
@@ -614,7 +614,7 @@
           {
             "datasource": {
               "type": "elasticsearch",
-              "uid": "elasticsearch-datasource"
+              "uid": "${DS_ELASTICSEARCH}"
             },
             "query": "status.success:true AND site.name.keyword:($site_name)",
             "alias": "Avg DNS",
@@ -662,7 +662,7 @@
           {
             "datasource": {
               "type": "elasticsearch",
-              "uid": "elasticsearch-datasource"
+              "uid": "${DS_ELASTICSEARCH}"
             },
             "query": "status.success:true AND site.name.keyword:($site_name)",
             "alias": "Avg TCP",
@@ -710,7 +710,7 @@
           {
             "datasource": {
               "type": "elasticsearch",
-              "uid": "elasticsearch-datasource"
+              "uid": "${DS_ELASTICSEARCH}"
             },
             "query": "status.success:true AND site.name.keyword:($site_name)",
             "alias": "Avg TLS",
@@ -758,7 +758,7 @@
           {
             "datasource": {
               "type": "elasticsearch",
-              "uid": "elasticsearch-datasource"
+              "uid": "${DS_ELASTICSEARCH}"
             },
             "query": "site.name.keyword:($site_name)",
             "metrics": [
@@ -827,7 +827,7 @@
           {
             "datasource": {
               "type": "elasticsearch",
-              "uid": "elasticsearch-datasource"
+              "uid": "${DS_ELASTICSEARCH}"
             },
             "query": "status.success:false AND site.name.keyword:($site_name)",
             "metrics": [
@@ -876,7 +876,7 @@
           {
             "datasource": {
               "type": "elasticsearch",
-              "uid": "elasticsearch-datasource"
+              "uid": "${DS_ELASTICSEARCH}"
             },
             "query": "status.success:false AND site.name.keyword:($site_name)",
             "metrics": [
