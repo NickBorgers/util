@@ -7,6 +7,9 @@ version: '3.8'
 services:
   # Internet Connection Monitor
   internet-monitor:
+    build:
+      context: ..
+      dockerfile: Dockerfile
     image: internet-connection-monitor:latest
     container_name: internet-monitor
     hostname: internet-monitor-01

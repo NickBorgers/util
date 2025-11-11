@@ -44,11 +44,11 @@ Each test produces a single JSON document that is:
 }
 ```
 
-### Failed Test Example
+### Failed Test Example (v1.3.0+)
 
 ```json
 {
-  "@timestamp": "2025-01-08T15:25:12.456Z",
+  "@timestamp": "2025-11-11T14:28:40.859Z",
   "test_id": "660e8400-e29b-41d4-a716-446655440001",
   "site": {
     "url": "https://example-down-site.com",
@@ -57,32 +57,75 @@ Each test produces a single JSON document that is:
   },
   "status": {
     "success": false,
-    "http_status": 0,
-    "error": {
-      "type": "timeout",
-      "message": "Navigation timeout of 30000ms exceeded",
-      "timestamp": "2025-01-08T15:25:12.456Z"
-    }
+    "message": "Failed to load page"
+  },
+  "error": {
+    "error_type": "ERR_CONNECTION_TIMED_OUT",
+    "error_message": "page load error net::ERR_CONNECTION_TIMED_OUT",
+    "failure_phase": "tcp"
   },
   "timings": {
-    "dns_lookup_ms": 45,
+    "dns_lookup_ms": 12,
     "tcp_connection_ms": null,
     "tls_handshake_ms": null,
     "time_to_first_byte_ms": null,
     "dom_content_loaded_ms": null,
     "network_idle_ms": null,
-    "total_duration_ms": 30000
+    "total_duration_ms": 30001
   },
-  "browser": {
-    "user_agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36...",
-    "viewport": "1920x1080"
-  },
-  "environment": {
-    "monitor_hostname": "internet-monitor-01",
-    "monitor_version": "1.0.0"
+  "metadata": {
+    "hostname": "internet-monitor-01",
+    "version": "1.3.0"
   }
 }
 ```
+
+### Error Object Fields (v1.3.0+)
+
+The `error` object provides detailed failure information:
+
+- **error_type** (string, keyword): Chrome's error code or simplified type
+  - Chrome network errors: `ERR_NAME_NOT_RESOLVED`, `ERR_CONNECTION_REFUSED`, `ERR_CONNECTION_TIMED_OUT`, `ERR_CERT_AUTHORITY_INVALID`, `ERR_ABORTED`, etc.
+  - Fallback types: `timeout` (chromedp timeout), `unknown` (unclassified error)
+
+- **error_message** (text): Full error message from Chrome/chromedp
+  - Example: `"page load error net::ERR_NAME_NOT_RESOLVED"`
+
+- **failure_phase** (keyword): Which network layer failed (inferred from timing data)
+  - `dns` - DNS resolution failed (no DNS timing)
+  - `tcp` - TCP connection failed (has DNS, no TCP)
+  - `tls` - TLS handshake failed (has TCP, no TLS - HTTPS only)
+  - `http` - HTTP request failed (has connection timing, no TTFB)
+  - `unknown` - Phase couldn't be determined
+
+- **stack_trace** (text, optional): Error stack trace for debugging
+
+### Common Chrome Error Codes
+
+**DNS errors (failure_phase: "dns"):**
+- `ERR_NAME_NOT_RESOLVED` - Hostname doesn't resolve
+- `ERR_DNS_TIMED_OUT` - DNS server timeout
+- `ERR_DNS_MALFORMED_RESPONSE` - Invalid DNS response
+- `ERR_DNS_SERVER_FAILED` - DNS server error
+
+**TCP errors (failure_phase: "tcp"):**
+- `ERR_CONNECTION_REFUSED` - Port not listening
+- `ERR_CONNECTION_RESET` - Connection reset by peer
+- `ERR_CONNECTION_TIMED_OUT` - TCP handshake timeout
+- `ERR_CONNECTION_FAILED` - Generic connection failure
+- `ERR_CONNECTION_ABORTED` - Connection aborted
+
+**TLS errors (failure_phase: "tls"):**
+- `ERR_SSL_PROTOCOL_ERROR` - TLS protocol error
+- `ERR_CERT_AUTHORITY_INVALID` - Invalid certificate authority
+- `ERR_CERT_DATE_INVALID` - Certificate expired/not yet valid
+- `ERR_CERT_COMMON_NAME_INVALID` - Hostname mismatch
+- `ERR_SSL_VERSION_OR_CIPHER_MISMATCH` - Incompatible TLS version/cipher
+
+**HTTP/Application errors (failure_phase: "http"):**
+- `ERR_ABORTED` - Request aborted (phase inferred from timing)
+- `ERR_TIMED_OUT` - HTTP request timeout
+- `ERR_EMPTY_RESPONSE` - Server closed connection without response
 
 ## Elasticsearch Index Template
 
@@ -664,11 +707,84 @@ Average total_duration_ms with timeshift -24h overlay
 Distribution of timeout, DNS, connection refused, etc.
 ```
 
+### "Which network layer is failing?" (v1.3.0+)
+**Panel**: Pie chart of failures by phase
+```
+Distribution across DNS, TCP, TLS, HTTP layers
+```
+
+**Query Example:**
+```json
+{
+  "query": "status.success:false",
+  "aggs": {
+    "phase_distribution": {
+      "terms": {
+        "field": "error.failure_phase.keyword",
+        "size": 10
+      }
+    }
+  }
+}
+```
+
+### "Detailed error analysis by phase" (v1.3.0+)
+**Panel**: Table showing error types grouped by failure phase
+```
+Shows which specific Chrome errors occur at each network layer
+```
+
+**Useful queries for troubleshooting:**
+
+```bash
+# All DNS failures (any DNS-related error)
+error.failure_phase: "dns"
+
+# Specific Chrome error
+error.error_type: "ERR_NAME_NOT_RESOLVED"
+
+# All timeouts across all phases
+error.error_type: "timeout" OR error.error_type: "ERR_CONNECTION_TIMED_OUT" OR error.error_type: "ERR_TIMED_OUT"
+
+# TCP layer issues (connection problems)
+error.failure_phase: "tcp"
+
+# TLS certificate issues
+error.failure_phase: "tls"
+
+# HTTP layer failures (connection succeeded, but HTTP request failed)
+error.failure_phase: "http"
+
+# Failures that made it past TLS but failed at HTTP
+error.failure_phase: "http" AND timings.tls_handshake_ms: *
+
+# Sites with the most DNS failures
+{
+  "query": "error.failure_phase:dns",
+  "aggs": {
+    "top_sites": {
+      "terms": {
+        "field": "site.name.keyword",
+        "size": 10
+      }
+    }
+  }
+}
+```
+
 ### "Detailed failure investigation"
 **Panel**: Table of recent failures with expandable error messages
 ```
-Show timestamp, site, error type, full error message
+Show timestamp, site, error type, failure phase, full error message
 ```
+
+**Updated columns for v1.3.0:**
+- @timestamp
+- site.name
+- error.error_type (now shows Chrome codes like ERR_NAME_NOT_RESOLVED)
+- error.failure_phase (NEW: dns, tcp, tls, http, unknown)
+- error.error_message
+- timings.total_duration_ms
 
 ## Retention and Performance
 
