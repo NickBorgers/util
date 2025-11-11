@@ -3,12 +3,7 @@
     "id": null,
     "uid": "internet-conn-mon",
     "title": "Internet Connection Monitor",
-    "tags": [
-      "internet",
-      "monitoring",
-      "connectivity",
-      "user-experience"
-    ],
+    "tags": ["internet", "monitoring", "connectivity", "user-experience"],
     "timezone": "browser",
     "schemaVersion": 38,
     "version": 1,
@@ -18,25 +13,8 @@
       "to": "now"
     },
     "timepicker": {
-      "refresh_intervals": [
-        "30s",
-        "1m",
-        "5m",
-        "15m",
-        "30m",
-        "1h"
-      ],
-      "time_options": [
-        "5m",
-        "15m",
-        "1h",
-        "6h",
-        "12h",
-        "24h",
-        "7d",
-        "30d",
-        "90d"
-      ]
+      "refresh_intervals": ["30s", "1m", "5m", "15m", "30m", "1h"],
+      "time_options": ["5m", "15m", "1h", "6h", "12h", "24h", "7d", "30d", "90d"]
     },
     "templating": {
       "list": [
@@ -46,7 +24,7 @@
           "label": "Site",
           "datasource": {
             "type": "elasticsearch",
-            "uid": "${DS_ELASTICSEARCH}"
+            "uid": "elasticsearch-datasource"
           },
           "query": "{\"find\": \"terms\", \"field\": \"site.name.keyword\"}",
           "multi": true,
@@ -99,7 +77,7 @@
         {
           "datasource": {
             "type": "elasticsearch",
-            "uid": "${DS_ELASTICSEARCH}"
+            "uid": "elasticsearch-datasource"
           },
           "enable": true,
           "name": "Deployment Events",
@@ -123,7 +101,7 @@
           {
             "datasource": {
               "type": "elasticsearch",
-              "uid": "${DS_ELASTICSEARCH}"
+              "uid": "elasticsearch-datasource"
             },
             "query": "site.name.keyword:($site_name)",
             "metrics": [
@@ -182,7 +160,7 @@
           {
             "datasource": {
               "type": "elasticsearch",
-              "uid": "${DS_ELASTICSEARCH}"
+              "uid": "elasticsearch-datasource"
             },
             "query": "status.success:true AND site.name.keyword:($site_name)",
             "metrics": [
@@ -241,7 +219,7 @@
           {
             "datasource": {
               "type": "elasticsearch",
-              "uid": "${DS_ELASTICSEARCH}"
+              "uid": "elasticsearch-datasource"
             },
             "query": "status.success:true AND site.name.keyword:($site_name)",
             "metrics": [
@@ -250,9 +228,7 @@
                 "type": "percentiles",
                 "field": "timings.total_duration_ms",
                 "settings": {
-                  "percents": [
-                    "95"
-                  ]
+                  "percents": ["95"]
                 }
               }
             ],
@@ -305,7 +281,7 @@
           {
             "datasource": {
               "type": "elasticsearch",
-              "uid": "${DS_ELASTICSEARCH}"
+              "uid": "elasticsearch-datasource"
             },
             "query": "site.name.keyword:($site_name)",
             "metrics": [
@@ -354,7 +330,7 @@
           {
             "datasource": {
               "type": "elasticsearch",
-              "uid": "${DS_ELASTICSEARCH}"
+              "uid": "elasticsearch-datasource"
             },
             "query": "site.name.keyword:($site_name)",
             "alias": "Success Rate",
@@ -408,7 +384,7 @@
               "lineInterpolation": "smooth",
               "fillOpacity": 60,
               "spanNulls": false,
-              "insertNulls": 150000,
+            "insertNulls": 150000,
               "showPoints": "never",
               "axisPlacement": "auto",
               "stacking": {
@@ -479,9 +455,7 @@
             "displayMode": "list",
             "placement": "bottom",
             "showLegend": true,
-            "calcs": [
-              "mean"
-            ]
+            "calcs": ["mean"]
           }
         }
       },
@@ -500,7 +474,7 @@
           {
             "datasource": {
               "type": "elasticsearch",
-              "uid": "${DS_ELASTICSEARCH}"
+              "uid": "elasticsearch-datasource"
             },
             "query": "status.success:true AND site.name.keyword:($site_name)",
             "alias": "Average",
@@ -527,7 +501,7 @@
           {
             "datasource": {
               "type": "elasticsearch",
-              "uid": "${DS_ELASTICSEARCH}"
+              "uid": "elasticsearch-datasource"
             },
             "query": "status.success:true AND site.name.keyword:($site_name)",
             "alias": "P95",
@@ -537,9 +511,7 @@
                 "type": "percentiles",
                 "field": "timings.total_duration_ms",
                 "settings": {
-                  "percents": [
-                    "95"
-                  ]
+                  "percents": ["95"]
                 }
               }
             ],
@@ -559,7 +531,7 @@
           {
             "datasource": {
               "type": "elasticsearch",
-              "uid": "${DS_ELASTICSEARCH}"
+              "uid": "elasticsearch-datasource"
             },
             "query": "status.success:true AND site.name.keyword:($site_name)",
             "alias": "P99",
@@ -569,9 +541,7 @@
                 "type": "percentiles",
                 "field": "timings.total_duration_ms",
                 "settings": {
-                  "percents": [
-                    "99"
-                  ]
+                  "percents": ["99"]
                 }
               }
             ],
@@ -597,7 +567,7 @@
               "lineInterpolation": "smooth",
               "fillOpacity": 0,
               "spanNulls": false,
-              "insertNulls": 150000,
+            "insertNulls": 150000,
               "showPoints": "never"
             }
           },
@@ -611,10 +581,7 @@
                 {
                   "id": "custom.lineStyle",
                   "value": {
-                    "dash": [
-                      10,
-                      10
-                    ],
+                    "dash": [10, 10],
                     "fill": "dash"
                   }
                 }
@@ -647,7 +614,7 @@
           {
             "datasource": {
               "type": "elasticsearch",
-              "uid": "${DS_ELASTICSEARCH}"
+              "uid": "elasticsearch-datasource"
             },
             "query": "status.success:true AND site.name.keyword:($site_name)",
             "alias": "Avg DNS",
@@ -695,7 +662,7 @@
           {
             "datasource": {
               "type": "elasticsearch",
-              "uid": "${DS_ELASTICSEARCH}"
+              "uid": "elasticsearch-datasource"
             },
             "query": "status.success:true AND site.name.keyword:($site_name)",
             "alias": "Avg TCP",
@@ -743,7 +710,7 @@
           {
             "datasource": {
               "type": "elasticsearch",
-              "uid": "${DS_ELASTICSEARCH}"
+              "uid": "elasticsearch-datasource"
             },
             "query": "status.success:true AND site.name.keyword:($site_name)",
             "alias": "Avg TLS",
@@ -786,12 +753,12 @@
           "y": 20
         },
         "type": "bargauge",
-        "title": "Success Rate by Site",
+        "title": "Success Rate by Site (Last 24h)",
         "targets": [
           {
             "datasource": {
               "type": "elasticsearch",
-              "uid": "${DS_ELASTICSEARCH}"
+              "uid": "elasticsearch-datasource"
             },
             "query": "site.name.keyword:($site_name)",
             "metrics": [
@@ -855,12 +822,12 @@
           "y": 20
         },
         "type": "piechart",
-        "title": "Error Distribution",
+        "title": "Error Distribution (Last 24h)",
         "targets": [
           {
             "datasource": {
               "type": "elasticsearch",
-              "uid": "${DS_ELASTICSEARCH}"
+              "uid": "elasticsearch-datasource"
             },
             "query": "status.success:false AND site.name.keyword:($site_name)",
             "metrics": [
@@ -874,7 +841,7 @@
               {
                 "id": "2",
                 "type": "terms",
-                "field": "error.error_type.keyword",
+                "field": "status.error.type.keyword",
                 "settings": {
                   "size": "10",
                   "order": "desc",
@@ -889,16 +856,10 @@
             "displayMode": "table",
             "placement": "right",
             "showLegend": true,
-            "values": [
-              "value",
-              "percent"
-            ]
+            "values": ["value", "percent"]
           },
           "pieType": "donut",
-          "displayLabels": [
-            "name",
-            "percent"
-          ]
+          "displayLabels": ["name", "percent"]
         }
       },
       {
@@ -915,7 +876,7 @@
           {
             "datasource": {
               "type": "elasticsearch",
-              "uid": "${DS_ELASTICSEARCH}"
+              "uid": "elasticsearch-datasource"
             },
             "query": "status.success:false AND site.name.keyword:($site_name)",
             "metrics": [
@@ -941,18 +902,16 @@
                 "@timestamp": 0,
                 "site.name": 1,
                 "site.url": 2,
-                "error.error_type": 3,
-                "error.failure_phase": 4,
-                "error.error_message": 5,
-                "timings.total_duration_ms": 6
+                "status.error.type": 3,
+                "status.error.message": 4,
+                "timings.total_duration_ms": 5
               },
               "renameByName": {
                 "@timestamp": "Time",
                 "site.name": "Site",
                 "site.url": "URL",
-                "error.error_type": "Error Type",
-                "error.failure_phase": "Failure Phase",
-                "error.error_message": "Error Message",
+                "status.error.type": "Error Type",
+                "status.error.message": "Error Message",
                 "timings.total_duration_ms": "Duration (ms)"
               }
             }
@@ -994,74 +953,7 @@
                   "value": 120
                 }
               ]
-            },
-            {
-              "matcher": {
-                "id": "byName",
-                "options": "Failure Phase"
-              },
-              "properties": [
-                {
-                  "id": "custom.width",
-                  "value": 120
-                }
-              ]
             }
-          ]
-        }
-      },
-      {
-        "id": 13,
-        "gridPos": {
-          "h": 8,
-          "w": 12,
-          "x": 0,
-          "y": 20
-        },
-        "type": "piechart",
-        "title": "Failures by Phase",
-        "targets": [
-          {
-            "datasource": {
-              "type": "elasticsearch",
-              "uid": "${DS_ELASTICSEARCH}"
-            },
-            "query": "status.success:false AND site.name.keyword:($site_name)",
-            "metrics": [
-              {
-                "id": "1",
-                "type": "count"
-              }
-            ],
-            "timeField": "@timestamp",
-            "bucketAggs": [
-              {
-                "id": "2",
-                "type": "terms",
-                "field": "error.failure_phase.keyword",
-                "settings": {
-                  "size": "10",
-                  "order": "desc",
-                  "orderBy": "_count"
-                }
-              }
-            ]
-          }
-        ],
-        "options": {
-          "legend": {
-            "displayMode": "table",
-            "placement": "right",
-            "showLegend": true,
-            "values": [
-              "value",
-              "percent"
-            ]
-          },
-          "pieType": "donut",
-          "displayLabels": [
-            "name",
-            "percent"
           ]
         }
       }
