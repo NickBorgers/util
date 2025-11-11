@@ -648,9 +648,7 @@ func (s *SNMPOutput) handleMIBRequest(w http.ResponseWriter, r *http.Request) {
 
 // handleOIDListRequest handles HTTP requests for the list of available OIDs
 func (s *SNMPOutput) handleOIDListRequest(w http.ResponseWriter, r *http.Request) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
+	// No lock needed here - getAllOIDs handles its own locking
 	oids := s.getAllOIDs()
 
 	w.Header().Set("Content-Type", "application/json")
