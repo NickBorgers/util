@@ -80,6 +80,8 @@ The monitor runs **continuously**, testing sites one at a time (like a real pers
 
 * ✅ **Real browser testing** - Uses headless Chrome via CDP
 * ✅ **Comprehensive timing metrics** - DNS, TCP, TLS, TTFB, DOM loaded, page load, network idle
+* ✅ **Network failure phase detection** - Pinpoints which layer failed (DNS, TCP, TLS, HTTP) using timing analysis
+* ✅ **Chrome error code capture** - Reports specific errors (ERR_NAME_NOT_RESOLVED, ERR_CONNECTION_REFUSED, etc.)
 * ✅ **Accurate DNS measurements** - Uses host networking to measure real DNS resolution times (not Docker's cached DNS)
 * ✅ **Continuous monitoring** - Serial testing, natural traffic patterns
 * ✅ **Multiple outputs** - Logs, Elasticsearch, Prometheus, SNMP (SNMP not tested)
@@ -146,16 +148,19 @@ See [deployments/.env.example](deployments/.env.example) for all options.
 
 ## Example Output
 
+**Successful test:**
 ```json
 {
   "@timestamp": "2025-01-08T15:23:45.123Z",
+  "test_id": "550e8400-e29b-41d4-a716-446655440000",
   "site": {
     "url": "https://www.google.com",
     "name": "google"
   },
   "status": {
     "success": true,
-    "http_status": 200
+    "http_status": 200,
+    "message": "Page loaded successfully"
   },
   "timings": {
     "dns_lookup_ms": 12,
@@ -165,9 +170,51 @@ See [deployments/.env.example](deployments/.env.example) for all options.
     "dom_content_loaded_ms": 432,
     "network_idle_ms": 1234,
     "total_duration_ms": 1456
+  },
+  "metadata": {
+    "hostname": "monitor-01",
+    "version": "1.3.0"
   }
 }
 ```
+
+**Failed test with phase detection:**
+```json
+{
+  "@timestamp": "2025-11-11T14:28:40.859Z",
+  "test_id": "660e8400-e29b-41d4-a716-446655440001",
+  "site": {
+    "url": "https://this-does-not-exist-12345.com",
+    "name": "test-site"
+  },
+  "status": {
+    "success": false,
+    "message": "Failed to load page"
+  },
+  "error": {
+    "error_type": "ERR_NAME_NOT_RESOLVED",
+    "error_message": "page load error net::ERR_NAME_NOT_RESOLVED",
+    "failure_phase": "dns"
+  },
+  "timings": {
+    "dns_lookup_ms": null,
+    "tcp_connection_ms": null,
+    "tls_handshake_ms": null,
+    "total_duration_ms": 10393
+  },
+  "metadata": {
+    "hostname": "monitor-01",
+    "version": "1.3.0"
+  }
+}
+```
+
+The `failure_phase` field indicates which network layer failed:
+- **dns** - DNS resolution failed (hostname couldn't be resolved)
+- **tcp** - TCP connection failed (DNS succeeded, but couldn't connect)
+- **tls** - TLS handshake failed (connection established, but TLS negotiation failed)
+- **http** - HTTP request failed (all connections succeeded, but HTTP request/response failed)
+- **unknown** - Failure phase couldn't be determined
 
 ## Installation
 

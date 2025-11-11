@@ -69,11 +69,17 @@ type TimingMetrics struct {
 
 // ErrorInfo contains error details when a test fails
 type ErrorInfo struct {
-	// ErrorType categorizes the error (e.g., "timeout", "dns", "connection")
+	// ErrorType is Chrome's error code (e.g., "ERR_NAME_NOT_RESOLVED", "ERR_ABORTED", "timeout")
+	// For chromedp errors without Chrome codes, use simplified types: "timeout", "unknown"
 	ErrorType string `json:"error_type"`
 
 	// ErrorMessage is the human-readable error message
 	ErrorMessage string `json:"error_message"`
+
+	// FailurePhase indicates which network layer failed (inferred from timing)
+	// Values: "dns", "tcp", "tls", "http", "unknown"
+	// Empty for successful requests
+	FailurePhase string `json:"failure_phase,omitempty"`
 
 	// StackTrace contains the error stack (for debugging)
 	StackTrace string `json:"stack_trace,omitempty"`

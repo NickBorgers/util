@@ -38,25 +38,36 @@
             "http_status": {
               "type": "integer"
             },
-            "error": {
-              "properties": {
-                "type": {
-                  "type": "keyword"
-                },
-                "message": {
-                  "type": "text",
-                  "fields": {
-                    "keyword": {
-                      "type": "keyword",
-                      "ignore_above": 256
-                    }
-                  }
-                },
-                "timestamp": {
-                  "type": "date",
-                  "format": "strict_date_optional_time||epoch_millis"
+            "message": {
+              "type": "text",
+              "fields": {
+                "keyword": {
+                  "type": "keyword",
+                  "ignore_above": 256
                 }
               }
+            }
+          }
+        },
+        "error": {
+          "properties": {
+            "error_type": {
+              "type": "keyword"
+            },
+            "error_message": {
+              "type": "text",
+              "fields": {
+                "keyword": {
+                  "type": "keyword",
+                  "ignore_above": 512
+                }
+              }
+            },
+            "failure_phase": {
+              "type": "keyword"
+            },
+            "stack_trace": {
+              "type": "text"
             }
           }
         },
@@ -77,6 +88,9 @@
             "dom_content_loaded_ms": {
               "type": "integer"
             },
+            "full_page_load_ms": {
+              "type": "integer"
+            },
             "network_idle_ms": {
               "type": "integer"
             },
@@ -85,8 +99,14 @@
             }
           }
         },
-        "browser": {
+        "metadata": {
           "properties": {
+            "hostname": {
+              "type": "keyword"
+            },
+            "version": {
+              "type": "keyword"
+            },
             "user_agent": {
               "type": "text",
               "fields": {
@@ -95,19 +115,6 @@
                   "ignore_above": 256
                 }
               }
-            },
-            "viewport": {
-              "type": "keyword"
-            }
-          }
-        },
-        "environment": {
-          "properties": {
-            "monitor_hostname": {
-              "type": "keyword"
-            },
-            "monitor_version": {
-              "type": "keyword"
             }
           }
         }
@@ -116,10 +123,12 @@
   },
   "priority": 500,
   "composed_of": [],
-  "version": 1,
+  "version": 2,
   "_meta": {
     "description": "Index template for Internet Connection Monitor test results",
     "created_by": "internet-connection-monitor",
-    "created_at": "2025-01-08"
+    "created_at": "2025-01-08",
+    "updated_at": "2025-11-11",
+    "changes": "Added failure_phase field, updated schema to match v1.3.0 data model"
   }
 }

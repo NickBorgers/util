@@ -753,7 +753,7 @@
           "y": 20
         },
         "type": "bargauge",
-        "title": "Success Rate by Site (Last 24h)",
+        "title": "Success Rate by Site",
         "targets": [
           {
             "datasource": {
@@ -822,7 +822,7 @@
           "y": 20
         },
         "type": "piechart",
-        "title": "Error Distribution (Last 24h)",
+        "title": "Error Distribution",
         "targets": [
           {
             "datasource": {

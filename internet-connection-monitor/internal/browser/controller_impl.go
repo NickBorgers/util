@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/chromedp/cdproto/network"
 	"github.com/chromedp/chromedp"
 	"github.com/google/uuid"
 	"github.com/nickborgers/monorepo/internet-connection-monitor/internal/config"
@@ -99,10 +100,13 @@ func (c *ControllerImpl) TestSite(ctx context.Context, site models.SiteDefinitio
 		},
 		Metadata: models.TestMetadata{
 			Hostname:  c.hostname,
-			Version:   "1.2.1",
+			Version:   "1.3.0",
 			UserAgent: c.config.UserAgent,
 		},
 	}
+
+	// Set up network listener before navigation
+	networkCapture := SetupNetworkListener(taskCtx)
 
 	startTime := time.Now()
 
@@ -110,6 +114,9 @@ func (c *ControllerImpl) TestSite(ctx context.Context, site models.SiteDefinitio
 	var navigationEntry map[string]interface{}
 
 	err := chromedp.Run(taskCtx,
+		// Enable network events to capture Chrome error codes
+		network.Enable(),
+
 		// Navigate to the URL
 		chromedp.Navigate(site.URL),
 
@@ -148,6 +155,14 @@ func (c *ControllerImpl) TestSite(ctx context.Context, site models.SiteDefinitio
 
 	totalDuration := time.Since(startTime).Milliseconds()
 
+	// Extract timing metrics from performance data (works for both success and failure)
+	result.Timings = extractTimings(navigationEntry, totalDuration)
+
+	// Merge network timing if available (fills gaps in Performance API data)
+	if networkCapture.GetTiming() != nil {
+		mergeNetworkTiming(&result.Timings, networkCapture.GetTiming())
+	}
+
 	// Handle errors
 	if err != nil {
 		// Check if this is a Chrome startup failure (resource exhaustion, not an Internet issue)
@@ -157,20 +172,21 @@ func (c *ControllerImpl) TestSite(ctx context.Context, site models.SiteDefinitio
 			return nil, ErrChromeStartupFailure
 		}
 
+		// Enhanced error classification with Chrome error codes and phase detection
+		errorType := parseErrorType(err, networkCapture.GetErrorText())
+		failurePhase := inferFailurePhase(&result.Timings, site.URL)
+
 		result.Status.Success = false
 		result.Status.Message = "Failed to load page"
 		result.Error = &models.ErrorInfo{
-			ErrorType:    categorizeError(err),
+			ErrorType:    errorType,
 			ErrorMessage: err.Error(),
+			FailurePhase: failurePhase,
 		}
-		// Extract whatever timing data is available, even on error
-		// For example, if an HTTP timeout occurs, we may still have DNS and TLS timing data
-		result.Timings = extractTimings(navigationEntry, totalDuration)
 		return result, nil // Return result even on error (for logging)
 	}
 
-	// Extract timing metrics from performance data
-	result.Timings = extractTimings(navigationEntry, totalDuration)
+	// Success case
 	result.Status.Success = true
 	result.Status.HTTPStatus = 200 // Navigation succeeded
 	result.Status.Message = "Page loaded successfully"
@@ -282,28 +298,4 @@ func isChromeStartupFailure(err error) bool {
 		strings.Contains(errStr, "failed to start chrome") ||
 		strings.Contains(errStr, "failed to allocate") ||
 		strings.Contains(errStr, "cannot start chrome")
-}
-
-// categorizeError determines the error type
-func categorizeError(err error) string {
-	errStr := strings.ToLower(err.Error())
-
-	switch {
-	case strings.Contains(errStr, "context deadline exceeded"):
-		return "timeout"
-	case strings.Contains(errStr, "context canceled"):
-		return "timeout"
-	case strings.Contains(errStr, "dns"):
-		return "dns"
-	case strings.Contains(errStr, "connection refused"):
-		return "connection_refused"
-	case strings.Contains(errStr, "tls"):
-		return "tls"
-	case strings.Contains(errStr, "timeout"):
-		return "timeout"
-	case strings.Contains(errStr, "no such host"):
-		return "dns"
-	default:
-		return "unknown"
-	}
 }
