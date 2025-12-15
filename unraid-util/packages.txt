@@ -5,3 +5,5 @@ dnsutils
 iproute2
 xxd
 ethtool
+rsync
+git
