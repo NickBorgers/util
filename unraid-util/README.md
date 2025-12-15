@@ -29,3 +29,39 @@ apt install dnsutils
 
 It's an Ubuntu instance, do what you will.
 
+## Disk Management Scripts
+
+This container includes the [unraid-diskmv](https://github.com/trinapicot/unraid-diskmv) scripts for moving files between disks:
+
+### diskmv
+Move files or directories between disks within a user share:
+```bash
+# Test mode (default - no files moved)
+diskmv /path/to/share disk1 disk2
+
+# Force mode (actually moves files)
+diskmv -f /path/to/share disk1 disk2
+```
+
+Options:
+- `-f` Force execution (default is test mode)
+- `-s SIZE` Only move files larger than SIZE (e.g., `-s 1G`)
+- `-e EXT` Only move files with extension EXT
+- `-c` Clobber/overwrite existing files
+- `-v` Verbose output
+- `-q` Quiet output
+
+### consld8
+Consolidate a user share directory from multiple disks onto a single disk:
+```bash
+# Test mode (default)
+consld8 /path/to/share
+
+# Force mode with specific destination disk
+consld8 -f /path/to/share disk3
+```
+
+If no destination disk is specified, it automatically selects one based on current usage and available space.
+
+**Warning**: These tools move files. Always back up important data before use.
+
