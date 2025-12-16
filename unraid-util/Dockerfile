@@ -20,4 +20,21 @@ RUN git clone --depth 1 https://github.com/trinapicot/unraid-diskmv.git /tmp/unr
     chmod +x /usr/local/bin/diskmv /usr/local/bin/consld8 && \
     rm -rf /tmp/unraid-diskmv
 
+# Install nputop - Intel NPU monitoring tool
+# https://github.com/ZoLArk173/nputop
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends curl build-essential && \
+    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y && \
+    . $HOME/.cargo/env && \
+    git clone --depth 1 https://github.com/ZoLArk173/nputop.git /tmp/nputop && \
+    cd /tmp/nputop && \
+    cargo build --release && \
+    cp target/release/nputop /usr/local/bin/ && \
+    chmod +x /usr/local/bin/nputop && \
+    cd / && \
+    rm -rf /tmp/nputop $HOME/.cargo $HOME/.rustup && \
+    apt-get purge -y build-essential && \
+    apt-get autoremove -y && \
+    rm -rf /var/lib/apt/lists/*
+
 ENTRYPOINT ["/entrypoint.sh"]

@@ -29,6 +29,18 @@ apt install dnsutils
 
 It's an Ubuntu instance, do what you will.
 
+## Intel NPU Monitoring
+
+This container includes [nputop](https://github.com/ZoLArk173/nputop), a terminal-based monitoring tool for Intel Neural Processing Units (NPUs):
+
+```bash
+nputop
+```
+
+This displays real-time NPU usage similar to how `nvtop` works for NVIDIA GPUs. Useful for monitoring AI/ML workloads on Intel systems with NPU hardware.
+
+**Note**: Requires Intel NPU hardware and appropriate host device passthrough to the container.
+
 ## Disk Management Scripts
 
 This container includes the [unraid-diskmv](https://github.com/trinapicot/unraid-diskmv) scripts for moving files between disks:
