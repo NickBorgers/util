@@ -75,6 +75,10 @@ function update_pdf() {
 	docker run --rm -t --volume=$(pwd):/content/ --workdir=/content/ --network=none nickborgers/update-pdf ash -c "gs -sDEVICE=pdfwrite -dCompatibilityLevel=1.4 -o /content/1_4.\"$1\" /content/\"$1\""
 }
 
+function md_to_pdf() {
+	docker run --rm -t --volume=$(pwd):/data/ --workdir=/data/ --network=none ghcr.io/nickborgers/md-to-pdf:latest "$1" "${2:-${1%.md}.pdf}"
+}
+
 function get_docker_pids() {
 	docker ps --format '{{.ID}} {{.Names}}' | while read cid cname; do \
 	  for pid in $(docker inspect --format '{{.State.Pid}}' "$cid"); do \
