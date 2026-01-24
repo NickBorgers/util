@@ -76,7 +76,7 @@ function update_pdf() {
 }
 
 function md_to_pdf() {
-	docker run --rm -t --volume=$(pwd):/data/ --workdir=/data/ --network=none ghcr.io/nickborgers/md-to-pdf:latest "$1" "${2:-${1%.md}.pdf}"
+	docker run --rm -t --volume=$(pwd):/data/ --workdir=/data/ --network=none ghcr.io/nickborgers/util/md-to-pdf:latest "$1" "${2:-${1%.md}.pdf}"
 }
 
 function get_docker_pids() {
