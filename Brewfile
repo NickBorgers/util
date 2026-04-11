@@ -1,0 +1,5 @@
+brew "git"
+brew "tmux"
+brew "jq"
+brew "wget"
+brew "htop"
