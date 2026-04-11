@@ -119,9 +119,14 @@ function network_blip() {
     } >>"$LOGFILE" 2>&1
 }
 
-# Activate mise if installed (provides node/npm for devcontainer CLI)
-if command -v mise &> /dev/null; then
-	eval "$(mise activate "$(basename "$SHELL")")"
+# Add mise shims to PATH if present (provides node/npm for devcontainer CLI).
+# Using shims instead of `mise activate` so node resolves inside function bodies,
+# not just after the next prompt fires (activate uses PROMPT_COMMAND hook).
+if [ -d "$HOME/.local/share/mise/shims" ]; then
+	case ":$PATH:" in
+		*":$HOME/.local/share/mise/shims:"*) ;;
+		*) export PATH="$HOME/.local/share/mise/shims:$PATH" ;;
+	esac
 fi
 
 function _ensure_devcontainer_cli() {
@@ -139,9 +144,16 @@ function _ensure_devcontainer_cli() {
 			echo "deb [signed-by=/etc/apt/keyrings/mise-archive-keyring.gpg arch=amd64] https://mise.jdx.dev/deb stable main" | sudo tee /etc/apt/sources.list.d/mise.list && \
 			sudo apt-get update && sudo apt-get install -y mise || { echo "Failed to install mise"; return 1; }
 		fi
-		eval "$(mise activate "$(basename "$SHELL")")"
 	fi
-	mise use --global node@lts && \
+	mise use --global node@lts || { echo "Failed to install node via mise"; return 1; }
+	# Ensure mise shims are on PATH for the rest of this shell so node/npm/devcontainer
+	# resolve immediately (without waiting for PROMPT_COMMAND).
+	if [ -d "$HOME/.local/share/mise/shims" ]; then
+		case ":$PATH:" in
+			*":$HOME/.local/share/mise/shims:"*) ;;
+			*) export PATH="$HOME/.local/share/mise/shims:$PATH" ;;
+		esac
+	fi
 	npm config set prefix ~/.local && \
 	npm install -g @devcontainers/cli || { echo "Failed to install devcontainer CLI"; return 1; }
 }
