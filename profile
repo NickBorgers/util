@@ -119,6 +119,11 @@ function network_blip() {
     } >>"$LOGFILE" 2>&1
 }
 
+# Activate mise if installed (provides node/npm for devcontainer CLI)
+if [ -x "$HOME/.local/bin/mise" ]; then
+	eval "$("$HOME/.local/bin/mise" activate bash)"
+fi
+
 function dcs() {
 	if ! command -v devcontainer &> /dev/null; then
 		echo "devcontainer CLI not found, installing..."
