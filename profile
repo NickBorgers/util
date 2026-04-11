@@ -164,3 +164,5 @@ function dcr() {
 	devcontainer exec --workspace-folder "$workspace" tmux new-session -A -s "$session"
 }
 
+alias claude-yolo='claude --dangerously-skip-permissions'
+
