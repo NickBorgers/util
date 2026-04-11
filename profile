@@ -119,3 +119,35 @@ function network_blip() {
     } >>"$LOGFILE" 2>&1
 }
 
+function dcs() {
+	if ! command -v devcontainer &> /dev/null; then
+		echo "devcontainer CLI not found, installing..."
+		curl -s https://mise.run | sh && \
+		eval "$("$HOME/.local/bin/mise" activate bash)" && \
+		"$HOME/.local/bin/mise" use --global node@lts && \
+		npm config set prefix ~/.local && \
+		npm install -g @devcontainers/cli || { echo "Failed to install devcontainer CLI"; return 1; }
+	fi
+	local workspace="${1:-.}"
+	local session
+	session=$(basename "$workspace")
+	devcontainer up --workspace-folder "$workspace" && \
+	devcontainer exec --workspace-folder "$workspace" tmux new-session -A -s "$session"
+}
+
+function dcr() {
+	if ! command -v devcontainer &> /dev/null; then
+		echo "devcontainer CLI not found, installing..."
+		curl -s https://mise.run | sh && \
+		eval "$("$HOME/.local/bin/mise" activate bash)" && \
+		"$HOME/.local/bin/mise" use --global node@lts && \
+		npm config set prefix ~/.local && \
+		npm install -g @devcontainers/cli || { echo "Failed to install devcontainer CLI"; return 1; }
+	fi
+	local workspace="${1:-.}"
+	local session
+	session=$(basename "$workspace")
+	devcontainer up --workspace-folder "$workspace" --remove-existing-container && \
+	devcontainer exec --workspace-folder "$workspace" tmux new-session -A -s "$session"
+}
+
