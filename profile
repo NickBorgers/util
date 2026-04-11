@@ -120,19 +120,34 @@ function network_blip() {
 }
 
 # Activate mise if installed (provides node/npm for devcontainer CLI)
-if [ -x "$HOME/.local/bin/mise" ]; then
-	eval "$("$HOME/.local/bin/mise" activate bash)"
+if command -v mise &> /dev/null; then
+	eval "$(mise activate bash)"
 fi
 
-function dcs() {
-	if ! command -v devcontainer &> /dev/null; then
-		echo "devcontainer CLI not found, installing..."
-		curl -s https://mise.run | sh && \
-		eval "$("$HOME/.local/bin/mise" activate bash)" && \
-		"$HOME/.local/bin/mise" use --global node@lts && \
-		npm config set prefix ~/.local && \
-		npm install -g @devcontainers/cli || { echo "Failed to install devcontainer CLI"; return 1; }
+function _ensure_devcontainer_cli() {
+	if command -v devcontainer &> /dev/null; then
+		return 0
 	fi
+	echo "devcontainer CLI not found, installing..."
+	if ! command -v mise &> /dev/null; then
+		if [[ "$(uname)" == "Darwin" ]]; then
+			brew install mise || { echo "Failed to install mise"; return 1; }
+		else
+			sudo apt-get update && sudo apt-get install -y gpg sudo wget curl && \
+			sudo install -dm 755 /etc/apt/keyrings && \
+			wget -qO - https://mise.jdx.dev/gpg-key.pub | gpg --dearmor | sudo tee /etc/apt/keyrings/mise-archive-keyring.gpg 1> /dev/null && \
+			echo "deb [signed-by=/etc/apt/keyrings/mise-archive-keyring.gpg arch=amd64] https://mise.jdx.dev/deb stable main" | sudo tee /etc/apt/sources.list.d/mise.list && \
+			sudo apt-get update && sudo apt-get install -y mise || { echo "Failed to install mise"; return 1; }
+		fi
+		eval "$(mise activate bash)"
+	fi
+	mise use --global node@lts && \
+	npm config set prefix ~/.local && \
+	npm install -g @devcontainers/cli || { echo "Failed to install devcontainer CLI"; return 1; }
+}
+
+function dcs() {
+	_ensure_devcontainer_cli || return 1
 	local workspace="${1:-.}"
 	local session
 	session=$(basename "$workspace")
@@ -141,14 +156,7 @@ function dcs() {
 }
 
 function dcr() {
-	if ! command -v devcontainer &> /dev/null; then
-		echo "devcontainer CLI not found, installing..."
-		curl -s https://mise.run | sh && \
-		eval "$("$HOME/.local/bin/mise" activate bash)" && \
-		"$HOME/.local/bin/mise" use --global node@lts && \
-		npm config set prefix ~/.local && \
-		npm install -g @devcontainers/cli || { echo "Failed to install devcontainer CLI"; return 1; }
-	fi
+	_ensure_devcontainer_cli || return 1
 	local workspace="${1:-.}"
 	local session
 	session=$(basename "$workspace")
