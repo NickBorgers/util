@@ -176,5 +176,15 @@ function dcr() {
 	devcontainer exec --workspace-folder "$workspace" tmux new-session -A -s "$session"
 }
 
+function ssht() {
+	local host="$1"
+	local session="${2:-main}"
+	if [ -z "$host" ]; then
+		echo "Usage: ssht <host> [session-name]"
+		return 1
+	fi
+	ssh "$host" -t "tmux attach -t $session || tmux new-session -s $session"
+}
+
 alias claude-yolo='claude --dangerously-skip-permissions'
 

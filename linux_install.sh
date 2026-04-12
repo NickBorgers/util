@@ -70,14 +70,18 @@ else
     echo "Created ~/.tmux.conf symlink."
 fi
 
-# 6. Install caveman hooks for Claude Code
+# 6. Install caveman plugin for Claude Code
 echo ""
-echo "Installing caveman hooks for Claude Code..."
-if command -v python3 &>/dev/null; then
-    bash <(curl -fsSL https://raw.githubusercontent.com/NickBorgers/caveman/main/hooks/install.sh)
+echo "Installing caveman plugin for Claude Code..."
+if command -v claude &>/dev/null; then
+    claude plugin marketplace add NickBorgers/caveman 2>/dev/null || true
+    claude plugin install caveman 2>/dev/null || true
+    echo "Caveman plugin installed."
 else
-    echo "WARNING: python3 not found — skipping caveman hook install."
-    echo "  Install Python 3.8+ and run: bash <(curl -s https://raw.githubusercontent.com/NickBorgers/caveman/main/hooks/install.sh)"
+    echo "WARNING: claude CLI not found — skipping caveman plugin install."
+    echo "  Install Claude Code and run:"
+    echo "    claude plugin marketplace add NickBorgers/caveman"
+    echo "    claude plugin install caveman"
 fi
 
 # 7. Summary
