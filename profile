@@ -164,16 +164,14 @@ function dcs() {
 	local session
 	session=$(basename "$workspace")
 	devcontainer up --workspace-folder "$workspace" && \
-	devcontainer exec --workspace-folder "$workspace" tmux new-session -A -s "$session"
+	devcontainer exec --workspace-folder "$workspace" bash
 }
 
 function dcr() {
 	_ensure_devcontainer_cli || return 1
 	local workspace="${1:-.}"
-	local session
-	session=$(basename "$workspace")
 	devcontainer up --workspace-folder "$workspace" --remove-existing-container && \
-	devcontainer exec --workspace-folder "$workspace" tmux new-session -A -s "$session"
+	devcontainer exec --workspace-folder "$workspace" bash
 }
 
 function ssht() {
