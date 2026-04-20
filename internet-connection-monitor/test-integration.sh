@@ -285,6 +285,18 @@ else
 fi
 echo ""
 
+# Step 13: Verify SNMP agent
+log_info "Step 13: Verifying SNMP agent via gosnmp client..."
+if SNMP_OUTPUT=$(go run ./cmd/snmpcheck -target 127.0.0.1 -port 161 -community public -base .1.3.6.1.4.1.99999 -retries 5 2>&1); then
+    log_success "SNMP agent responded to queries"
+    echo "$SNMP_OUTPUT"
+else
+    log_error "SNMP verification failed"
+    echo "$SNMP_OUTPUT"
+    exit 1
+fi
+echo ""
+
 # Final summary
 echo -e "${CYAN}╔════════════════════════════════════════════════════════════════╗${NC}"
 echo -e "${CYAN}║  Integration Test Results                                      ║${NC}"
@@ -298,6 +310,7 @@ log_success "✓ Grafana datasource is configured"
 log_success "✓ Grafana can query data from Elasticsearch"
 log_success "✓ Prometheus metrics endpoint is working"
 log_success "✓ Health endpoint is working"
+log_success "✓ SNMP agent responded to queries"
 echo ""
 echo -e "${GREEN}╔════════════════════════════════════════════════════════════════╗${NC}"
 echo -e "${GREEN}║  ALL INTEGRATION TESTS PASSED                                  ║${NC}"

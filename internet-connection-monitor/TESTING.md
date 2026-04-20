@@ -33,9 +33,9 @@ The integration tests validate the complete data flow from the monitor through E
 - ✅ Grafana can query Elasticsearch data
 
 **What Is NOT Tested:**
-- ❌ SNMP agent (implemented but not validated)
-- ❌ Output module initialization for SNMP
-- ❌ SNMP data export functionality
+- ✅ SNMP agent request handling (validated via unit test `TestSNMPAgentRespondsToGetAndWalk`)
+- ⚠️ Output module initialization for SNMP (covered indirectly, but still missing end-to-end validation)
+- ⚠️ SNMP data export functionality (MIB export remains manual)
 
 ### ✅ Unit Tests (Implemented)
 
@@ -94,7 +94,7 @@ The integration tests validate the complete data flow from the monitor through E
 5. **Output Modules** (`internal/outputs/`)
    - ❌ Prometheus metrics registration (integration tested but no unit tests)
    - ❌ Elasticsearch bulk indexing (integration tested but no unit tests)
-   - ❌ SNMP agent (NOT tested at all - no unit or integration tests)
+   - ✅ SNMP agent basic request/response behaviour (`TestSNMPAgentRespondsToGetAndWalk`)
    - ❌ JSON logger (integration tested but no unit tests)
 
 6. **Environment Variable Loading** (`internal/config/loader.go:LoadFromEnv()`)
