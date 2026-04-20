@@ -67,6 +67,22 @@ def smart_crop_container(
         # Find a free port to avoid conflicts between tests
         port = find_free_port()
 
+        # Convert container path to host path for Docker-in-Docker
+        # When running tests in Docker, we need to mount the actual host path
+        import os
+        host_workspace_dir = os.environ.get('HOST_WORKSPACE_DIR')
+        if host_workspace_dir:
+            # We're running in Docker, convert /workspace path to host path
+            work_dir_str = str(temp_workdir)
+            if work_dir_str.startswith('/workspace'):
+                # Replace /workspace with the actual host path
+                host_work_dir = work_dir_str.replace('/workspace', host_workspace_dir, 1)
+            else:
+                host_work_dir = work_dir_str
+        else:
+            # Running directly on host
+            host_work_dir = str(temp_workdir)
+
         # Start container with port mapping and volume mount
         container = docker_client.containers.run(
             docker_image,
@@ -77,19 +93,20 @@ def smart_crop_container(
             tty=True,  # Allocate pseudo-TTY (makes sys.stdin.isatty() return True)
             ports={"8765/tcp": port},  # Map container port 8765 to dynamic host port
             volumes={
-                str(temp_workdir): {"bind": "/content", "mode": "rw"}
+                host_work_dir: {"bind": "/content", "mode": "rw"}
             },
             working_dir="/content",
             environment={
                 "PRESET": "ultrafast",  # Fast encoding for tests
                 "ANALYSIS_FRAMES": "10",  # Fewer frames for faster tests
-                "CROP_SCALE": "0.75"
+                "CROP_SCALE": "0.75",
+                "AUTO_CONFIRM": "true"  # Non-interactive mode for tests
             }
         )
 
         # Wait for Flask server to be ready
         base_url = f"http://localhost:{port}"
-        max_wait = 30
+        max_wait = 240  # Increased to allow for full workflow (analysis + encoding can take 3+ minutes)
         wait_interval = 0.5
         elapsed = 0
 
