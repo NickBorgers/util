@@ -174,14 +174,14 @@ function dcr() {
 	devcontainer exec --workspace-folder "$workspace" bash
 }
 
-function ssht() {
+function mosht() {
 	local host="$1"
 	local session="${2:-main}"
 	if [ -z "$host" ]; then
-		echo "Usage: ssht <host> [session-name]"
+		echo "Usage: mosht <host> [session-name]"
 		return 1
 	fi
-	ssh "$host" -t "tmux attach -t $session || tmux new-session -s $session"
+	mosh "$host" -- bash -c "tmux attach -t $session || tmux new-session -s $session"
 }
 
 alias claude-yolo='claude --dangerously-skip-permissions'
