@@ -13,5 +13,9 @@ docker>=6.1.0
 # HTTP requests
 requests>=2.31.0
 
+# Image processing for frame analysis
+Pillow>=10.0.0
+numpy>=1.24.0
+
 # Coverage (optional)
 pytest-cov>=4.1.0

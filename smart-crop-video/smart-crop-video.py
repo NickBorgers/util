@@ -579,6 +579,13 @@ def get_video_dimensions(input_file: str) -> Tuple[int, int]:
         input_file
     ]
     result = subprocess.run(cmd, capture_output=True, text=True)
+
+    if not result.stdout.strip():
+        raise ValueError(
+            f"ffprobe returned empty output for {input_file}. "
+            f"stderr: {result.stderr}, returncode: {result.returncode}"
+        )
+
     width, height = map(int, result.stdout.strip().split(','))
     return width, height
 
@@ -840,6 +847,9 @@ def identify_boring_sections(scenes: List[Scene], percentile_threshold: float = 
     """Identify boring sections based on metric values
 
     Returns list of (scene_index, speedup_factor) tuples
+
+    NOTE: Currently non-functional because Scene.metric_value is never populated
+    by analyze_temporal_patterns(). Scene metric calculation needs to be implemented.
     """
     if not scenes:
         return []
@@ -1371,10 +1381,14 @@ def main():
         print()
 
         # Interactive selection with web UI awareness
-        # First check if already selected via web UI before we got here
-        web_selection = state.get('selected_index')
-
-        if web_selection is not None:
+        # First check for non-interactive mode (used by tests and automated workflows)
+        if os.getenv('AUTO_CONFIRM'):
+            print("AUTO_CONFIRM enabled, using automatic selection")
+            selected = unique_candidates[0]
+            print(f"Using automatic selection: Position (x={selected.x}, y={selected.y}) with score: {selected.score:.2f}")
+            print(f"Strategy: {selected.strategy}")
+        # Then check if already selected via web UI before we got here
+        elif (web_selection := state.get('selected_index')) is not None:
             selected = unique_candidates[web_selection - 1]
             print(f"Using web UI selection #{web_selection}: Position (x={selected.x}, y={selected.y}) with score: {selected.score:.2f}")
             print(f"Strategy: {selected.strategy}")
@@ -1428,11 +1442,21 @@ def main():
                         choice = ""
                     elif choice is None:
                         # This shouldn't happen, but just in case
-                        choice = input()
+                        # Check for AUTO_CONFIRM before attempting input
+                        if os.getenv('AUTO_CONFIRM'):
+                            print("\n\nAUTO_CONFIRM enabled, using automatic selection")
+                            choice = ""
+                        else:
+                            choice = input()
             else:
                 # Not a terminal (piped input or non-interactive), read directly
-                print(f"Which crop looks best? [1-{len(unique_candidates)}] (or press Enter for automatic selection): ", end='', flush=True)
-                choice = input().strip()
+                # Check for AUTO_CONFIRM before attempting input
+                if os.getenv('AUTO_CONFIRM'):
+                    print("AUTO_CONFIRM enabled, using automatic selection")
+                    choice = ""
+                else:
+                    print(f"Which crop looks best? [1-{len(unique_candidates)}] (or press Enter for automatic selection): ", end='', flush=True)
+                    choice = input().strip()
 
             # Process text input choice if no web selection was made
             if web_selection is None:
@@ -1481,10 +1505,17 @@ def main():
     print("="*70)
     print()
 
+    # Check for explicit ENABLE_ACCELERATION setting first (for tests)
+    enable_accel_env = os.getenv('ENABLE_ACCELERATION')
+    if enable_accel_env is not None:
+        enable_speedup = enable_accel_env.lower() in ('true', '1', 'yes')
+        print(f"ENABLE_ACCELERATION set to: {enable_speedup}")
+    # Check for non-interactive mode
+    elif os.getenv('AUTO_CONFIRM'):
+        print("AUTO_CONFIRM enabled, defaulting to no acceleration")
+        enable_speedup = False
     # Check if web UI already made the choice
-    web_acceleration_choice = state.get('enable_acceleration')
-
-    if web_acceleration_choice is not None:
+    elif (web_acceleration_choice := state.get('enable_acceleration')) is not None:
         # Web UI made the choice
         print(f"Using web UI choice: {'Yes' if web_acceleration_choice else 'No'}")
         enable_speedup = web_acceleration_choice
@@ -1538,15 +1569,25 @@ def main():
                     enable_speedup = False
                 elif choice is None:
                     # This shouldn't happen, but just in case
-                    choice = input().strip()
-                    enable_speedup = choice.lower() in ('y', 'yes')
+                    # Check for AUTO_CONFIRM before attempting input
+                    if os.getenv('AUTO_CONFIRM'):
+                        print("\n\nAUTO_CONFIRM enabled, defaulting to no acceleration")
+                        enable_speedup = False
+                    else:
+                        choice = input().strip()
+                        enable_speedup = choice.lower() in ('y', 'yes')
                 else:
                     enable_speedup = choice.lower() in ('y', 'yes')
         else:
             # Not a terminal (piped input or non-interactive), read directly
-            print(f"Accelerate boring sections? [y/N]: ", end='', flush=True)
-            choice = input().strip()
-            enable_speedup = choice.lower() in ('y', 'yes')
+            # Check for AUTO_CONFIRM before attempting input
+            if os.getenv('AUTO_CONFIRM'):
+                print("AUTO_CONFIRM enabled, defaulting to no acceleration")
+                enable_speedup = False
+            else:
+                print(f"Accelerate boring sections? [y/N]: ", end='', flush=True)
+                choice = input().strip()
+                enable_speedup = choice.lower() in ('y', 'yes')
 
     scenes = None
     scene_selections = None
@@ -1556,40 +1597,65 @@ def main():
                                           selected_strategy, base_name, state)
 
         if scenes:
-            # Wait for user to select scenes (from web UI or text interface)
-            print()
-            print(f"Waiting for scene selection via web UI or text input...")
-            print(f"  - Web UI: Open http://localhost:{port} to select scenes visually")
-            print(f"  - Text: Scene thumbnails saved as {base_name}_scene_*_first.jpg and *_last.jpg")
-            print()
-
-            # Check if web UI already made selections
-            web_scene_selections = state.get('scene_selections')
-
-            if web_scene_selections is not None:
-                print(f"Using web UI selections: {len(web_scene_selections)} scenes to accelerate")
-                scene_selections = web_scene_selections
+            # Check for scene selections from environment variable first (used by tests)
+            scene_selections_env = os.getenv('SCENE_SELECTIONS')
+            if scene_selections_env:
+                # Parse format: "0:1.0,1:2.0,2:1.0" -> {1: 1.0, 2: 2.0, 3: 1.0} (convert to 1-based)
+                scene_selections = {}
+                for selection in scene_selections_env.split(','):
+                    idx_str, speed_str = selection.split(':')
+                    # Add 1 to convert from 0-based (test format) to 1-based (UI format)
+                    scene_selections[int(idx_str) + 1] = float(speed_str)
+                print(f"Using SCENE_SELECTIONS from environment: {len(scene_selections)} scenes to accelerate")
+            # Check for non-interactive mode - automatically detect boring sections
+            elif os.getenv('AUTO_CONFIRM'):
+                print("AUTO_CONFIRM enabled, automatically detecting boring sections")
+                # Auto-detect boring sections
+                boring_sections_list = identify_boring_sections(scenes)
+                # Convert to scene_selections format: {scene_idx: speedup_factor}
+                scene_selections = {}
+                for scene_idx, speedup_factor in boring_sections_list:
+                    # identify_boring_sections returns 0-based indices, convert to 1-based for UI format
+                    scene_selections[scene_idx + 1] = speedup_factor
+                if scene_selections:
+                    print(f"Auto-detected {len(scene_selections)} boring sections to accelerate")
+                else:
+                    print("No boring sections detected, no acceleration will be applied")
             else:
-                # Wait for web UI selection
-                max_wait = 600  # 10 minutes
-                poll_interval = 0.5
-                elapsed = 0
+                # Wait for user to select scenes (from web UI or text interface)
+                print()
+                print(f"Waiting for scene selection via web UI or text input...")
+                print(f"  - Web UI: Open http://localhost:{port} to select scenes visually")
+                print(f"  - Text: Scene thumbnails saved as {base_name}_scene_*_first.jpg and *_last.jpg")
+                print()
 
-                print("Waiting for scene selections from web UI...")
-                print(f"(Timeout in {max_wait}s)")
+                # Check if web UI already made selections
+                web_scene_selections = state.get('scene_selections')
 
-                while elapsed < max_wait:
-                    web_selections = state.get('scene_selections')
-                    if web_selections is not None:
-                        print(f"\n✓ Selections received from web UI: {len(web_selections)} scenes to accelerate")
-                        scene_selections = web_selections
-                        break
+                if web_scene_selections is not None:
+                    print(f"Using web UI selections: {len(web_scene_selections)} scenes to accelerate")
+                    scene_selections = web_scene_selections
+                else:
+                    # Wait for web UI selection
+                    max_wait = 600  # 10 minutes
+                    poll_interval = 0.5
+                    elapsed = 0
 
-                    time.sleep(poll_interval)
-                    elapsed += poll_interval
+                    print("Waiting for scene selections from web UI...")
+                    print(f"(Timeout in {max_wait}s)")
 
-                if scene_selections is None:
-                    print("\n\nNo scene selections made, skipping acceleration")
+                    while elapsed < max_wait:
+                        web_selections = state.get('scene_selections')
+                        if web_selections is not None:
+                            print(f"\n✓ Selections received from web UI: {len(web_selections)} scenes to accelerate")
+                            scene_selections = web_selections
+                            break
+
+                        time.sleep(poll_interval)
+                        elapsed += poll_interval
+
+                    if scene_selections is None:
+                        print("\n\nNo scene selections made, skipping acceleration")
 
     # Convert scene selections to boring_sections format for encoding
     boring_sections = []

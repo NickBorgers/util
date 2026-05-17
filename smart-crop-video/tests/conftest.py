@@ -30,14 +30,31 @@ def test_video_path() -> Path:
 @pytest.fixture
 def temp_workdir(test_video_path: Path) -> Generator[Path, None, None]:
     """Create a temporary working directory with a copy of the test video."""
-    with tempfile.TemporaryDirectory(prefix="smart_crop_test_") as tmpdir:
-        tmpdir_path = Path(tmpdir)
+    # Create temp dir in /workspace for Docker-in-Docker compatibility
+    # If running in test container, this ensures the host can mount the path
+    workspace_dir = Path("/workspace")
+    if workspace_dir.exists():
+        # Running in Docker, use workspace
+        base_dir = workspace_dir / "tests" / ".test_output"
+        base_dir.mkdir(parents=True, exist_ok=True)
+        with tempfile.TemporaryDirectory(prefix="smart_crop_test_", dir=base_dir) as tmpdir:
+            tmpdir_path = Path(tmpdir)
 
-        # Copy test video to temp directory
-        test_video_copy = tmpdir_path / test_video_path.name
-        shutil.copy(test_video_path, test_video_copy)
+            # Copy test video to temp directory
+            test_video_copy = tmpdir_path / test_video_path.name
+            shutil.copy(test_video_path, test_video_copy)
 
-        yield tmpdir_path
+            yield tmpdir_path
+    else:
+        # Running on host, use system temp
+        with tempfile.TemporaryDirectory(prefix="smart_crop_test_") as tmpdir:
+            tmpdir_path = Path(tmpdir)
+
+            # Copy test video to temp directory
+            test_video_copy = tmpdir_path / test_video_path.name
+            shutil.copy(test_video_path, test_video_copy)
+
+            yield tmpdir_path
 
 
 @pytest.fixture
