@@ -70,18 +70,21 @@ else
     echo "Created ~/.tmux.conf symlink."
 fi
 
-# 6. Install caveman plugin for Claude Code
+# 6. Install plugins for Claude Code
 echo ""
-echo "Installing caveman plugin for Claude Code..."
+echo "Installing plugins for Claude Code..."
 if command -v claude &>/dev/null; then
     claude plugin marketplace add NickBorgers/caveman 2>/dev/null || true
     claude plugin install caveman 2>/dev/null || true
     echo "Caveman plugin installed."
+    claude plugin install playground@claude-plugins-official 2>/dev/null || true
+    echo "Playground plugin installed."
 else
-    echo "WARNING: claude CLI not found — skipping caveman plugin install."
+    echo "WARNING: claude CLI not found — skipping plugin installs."
     echo "  Install Claude Code and run:"
     echo "    claude plugin marketplace add NickBorgers/caveman"
     echo "    claude plugin install caveman"
+    echo "    claude plugin install playground@claude-plugins-official"
 fi
 
 # 7. Summary
