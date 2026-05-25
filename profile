@@ -184,5 +184,23 @@ function mosht() {
 	mosh "$host" -- bash -c "tmux attach -t $session || tmux new-session -s $session"
 }
 
+function publish_report() {
+	if [ -z "$1" ]; then
+		echo "Usage: publish_report <file-or-dir> [remote-path]"
+		echo "Examples:"
+		echo "  publish_report report.html"
+		echo "  publish_report report.html 2026-05/weekly.html"
+		echo "  publish_report ./output-dir/ reports/q2"
+		return 1
+	fi
+	local remote_dir="/opt/dockergeneric/reports/html"
+	if [ -n "$2" ]; then
+		ssh dockergeneric "mkdir -p '$remote_dir/$(dirname "$2")'" && \
+		scp -r "$1" "dockergeneric:$remote_dir/$2"
+	else
+		scp -r "$1" "dockergeneric:$remote_dir/"
+	fi
+}
+
 alias claude-yolo='claude --dangerously-skip-permissions'
 
