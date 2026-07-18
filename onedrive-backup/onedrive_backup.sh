@@ -7,7 +7,7 @@
 : "${ONEDRIVE_FOLDER:?You must set ONEDRIVE_FOLDER to the shared folder name}"
 : "${BACKUP_PATH:=/mnt/backups}"
 : "${BACKUP_INTERVAL_DAYS:=30}"
-: "${RETENTION_DAYS:=365}"
+: "${RETENTION_DAYS:=1825}"
 : "${RCLONE_CONFIG:=}"
 : "${CHECK_INTERVAL_SECONDS:=3600}"
 : "${RETRY_COOLDOWN_DAYS:=1}"
