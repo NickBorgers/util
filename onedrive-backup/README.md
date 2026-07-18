@@ -23,11 +23,20 @@ You'll need to modify all of those parameters for you situation:
 ## Behaviors
 This container is meant to be run forever. I'm using a hosting solution which probably would allow me to have a cron job but I'm not going that route. A `bash` script sleeping doesn't consume a significant amount of resources, so is good enough.
 
-Every hour it will check if it should make a new backup, and if `BACKUP_INTERVAL` has elpased it will copy the last backup to become a new backup. Then it runs `rclone` against the newly created directory which was based on the last backup.
+Every hour it will check if it should make a new backup, and if `BACKUP_INTERVAL` has elapsed it will copy the last backup to become a new backup using hardlinks (`cp -al`), so each new snapshot uses near-zero additional disk space until rclone replaces changed files. Then it runs `rclone` against the newly created directory which was based on the last backup.
 
 Why do the copy? Just trying to reduce how much downloading actually occurs; rclone seems to sync it pretty well. I do want a complete separate backup because of the why for this.
 
 The default configuration will keep old backups for one year - you have one year to figure out someone accidentally deleted something.
+
+## Failure handling
+If `rclone sync` fails (network issue, auth expiry, etc.), the script:
+1. Cleans up the failed backup directory immediately (no disk accumulation)
+2. Enforces a cooldown before retrying (`RETRY_COOLDOWN_DAYS`, default 1 day)
+3. Logs `BACKUP OVERDUE` every hour while in cooldown, so failures are visible in `docker logs`
+4. Never marks a failed backup as successful — retries continue each cooldown period until one succeeds
+
+Set `RETRY_COOLDOWN_DAYS` to control how frequently retries happen after a failure.
 
 ## Why do this?
 Specifically, why backup a cloud storage solution a vendor is promising you has HA and its own backups? It even has ransomware protection so if your data gets hosed that way they can help you recover it.
