@@ -62,15 +62,39 @@ if command -v claude &>/dev/null; then
     echo "Caveman plugin installed."
     claude plugin install playground@claude-plugins-official 2>/dev/null || true
     echo "Playground plugin installed."
+    if command -v codex &>/dev/null; then
+        claude mcp add codex -- codex mcp-server 2>/dev/null || true
+        echo "Codex MCP server added."
+    else
+        echo "NOTE: codex CLI not found — skipping MCP server setup."
+        echo "  Install Codex and run: claude mcp add codex -- codex mcp-server"
+    fi
 else
     echo "WARNING: claude CLI not found — skipping plugin installs."
     echo "  Install Claude Code and run:"
     echo "    claude plugin marketplace add NickBorgers/caveman"
     echo "    claude plugin install caveman"
     echo "    claude plugin install playground@claude-plugins-official"
+    echo "  If Codex is installed, also run:"
+    echo "    claude mcp add codex -- codex mcp-server"
 fi
 
-# 6. Summary
+# 6. Install Claude Code skills
+echo ""
+echo "Installing Claude Code skills..."
+SKILLS_BASE_URL="https://raw.githubusercontent.com/wi-adam/agent-skills/main/plugins/claude/epic-workflow-tkt/skills"
+SKILLS="adversarial-code-review adversarial-design-review"
+for SKILL in $SKILLS; do
+    SKILL_DIR="$HOME/.claude/skills/$SKILL"
+    mkdir -p "$SKILL_DIR"
+    if curl -fsSL "$SKILLS_BASE_URL/$SKILL/SKILL.md" -o "$SKILL_DIR/SKILL.md"; then
+        echo "  $SKILL installed."
+    else
+        echo "  WARNING: failed to download $SKILL"
+    fi
+done
+
+# 7. Summary
 echo ""
 echo "=== Done ==="
 echo ""
