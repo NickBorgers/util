@@ -76,9 +76,11 @@ echo "Installing plugins for Claude Code..."
 if command -v claude &>/dev/null; then
     claude plugin marketplace add NickBorgers/caveman 2>/dev/null || true
     claude plugin install caveman 2>/dev/null || true
-    echo "Caveman plugin installed."
+    claude plugin update caveman 2>/dev/null || true
+    echo "Caveman plugin installed/updated."
     claude plugin install playground@claude-plugins-official 2>/dev/null || true
-    echo "Playground plugin installed."
+    claude plugin update playground@claude-plugins-official 2>/dev/null || true
+    echo "Playground plugin installed/updated."
     if command -v codex &>/dev/null; then
         claude mcp add codex -- codex mcp-server 2>/dev/null || true
         echo "Codex MCP server added."
@@ -90,8 +92,8 @@ else
     echo "WARNING: claude CLI not found — skipping plugin installs."
     echo "  Install Claude Code and run:"
     echo "    claude plugin marketplace add NickBorgers/caveman"
-    echo "    claude plugin install caveman"
-    echo "    claude plugin install playground@claude-plugins-official"
+    echo "    claude plugin install caveman; claude plugin update caveman"
+    echo "    claude plugin install playground@claude-plugins-official; claude plugin update playground@claude-plugins-official"
     echo "  If Codex is installed, also run:"
     echo "    claude mcp add codex -- codex mcp-server"
 fi
