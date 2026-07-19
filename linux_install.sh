@@ -103,15 +103,20 @@ echo ""
 echo "Installing Claude Code skills..."
 SKILLS_BASE_URL="https://raw.githubusercontent.com/wi-adam/agent-skills/main/plugins/claude/epic-workflow-tkt/skills"
 SKILLS="adversarial-code-review adversarial-design-review"
-for SKILL in $SKILLS; do
-    SKILL_DIR="$HOME/.claude/skills/$SKILL"
-    mkdir -p "$SKILL_DIR"
-    if curl -fsSL "$SKILLS_BASE_URL/$SKILL/SKILL.md" -o "$SKILL_DIR/SKILL.md"; then
-        echo "  $SKILL installed."
-    else
-        echo "  WARNING: failed to download $SKILL"
-    fi
-done
+CLAUDE_PLUGINS="$(claude plugin list 2>/dev/null || true)"
+if grep -Eq 'epic-workflow-(github|tkt)@wi-adam-skills' <<<"$CLAUDE_PLUGINS"; then
+    echo "  Adversarial review skills already provided by an epic-workflow plugin; skipping standalone copies."
+else
+    for SKILL in $SKILLS; do
+        SKILL_DIR="$HOME/.claude/skills/$SKILL"
+        mkdir -p "$SKILL_DIR"
+        if curl -fsSL "$SKILLS_BASE_URL/$SKILL/SKILL.md" -o "$SKILL_DIR/SKILL.md"; then
+            echo "  $SKILL installed."
+        else
+            echo "  WARNING: failed to download $SKILL"
+        fi
+    done
+fi
 
 # 8. Summary
 echo ""
