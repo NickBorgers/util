@@ -82,12 +82,18 @@ if command -v claude &>/dev/null; then
     claude plugin update playground@claude-plugins-official 2>/dev/null || true
     echo "Playground plugin installed/updated."
     if command -v codex &>/dev/null; then
-        # Re-add so overrides apply on re-runs. approval_policy=never +
-        # sandbox_mode=workspace-write stop Codex from surfacing interactive
-        # approval modals — the prompts that lock up mosh + tmux sessions.
+        # Re-add so overrides apply on re-runs. approval_policy=never stops
+        # Codex from surfacing interactive approval modals — the prompts that
+        # lock up mosh + tmux sessions.
+        #
+        # Deliberately do NOT pin sandbox_mode here. It belongs to the user's
+        # ~/.codex/config.toml: a flag on this line silently overrides it, which
+        # breaks hosts where Codex's sandbox cannot start (e.g. a bundled bwrap
+        # blocked by apparmor_restrict_unprivileged_userns) and leaves every
+        # command Codex runs failing.
         claude mcp remove codex 2>/dev/null || true
         claude mcp add codex -- codex mcp-server \
-            -c approval_policy="never" -c sandbox_mode="workspace-write" 2>/dev/null || true
+            -c approval_policy="never" 2>/dev/null || true
         echo "Codex MCP server added (non-interactive approvals)."
         # Belt-and-suspenders: pre-authorize the codex MCP tool in Claude Code so
         # it doesn't prompt when permission checks are active (non-skip runs).
@@ -105,7 +111,7 @@ if command -v claude &>/dev/null; then
     else
         echo "NOTE: codex CLI not found — skipping MCP server setup."
         echo "  Install Codex and run:"
-        echo "    claude mcp add codex -- codex mcp-server -c approval_policy=never -c sandbox_mode=workspace-write"
+        echo "    claude mcp add codex -- codex mcp-server -c approval_policy=never"
     fi
 else
     echo "WARNING: claude CLI not found — skipping plugin installs."
@@ -114,28 +120,15 @@ else
     echo "    claude plugin install caveman; claude plugin update caveman"
     echo "    claude plugin install playground@claude-plugins-official; claude plugin update playground@claude-plugins-official"
     echo "  If Codex is installed, also run:"
-    echo "    claude mcp add codex -- codex mcp-server -c approval_policy=never -c sandbox_mode=workspace-write"
+    echo "    claude mcp add codex -- codex mcp-server -c approval_policy=never"
 fi
 
 # 7. Install Claude Code skills
 echo ""
 echo "Installing Claude Code skills..."
-SKILLS_BASE_URL="https://raw.githubusercontent.com/wi-adam/agent-skills/main/plugins/claude/epic-workflow-tkt/skills"
-SKILLS="adversarial-code-review adversarial-design-review"
-CLAUDE_PLUGINS="$(claude plugin list 2>/dev/null || true)"
-if grep -Eq 'epic-workflow-(github|tkt)@wi-adam-skills' <<<"$CLAUDE_PLUGINS"; then
-    echo "  Adversarial review skills already provided by an epic-workflow plugin; skipping standalone copies."
-else
-    for SKILL in $SKILLS; do
-        SKILL_DIR="$HOME/.claude/skills/$SKILL"
-        mkdir -p "$SKILL_DIR"
-        if curl -fsSL "$SKILLS_BASE_URL/$SKILL/SKILL.md" -o "$SKILL_DIR/SKILL.md"; then
-            echo "  $SKILL installed."
-        else
-            echo "  WARNING: failed to download $SKILL"
-        fi
-    done
-fi
+# shellcheck source=lib/claude-skills.sh
+source "$SCRIPT_DIR/lib/claude-skills.sh"
+install_adversarial_skills
 
 # 8. Summary
 echo ""

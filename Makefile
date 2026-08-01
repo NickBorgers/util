@@ -6,3 +6,7 @@ help:
 
 build:
 	docker build -t onedrive-backup ./onedrive-backup/
+
+#help: @ Run shell tests for the bootstrap installers
+test:
+	./tests/test_claude_skills.sh
