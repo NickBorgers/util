@@ -65,11 +65,30 @@ if command -v claude &>/dev/null; then
     claude plugin update playground@claude-plugins-official 2>/dev/null || true
     echo "Playground plugin installed/updated."
     if command -v codex &>/dev/null; then
-        claude mcp add codex -- codex mcp-server 2>/dev/null || true
-        echo "Codex MCP server added."
+        # Re-add so overrides apply on re-runs. approval_policy=never +
+        # sandbox_mode=workspace-write stop Codex from surfacing interactive
+        # approval modals — the prompts that lock up mosh + tmux sessions.
+        claude mcp remove codex 2>/dev/null || true
+        claude mcp add codex -- codex mcp-server \
+            -c approval_policy="never" -c sandbox_mode="workspace-write" 2>/dev/null || true
+        echo "Codex MCP server added (non-interactive approvals)."
+        # Belt-and-suspenders: pre-authorize the codex MCP tool in Claude Code so
+        # it doesn't prompt when permission checks are active (non-skip runs).
+        SETTINGS="$HOME/.claude/settings.json"
+        mkdir -p "$HOME/.claude"
+        [ -f "$SETTINGS" ] || echo '{}' > "$SETTINGS"
+        TMP="$(mktemp)"
+        if jq '.permissions.allow = ((.permissions.allow // []) + ["mcp__codex"] | unique)' "$SETTINGS" > "$TMP" 2>/dev/null; then
+            mv "$TMP" "$SETTINGS"
+            echo "  Pre-authorized mcp__codex in $SETTINGS."
+        else
+            rm -f "$TMP"
+            echo "  WARNING: could not update $SETTINGS (invalid JSON or jq missing)."
+        fi
     else
         echo "NOTE: codex CLI not found — skipping MCP server setup."
-        echo "  Install Codex and run: claude mcp add codex -- codex mcp-server"
+        echo "  Install Codex and run:"
+        echo "    claude mcp add codex -- codex mcp-server -c approval_policy=never -c sandbox_mode=workspace-write"
     fi
 else
     echo "WARNING: claude CLI not found — skipping plugin installs."
@@ -78,7 +97,7 @@ else
     echo "    claude plugin install caveman; claude plugin update caveman"
     echo "    claude plugin install playground@claude-plugins-official; claude plugin update playground@claude-plugins-official"
     echo "  If Codex is installed, also run:"
-    echo "    claude mcp add codex -- codex mcp-server"
+    echo "    claude mcp add codex -- codex mcp-server -c approval_policy=never -c sandbox_mode=workspace-write"
 fi
 
 # 6. Install Claude Code skills
