@@ -1,0 +1,223 @@
+name: Comprehensive Tests - smart-crop-video
+
+on:
+  # Run on pull requests (required for merge)
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'smart-crop-video/**'
+      - '.github/workflows/test-smart-crop-video-comprehensive.yml'
+
+  # Run before releases
+  release:
+    types: [created, published]
+
+  # Run weekly to catch regressions
+  schedule:
+    - cron: '0 6 * * 1'  # Monday at 6 AM UTC
+
+  # Allow manual trigger
+  workflow_dispatch:
+
+jobs:
+  comprehensive-tests:
+    name: End-to-End & Acceleration Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: 'smart-crop-video/tests/requirements.txt'
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+
+          # Verify FFmpeg installation
+          ffmpeg -version
+          ffprobe -version
+
+      - name: Install Python dependencies
+        working-directory: smart-crop-video
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r tests/requirements.txt
+
+          # Verify key dependencies
+          python -c "import PIL; print(f'Pillow version: {PIL.__version__}')"
+          python -c "import numpy; print(f'NumPy version: {numpy.__version__}')"
+
+      - name: Verify test fixtures
+        working-directory: smart-crop-video
+        run: |
+          # Example video should exist
+          if [ ! -f example_movie.mov ]; then
+            echo "Test video example_movie.mov not found!"
+            exit 1
+          fi
+          echo "✅ Test video exists: $(du -h example_movie.mov)"
+
+      - name: Build Docker image for testing
+        working-directory: smart-crop-video
+        run: |
+          echo "Building smart-crop-video Docker image..."
+          docker build -t smart-crop-video:test .
+
+          echo "✅ Docker image built successfully"
+          docker images | grep smart-crop-video
+
+      - name: Run end-to-end video validation tests
+        working-directory: smart-crop-video
+        run: |
+          echo "========================================"
+          echo "End-to-End Video Validation Tests"
+          echo "========================================"
+          echo "These tests verify crop accuracy, aspect ratios,"
+          echo "and output video quality by generating synthetic"
+          echo "test videos and analyzing output frames."
+          echo ""
+
+          pytest tests/integration/test_end_to_end_video.py \
+            -v \
+            --timeout=1800 \
+            -m comprehensive \
+            --tb=short
+
+          echo ""
+          echo "✅ End-to-end video validation tests passed"
+
+      - name: Run acceleration feature tests
+        working-directory: smart-crop-video
+        run: |
+          echo "========================================"
+          echo "Acceleration Feature Tests"
+          echo "========================================"
+          echo "These tests verify intelligent acceleration"
+          echo "including scene detection, variable speeds,"
+          echo "audio tempo matching, and duration calculations."
+          echo ""
+
+          pytest tests/integration/test_acceleration.py \
+            -v \
+            --timeout=1800 \
+            -m comprehensive \
+            --tb=short
+
+          echo ""
+          echo "✅ Acceleration feature tests passed"
+
+      - name: Test Summary
+        if: always()
+        run: |
+          echo "========================================"
+          echo "Comprehensive Test Summary"
+          echo "========================================"
+          echo ""
+          echo "Test Categories:"
+          echo "  • End-to-End Video Validation"
+          echo "    - Crop accuracy (motion detection)"
+          echo "    - Crop accuracy (subject detection)"
+          echo "    - Aspect ratio precision"
+          echo "    - Video playability"
+          echo "    - Audio preservation"
+          echo "    - Strategy comparison"
+          echo ""
+          echo "  • Acceleration Features"
+          echo "    - Basic functionality"
+          echo "    - Duration calculations"
+          echo "    - Audio tempo matching"
+          echo "    - Boring section detection"
+          echo "    - Mixed acceleration rates"
+          echo "    - Scene boundary transitions"
+          echo "    - Edge cases"
+          echo ""
+          echo "These tests take 10-15 minutes but provide"
+          echo "confidence that the tool produces correct"
+          echo "output videos for real user scenarios."
+          echo "========================================"
+
+      - name: Upload test artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: comprehensive-test-artifacts
+          path: |
+            /tmp/smart_crop_e2e_*/*.mov
+            /tmp/smart_crop_accel_*/*.mov
+            /tmp/*.png
+            smart-crop-video/tests/test_run.log
+          retention-days: 7
+          if-no-files-found: ignore
+
+      - name: Upload test logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: comprehensive-test-logs
+          path: |
+            smart-crop-video/tests/test_run.log
+            smart-crop-video/tests/*.log
+          retention-days: 14
+          if-no-files-found: ignore
+
+      - name: Clean up test artifacts
+        if: always()
+        run: |
+          # Clean up temporary test videos
+          rm -rf /tmp/smart_crop_e2e_*
+          rm -rf /tmp/smart_crop_accel_*
+
+          # Clean up extracted frames
+          find /tmp -name "frame_*.png" -type f -delete
+
+          echo "✅ Test artifacts cleaned up"
+
+  test-status:
+    name: Comprehensive Test Status
+    runs-on: ubuntu-latest
+    needs: comprehensive-tests
+    if: always()
+
+    steps:
+      - name: Check test results
+        run: |
+          echo "========================================"
+          echo "Comprehensive Test Results"
+          echo "========================================"
+
+          if [ "${{ needs.comprehensive-tests.result }}" == "success" ]; then
+            echo "✅ All comprehensive tests passed!"
+            echo ""
+            echo "The following has been verified:"
+            echo "  ✓ Crop accuracy (motion & subject detection)"
+            echo "  ✓ Aspect ratio precision (1:1, 9:16)"
+            echo "  ✓ Video output quality and playability"
+            echo "  ✓ Audio preservation"
+            echo "  ✓ Acceleration features"
+            echo "  ✓ Scene detection and variable speeds"
+            echo ""
+            echo "These tests validate the most critical"
+            echo "user concern: 'Did it crop my video correctly?'"
+            exit 0
+          else
+            echo "❌ Some comprehensive tests failed"
+            echo ""
+            echo "Please review the test logs above to identify"
+            echo "which test failed and why. Common issues:"
+            echo "  • FFmpeg command failures"
+            echo "  • Frame analysis errors"
+            echo "  • Duration calculation mismatches"
+            echo "  • Audio sync problems"
+            echo ""
+            echo "Check the uploaded artifacts for test videos"
+            echo "and logs to help diagnose the issue."
+            exit 1
+          fi

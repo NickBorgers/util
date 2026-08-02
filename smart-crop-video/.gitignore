@@ -1,6 +1,7 @@
 # Test artifacts
 tests/.pytest_cache/
 tests/__pycache__/
+tests/.test_output/
 __pycache__/
 *.pyc
 *.pyo
