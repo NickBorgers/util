@@ -206,6 +206,14 @@ function _devcontainer_util_mounts() {
 		[ -f "$HOME/$rel" ] || continue
 		_DC_MOUNTS+=(--mount "type=bind,source=$HOME/$rel,target=$home/$rel")
 	done
+
+	# The token alone does not spare you a login: onboarding state lives in
+	# ~/.claude.json. That file also holds per-path project history and the
+	# container's own MCP config, so it is mounted aside rather than over the
+	# container's copy, and the bootstrap lifts only the identity keys out.
+	if [ -f "$HOME/.claude.json" ]; then
+		_DC_MOUNTS+=(--mount "type=bind,source=$HOME/.claude.json,target=/host-claude.json")
+	fi
 }
 
 # Run the bootstrap inside the container, once per container. Stamped because

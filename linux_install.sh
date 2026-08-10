@@ -106,6 +106,11 @@ echo "Installing agent CLIs..."
 source "$SCRIPT_DIR/lib/agent-clis.sh"
 install_agent_clis
 
+# No-op unless the host's config has been mounted in, which only dcs/dcr do.
+# shellcheck source=lib/agent-identity.sh
+source "$SCRIPT_DIR/lib/agent-identity.sh"
+seed_claude_identity
+
 # 7. Install plugins for Claude Code
 echo ""
 echo "Installing plugins for Claude Code..."
