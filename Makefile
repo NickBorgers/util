@@ -10,3 +10,4 @@ build:
 #help: @ Run shell tests for the bootstrap installers
 test:
 	./tests/test_claude_skills.sh
+	./tests/test_agent_clis.sh
