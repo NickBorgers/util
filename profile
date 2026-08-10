@@ -187,8 +187,21 @@ fi
 # and a container refreshing against a copy would strand the host on a token
 # that is no longer valid.
 function _devcontainer_util_mounts() {
-	_DC_MOUNTS=(--mount "type=bind,source=$UTIL_DIR,target=/util")
+	_DC_MOUNTS=()
 	local home="/home/$UTIL_DEVCONTAINER_USER" rel
+
+	# Only mount a real checkout. Docker creates a missing bind source as a
+	# root-owned directory on the host, so a wrong UTIL_DIR - the zsh fallback
+	# on a machine that keeps the checkout elsewhere, say - would silently
+	# litter one and mount an empty /util. The bootstrap tolerates the absence;
+	# a root-owned ~/code/util that later blocks a clone is worse.
+	if [ -x "$UTIL_DIR/linux_install.sh" ]; then
+		_DC_MOUNTS+=(--mount "type=bind,source=$UTIL_DIR,target=/util")
+	else
+		echo "util checkout not found at $UTIL_DIR; container gets no profile or agent CLIs." >&2
+		echo "  Set UTIL_DIR to the checkout to change that." >&2
+	fi
+
 	for rel in ".claude/.credentials.json" ".codex/auth.json"; do
 		[ -f "$HOME/$rel" ] || continue
 		_DC_MOUNTS+=(--mount "type=bind,source=$HOME/$rel,target=$home/$rel")

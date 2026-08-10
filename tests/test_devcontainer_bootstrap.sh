@@ -71,6 +71,8 @@ not_called() { grep -qF -- "$1" "$CALLS" && echo 0 || echo 1; }
 # than a substring of one - the difference between asserting an argument is "1"
 # and matching every line that happens to contain a 1.
 arg() { grep -qxF -- "$1" "$CALLS" && echo 1 || echo 0; }
+# For the helpers' own stderr, which never reaches the devcontainer stub.
+contains() { grep -qF -- "$2" <<<"$1" && echo 1 || echo 0; }
 count_of() { grep -cF -- "$1" "$CALLS"; }
 eq() { [ "$1" = "$2" ] && echo 1 || echo 0; }
 
@@ -102,6 +104,20 @@ run dcr /work >/dev/null
 check "mounts the checkout regardless" "$(called "target=/util")"
 check "no Claude mount" "$(not_called ".credentials.json")"
 check "no Codex mount" "$(not_called "auth.json")"
+teardown
+
+echo "== a UTIL_DIR that is not a checkout is not mounted =="
+setup
+seed_credentials
+# Docker would create the missing source as a root-owned directory on the host
+# and mount an empty /util, so the mount has to be withheld, not merely survived.
+OUT="$(UTIL_DIR="$SANDBOX/not-a-checkout" run dcr /work)"
+check "no /util mount" "$(not_called "target=/util")"
+check "says what is missing" "$(contains "$OUT" "util checkout not found")"
+check "names the path it looked at" "$(contains "$OUT" "$SANDBOX/not-a-checkout")"
+check "still brings up the container" "$(called "up")"
+check "still mounts the credentials" "$(called "target=/home/vscode/.codex/auth.json")"
+check "bootstrap degrades inside the container" "$(called "util is not mounted at /util")"
 teardown
 
 echo "== the container user is overridable =="
