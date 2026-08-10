@@ -218,7 +218,12 @@ function _devcontainer_util_bootstrap() {
 		stamp="$HOME/.util-bootstrapped"
 		if [ -e "$stamp" ] && [ -z "$1" ]; then exit 0; fi
 		if [ ! -x /util/linux_install.sh ]; then
+			# Mounts are fixed when a container is created, so a container that
+			# something else brought up - an editor, a plain devcontainer up -
+			# can never gain /util. Recreating is the only fix, so say so
+			# rather than leaving a shell with no claude and no explanation.
 			echo "util is not mounted at /util; skipping bootstrap." >&2
+			echo "  This container was not created by dcs/dcr. Run dcr to recreate it." >&2
 			exit 0
 		fi
 		# Bind-mounting a credential file makes the daemon create its parent

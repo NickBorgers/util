@@ -136,6 +136,7 @@ check "skips the apt step inside a container" "$(called "UTIL_SKIP_PACKAGES=1")"
 check "stamps the container so it runs once" "$(called 'touch "$stamp"')"
 check "reclaims the mount-created config dirs" "$(called "sudo chown")"
 check "degrades if the mount is missing" "$(called "util is not mounted at /util")"
+check "says how to fix it" "$(called "Run dcr to recreate it")"
 teardown
 
 echo "== bootstrap force flag is passed through =="
