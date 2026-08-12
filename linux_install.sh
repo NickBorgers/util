@@ -23,7 +23,7 @@ fi
 # curl, the run may have no sudo at all, and none of that should stop the shell
 # config and agent CLIs that follow - which are the parts that actually matter.
 echo ""
-PACKAGES="tmux git jq wget htop curl"
+PACKAGES="tmux et git jq wget htop curl"
 MISSING=""
 for pkg in $PACKAGES; do
     command -v "$pkg" &>/dev/null || MISSING="${MISSING:+$MISSING }$pkg"
