@@ -158,19 +158,107 @@ function _ensure_devcontainer_cli() {
 	npm install -g @devcontainers/cli || { echo "Failed to install devcontainer CLI"; return 1; }
 }
 
+# Where this checkout lives. The rc file sources the profile by absolute path,
+# so bash can locate itself; zsh has no BASH_SOURCE, hence the fallback. Set
+# UTIL_DIR yourself if the checkout is somewhere else.
+if [ -z "${UTIL_DIR:-}" ]; then
+	if [ -n "${BASH_SOURCE:-}" ]; then
+		UTIL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+	else
+		UTIL_DIR="$HOME/code/util"
+	fi
+	export UTIL_DIR
+fi
+
+# The account a devcontainer runs as. Nearly every image built on the
+# devcontainers base images uses `vscode`; override for one that does not.
+: "${UTIL_DEVCONTAINER_USER:=vscode}"
+
+# Sets _DC_MOUNTS to the bind mounts every container should get.
+#
+# A devcontainer is otherwise whatever its base image shipped: no profile, no
+# tmux config, and none of the agent CLIs - a project's devcontainer.json
+# describes that project, not this machine, and should not have to know about
+# either. So mount this checkout and let its bootstrap run inside.
+#
+# Credentials are mounted per-file rather than by mounting ~/.claude wholesale:
+# the container installs its own plugins and settings, and those must not write
+# back over the host's. Read-write on purpose - both CLIs rotate their tokens,
+# and a container refreshing against a copy would strand the host on a token
+# that is no longer valid.
+function _devcontainer_util_mounts() {
+	_DC_MOUNTS=()
+	local home="/home/$UTIL_DEVCONTAINER_USER" rel
+
+	# Only mount a real checkout. Docker creates a missing bind source as a
+	# root-owned directory on the host, so a wrong UTIL_DIR - the zsh fallback
+	# on a machine that keeps the checkout elsewhere, say - would silently
+	# litter one and mount an empty /util. The bootstrap tolerates the absence;
+	# a root-owned ~/code/util that later blocks a clone is worse.
+	if [ -x "$UTIL_DIR/linux_install.sh" ]; then
+		_DC_MOUNTS+=(--mount "type=bind,source=$UTIL_DIR,target=/util")
+	else
+		echo "util checkout not found at $UTIL_DIR; container gets no profile or agent CLIs." >&2
+		echo "  Set UTIL_DIR to the checkout to change that." >&2
+	fi
+
+	for rel in ".claude/.credentials.json" ".codex/auth.json"; do
+		[ -f "$HOME/$rel" ] || continue
+		_DC_MOUNTS+=(--mount "type=bind,source=$HOME/$rel,target=$home/$rel")
+	done
+
+	# The token alone does not spare you a login: onboarding state lives in
+	# ~/.claude.json. That file also holds per-path project history and the
+	# container's own MCP config, so it is mounted aside rather than over the
+	# container's copy, and the bootstrap lifts only the identity keys out.
+	if [ -f "$HOME/.claude.json" ]; then
+		_DC_MOUNTS+=(--mount "type=bind,source=$HOME/.claude.json,target=/host-claude.json")
+	fi
+}
+
+# Run the bootstrap inside the container, once per container. Stamped because
+# `dcs` reuses a running container, and re-running plugin installs on every
+# attach would put a network round trip in front of every shell.
+# UTIL_FORCE_BOOTSTRAP=1 re-runs it anyway.
+function _devcontainer_util_bootstrap() {
+	local workspace="$1"
+	devcontainer exec --workspace-folder "$workspace" bash -lc '
+		stamp="$HOME/.util-bootstrapped"
+		if [ -e "$stamp" ] && [ -z "$1" ]; then exit 0; fi
+		if [ ! -x /util/linux_install.sh ]; then
+			# Mounts are fixed when a container is created, so a container that
+			# something else brought up - an editor, a plain devcontainer up -
+			# can never gain /util. Recreating is the only fix, so say so
+			# rather than leaving a shell with no claude and no explanation.
+			echo "util is not mounted at /util; skipping bootstrap." >&2
+			echo "  This container was not created by dcs/dcr. Run dcr to recreate it." >&2
+			exit 0
+		fi
+		# Bind-mounting a credential file makes the daemon create its parent
+		# directory as root. Hand those back before anything tries to write a
+		# settings file into them. Non-recursive on purpose: the mounted files
+		# belong to the host, and chowning through a bind mount would retitle
+		# them there too.
+		sudo chown "$(id -u):$(id -g)" "$HOME/.claude" "$HOME/.codex" 2>/dev/null || true
+		UTIL_SKIP_PACKAGES=1 /util/linux_install.sh && touch "$stamp"
+	' util-bootstrap "${UTIL_FORCE_BOOTSTRAP:-}"
+}
+
 function dcs() {
 	_ensure_devcontainer_cli || return 1
 	local workspace="${1:-.}"
-	local session
-	session=$(basename "$workspace")
-	devcontainer up --workspace-folder "$workspace" && \
+	_devcontainer_util_mounts
+	devcontainer up --workspace-folder "$workspace" "${_DC_MOUNTS[@]}" && \
+	_devcontainer_util_bootstrap "$workspace" && \
 	devcontainer exec --workspace-folder "$workspace" bash
 }
 
 function dcr() {
 	_ensure_devcontainer_cli || return 1
 	local workspace="${1:-.}"
-	devcontainer up --workspace-folder "$workspace" --remove-existing-container && \
+	_devcontainer_util_mounts
+	devcontainer up --workspace-folder "$workspace" --remove-existing-container "${_DC_MOUNTS[@]}" && \
+	_devcontainer_util_bootstrap "$workspace" && \
 	devcontainer exec --workspace-folder "$workspace" bash
 }
 

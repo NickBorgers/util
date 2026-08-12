@@ -53,7 +53,14 @@ else
     echo "Created ~/.tmux.conf symlink."
 fi
 
-# 5. Install plugins for Claude Code
+# 5. Install the agent CLIs themselves
+echo ""
+echo "Installing agent CLIs..."
+# shellcheck source=lib/agent-clis.sh
+source "$SCRIPT_DIR/lib/agent-clis.sh"
+install_agent_clis
+
+# 6. Install plugins for Claude Code
 echo ""
 echo "Installing plugins for Claude Code..."
 if command -v claude &>/dev/null; then
@@ -106,14 +113,14 @@ else
     echo "    claude mcp add codex -- codex mcp-server -c approval_policy=never"
 fi
 
-# 6. Install Claude Code skills
+# 7. Install Claude Code skills
 echo ""
 echo "Installing Claude Code skills..."
 # shellcheck source=lib/claude-skills.sh
 source "$SCRIPT_DIR/lib/claude-skills.sh"
 install_adversarial_skills
 
-# 7. Summary
+# 8. Summary
 echo ""
 echo "=== Done ==="
 echo ""
