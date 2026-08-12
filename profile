@@ -181,7 +181,18 @@ function mosht() {
 		echo "Usage: mosht <host> [session-name]"
 		return 1
 	fi
+	ssh "$host" "pkill mosh-server; true"
 	mosh "$host" -- bash -c "tmux attach -t $session || tmux new-session -s $session"
+}
+
+function ett() {
+	local host="$1"
+	local session="${2:-main}"
+	if [ -z "$host" ]; then
+		echo "Usage: ett <host> [session-name]"
+		return 1
+	fi
+	et "$host" -c "tmux attach -t $session || tmux new-session -s $session"
 }
 
 function publish_report() {

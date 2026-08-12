@@ -20,7 +20,7 @@ echo "Detected package manager: $PKG_MGR"
 # 2. Install packages
 echo ""
 echo "Installing packages..."
-PACKAGES="tmux git jq wget htop curl"
+PACKAGES="tmux et git jq wget htop curl"
 if [ "$PKG_MGR" = "apt" ]; then
     sudo apt-get update
     sudo apt-get install -y $PACKAGES
