@@ -12,20 +12,49 @@ if command -v apt-get &>/dev/null; then
 elif command -v dnf &>/dev/null; then
     PKG_MGR="dnf"
 else
-    echo "Error: No supported package manager found (apt or dnf)."
-    exit 1
+    PKG_MGR=""
 fi
-echo "Detected package manager: $PKG_MGR"
 
-# 2. Install packages
+# 2. Install the system packages that are actually missing.
+#
+# This step used to install the whole list unconditionally and abort the script
+# when neither apt nor dnf existed. That is wrong inside a devcontainer, where
+# `dcr` runs this on every fresh container: the base image already ships git and
+# curl, the run may have no sudo at all, and none of that should stop the shell
+# config and agent CLIs that follow - which are the parts that actually matter.
 echo ""
-echo "Installing packages..."
 PACKAGES="tmux et git jq wget htop curl"
-if [ "$PKG_MGR" = "apt" ]; then
-    sudo apt-get update
-    sudo apt-get install -y $PACKAGES
+MISSING=""
+for pkg in $PACKAGES; do
+    command -v "$pkg" &>/dev/null || MISSING="${MISSING:+$MISSING }$pkg"
+done
+
+SUDO=""
+if [ "$(id -u)" -ne 0 ]; then
+    command -v sudo &>/dev/null && SUDO="sudo"
+fi
+
+if [ -n "${UTIL_SKIP_PACKAGES:-}" ]; then
+    echo "Skipping system packages (UTIL_SKIP_PACKAGES is set)."
+elif [ -z "$MISSING" ]; then
+    echo "All system packages already present."
+elif [ -z "$PKG_MGR" ]; then
+    echo "WARNING: no apt or dnf here; install these yourself: $MISSING"
+elif [ "$(id -u)" -ne 0 ] && [ -z "$SUDO" ]; then
+    echo "WARNING: not root and no sudo; install these yourself: $MISSING"
 else
-    sudo dnf install -y $PACKAGES
+    echo "Detected package manager: $PKG_MGR"
+    echo "Installing packages: $MISSING"
+    # Non-fatal: a stale index or an offline machine must not cost the caller
+    # everything downstream of here.
+    if [ "$PKG_MGR" = "apt" ]; then
+        # shellcheck disable=SC2086  # deliberate word splitting: $MISSING is a package list
+        $SUDO apt-get update && $SUDO apt-get install -y $MISSING \
+            || echo "WARNING: package install failed; continuing."
+    else
+        # shellcheck disable=SC2086  # deliberate word splitting: $MISSING is a package list
+        $SUDO dnf install -y $MISSING || echo "WARNING: package install failed; continuing."
+    fi
 fi
 
 # 3. Detect shell rc file
@@ -70,7 +99,19 @@ else
     echo "Created ~/.tmux.conf symlink."
 fi
 
-# 6. Install plugins for Claude Code
+# 6. Install the agent CLIs themselves
+echo ""
+echo "Installing agent CLIs..."
+# shellcheck source=lib/agent-clis.sh
+source "$SCRIPT_DIR/lib/agent-clis.sh"
+install_agent_clis
+
+# No-op unless the host's config has been mounted in, which only dcs/dcr do.
+# shellcheck source=lib/agent-identity.sh
+source "$SCRIPT_DIR/lib/agent-identity.sh"
+seed_claude_identity
+
+# 7. Install plugins for Claude Code
 echo ""
 echo "Installing plugins for Claude Code..."
 if command -v claude &>/dev/null; then
@@ -123,14 +164,14 @@ else
     echo "    claude mcp add codex -- codex mcp-server -c approval_policy=never"
 fi
 
-# 7. Install Claude Code skills
+# 8. Install Claude Code skills
 echo ""
 echo "Installing Claude Code skills..."
 # shellcheck source=lib/claude-skills.sh
 source "$SCRIPT_DIR/lib/claude-skills.sh"
 install_adversarial_skills
 
-# 8. Summary
+# 9. Summary
 echo ""
 echo "=== Done ==="
 echo ""
