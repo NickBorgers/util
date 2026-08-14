@@ -16,31 +16,19 @@ REPO_DIR="$(cd "$TESTS_DIR/.." && pwd)"
 # Exported shell functions outrank executables on PATH, so a `curl` or `npm`
 # function inherited from the caller's profile would defeat the stubs - and a
 # `curl` function could reach the real network. Drop them before anything runs.
-unset -f claude codex curl npm mise brew uname 2>/dev/null || true
+unset -f claude codex curl npm mise brew uname mktemp ln 2>/dev/null || true
 unset CLAUDE_INSTALL_URL CODEX_NPM_PACKAGE MISE_INSTALL_URL 2>/dev/null || true
 
 PASS=0
 FAIL=0
 SANDBOX=""
 
-# Drop every directory holding a real copy of a program we stub, so the "not
-# installed" cases actually see it missing on a machine where it is installed.
-# Each case then gets its state solely from the stubs it writes.
-sanitized_path() {
-    local dir out="" prog found
-    while IFS= read -r dir; do
-        [ -n "$dir" ] || continue
-        found=0
-        for prog in claude codex npm node mise brew; do
-            [ -x "$dir/$prog" ] && found=1
-        done
-        [ "$found" = "1" ] && continue
-        out="${out:+$out:}$dir"
-    done <<<"${PATH//:/$'\n'}"
-    echo "$out"
-}
-
-REAL_PATH="$(sanitized_path)"
+# Hide every real copy of a program we stub, so the "not installed" cases
+# actually see it missing on a machine where it is installed. Each case then
+# gets its state solely from the stubs it writes.
+# shellcheck source=tests/shim_path.sh
+source "$TESTS_DIR/shim_path.sh"
+REAL_PATH="$(shim_path claude codex npm node mise brew)"
 
 setup() {
     # Exported: a stub body is inserted into the file as an unexpanded variable,
@@ -99,7 +87,7 @@ teardown() {
     [ -n "$SANDBOX" ] && rm -rf "$SANDBOX"
     SANDBOX=""
 }
-trap teardown EXIT
+trap 'teardown; rm -rf "$REAL_PATH"' EXIT
 
 # write_stub <path> <body>: a recording stub. Logs "<name> <args>" to $CALLS
 # first, so a call is observable even when the body exits non-zero.

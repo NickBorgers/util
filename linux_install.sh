@@ -122,6 +122,39 @@ if command -v claude &>/dev/null; then
     claude plugin install playground@claude-plugins-official 2>/dev/null || true
     claude plugin update playground@claude-plugins-official 2>/dev/null || true
     echo "Playground plugin installed/updated."
+
+    # Caveman ships a statusline badge script but a plugin cannot wire itself
+    # into settings.json, so without this it asks to be set up every session.
+    # The marketplace clone is the stable path; the plugin cache dir carries a
+    # version hash that changes on every update.
+    CAVEMAN_STATUSLINE="$HOME/.claude/plugins/marketplaces/caveman/hooks/caveman-statusline.sh"
+    if [ ! -f "$CAVEMAN_STATUSLINE" ]; then
+        CAVEMAN_STATUSLINE="$(find "$HOME/.claude/plugins/cache" \
+            -path '*caveman*/hooks/caveman-statusline.sh' 2>/dev/null | head -1 || true)"
+    fi
+    if [ -n "$CAVEMAN_STATUSLINE" ] && [ -f "$CAVEMAN_STATUSLINE" ]; then
+        SETTINGS="$HOME/.claude/settings.json"
+        mkdir -p "$HOME/.claude"
+        [ -f "$SETTINGS" ] || echo '{}' > "$SETTINGS"
+        CURRENT_STATUSLINE="$(jq -r '.statusLine.command // ""' "$SETTINGS" 2>/dev/null || true)"
+        if [ -n "$CURRENT_STATUSLINE" ] && [[ "$CURRENT_STATUSLINE" != *caveman-statusline* ]]; then
+            echo "  NOTE: $SETTINGS already sets a statusLine; leaving it alone."
+            echo "    To show the caveman badge: bash \"$CAVEMAN_STATUSLINE\""
+        else
+            TMP="$(mktemp)"
+            if jq --arg cmd "bash \"$CAVEMAN_STATUSLINE\"" \
+                '.statusLine = {type: "command", command: $cmd}' "$SETTINGS" > "$TMP" 2>/dev/null; then
+                mv "$TMP" "$SETTINGS"
+                echo "  Caveman statusline badge wired into $SETTINGS."
+            else
+                rm -f "$TMP"
+                echo "  WARNING: could not update $SETTINGS (invalid JSON or jq missing)."
+            fi
+        fi
+    else
+        echo "  NOTE: caveman statusline script not found; badge not configured."
+    fi
+
     if command -v codex &>/dev/null; then
         # Re-add so overrides apply on re-runs. approval_policy=never stops
         # Codex from surfacing interactive approval modals — the prompts that
@@ -132,10 +165,22 @@ if command -v claude &>/dev/null; then
         # breaks hosts where Codex's sandbox cannot start (e.g. a bundled bwrap
         # blocked by apparmor_restrict_unprivileged_userns) and leaves every
         # command Codex runs failing.
-        claude mcp remove codex 2>/dev/null || true
-        claude mcp add codex -- codex mcp-server \
-            -c approval_policy="never" 2>/dev/null || true
-        echo "Codex MCP server added (non-interactive approvals)."
+        #
+        # -s user, not `claude mcp add`'s default `local` scope: local writes the
+        # server under projects/<cwd> in ~/.claude.json, so Codex existed only in
+        # the directory this installer happened to run from and every other repo
+        # reported it unregistered. The local remove clears that stale entry.
+        claude mcp remove -s local codex >/dev/null 2>&1 || true
+        claude mcp remove -s user codex >/dev/null 2>&1 || true
+        # Not silenced: a failed add used to still print "added", so a broken
+        # /adversarial-code-review looked like a clean install.
+        if claude mcp add -s user codex -- codex mcp-server \
+            -c approval_policy="never"; then
+            echo "Codex MCP server added (user scope, non-interactive approvals)."
+        else
+            echo "  WARNING: could not register the Codex MCP server."
+            echo "    Retry manually: claude mcp add -s user codex -- codex mcp-server -c approval_policy=never"
+        fi
         # Belt-and-suspenders: pre-authorize the codex MCP tool in Claude Code so
         # it doesn't prompt when permission checks are active (non-skip runs).
         SETTINGS="$HOME/.claude/settings.json"
@@ -152,7 +197,7 @@ if command -v claude &>/dev/null; then
     else
         echo "NOTE: codex CLI not found — skipping MCP server setup."
         echo "  Install Codex and run:"
-        echo "    claude mcp add codex -- codex mcp-server -c approval_policy=never"
+        echo "    claude mcp add -s user codex -- codex mcp-server -c approval_policy=never"
     fi
 else
     echo "WARNING: claude CLI not found — skipping plugin installs."
@@ -161,7 +206,7 @@ else
     echo "    claude plugin install caveman; claude plugin update caveman"
     echo "    claude plugin install playground@claude-plugins-official; claude plugin update playground@claude-plugins-official"
     echo "  If Codex is installed, also run:"
-    echo "    claude mcp add codex -- codex mcp-server -c approval_policy=never"
+    echo "    claude mcp add -s user codex -- codex mcp-server -c approval_policy=never"
 fi
 
 # 8. Install Claude Code skills
