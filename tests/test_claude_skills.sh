@@ -14,27 +14,19 @@ REPO_DIR="$(cd "$TESTS_DIR/.." && pwd)"
 # Exported shell functions outrank executables on PATH, so a `claude` or `curl`
 # function inherited from the caller's profile would defeat the stubs - and a
 # `curl` function could reach the real network. Drop them before anything runs.
-unset -f claude curl mktemp cmp find 2>/dev/null || true
+unset -f claude curl mktemp cmp find ln 2>/dev/null || true
 unset CURL_SHOULD_FAIL SKILLS_BASE_URL ADVERSARIAL_SKILLS 2>/dev/null || true
 
 PASS=0
 FAIL=0
 SANDBOX=""
 
-# Drop any directory holding a real `claude` from PATH, so the "claude CLI not
-# installed" case actually sees it missing on a machine where it is installed.
-# Every case then gets its plugin state solely from the stub.
-sanitized_path() {
-    local dir out=""
-    while IFS= read -r dir; do
-        [ -n "$dir" ] || continue
-        [ -x "$dir/claude" ] && continue
-        out="${out:+$out:}$dir"
-    done <<<"${PATH//:/$'\n'}"
-    echo "$out"
-}
-
-REAL_PATH="$(sanitized_path)"
+# Hide the real `claude` from PATH, so the "claude CLI not installed" case
+# actually sees it missing on a machine where it is installed. Every case then
+# gets its plugin state solely from the stub.
+# shellcheck source=tests/shim_path.sh
+source "$TESTS_DIR/shim_path.sh"
+REAL_PATH="$(shim_path claude)"
 STUB_BODY="stub skill body"
 
 # Sandbox: temp HOME + temp bin dir prepended to PATH, torn down after each case.
@@ -75,7 +67,7 @@ teardown() {
     [ -n "$SANDBOX" ] && rm -rf "$SANDBOX"
     SANDBOX=""
 }
-trap teardown EXIT
+trap 'teardown; rm -rf "$REAL_PATH"' EXIT
 
 # stub_claude <mode>: present | missing-plugin | broken | absent
 stub_claude() {
