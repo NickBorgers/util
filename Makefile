@@ -13,3 +13,4 @@ test:
 	./tests/test_agent_clis.sh
 	./tests/test_devcontainer_bootstrap.sh
 	./tests/test_agent_identity.sh
+	./tests/test_claude_output_styles.sh

@@ -60,7 +60,15 @@ echo "Installing agent CLIs..."
 source "$SCRIPT_DIR/lib/agent-clis.sh"
 install_agent_clis
 
-# 6. Install plugins for Claude Code
+# 6. Install Claude Code output styles
+echo ""
+echo "Installing Claude Code output styles..."
+# shellcheck source=lib/claude-output-styles.sh
+source "$SCRIPT_DIR/lib/claude-output-styles.sh"
+install_claude_output_styles "$SCRIPT_DIR/claude-output-styles"
+configure_claude_output_style "PlainTech"
+
+# 7. Install plugins for Claude Code
 echo ""
 echo "Installing plugins for Claude Code..."
 if command -v claude &>/dev/null; then
@@ -158,14 +166,14 @@ else
     echo "    claude mcp add -s user codex -- codex mcp-server -c approval_policy=never"
 fi
 
-# 7. Install Claude Code skills
+# 8. Install Claude Code skills
 echo ""
 echo "Installing Claude Code skills..."
 # shellcheck source=lib/claude-skills.sh
 source "$SCRIPT_DIR/lib/claude-skills.sh"
 install_adversarial_skills
 
-# 8. Summary
+# 9. Summary
 echo ""
 echo "=== Done ==="
 echo ""
