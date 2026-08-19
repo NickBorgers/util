@@ -14,6 +14,9 @@
 # into $HOME/.claude/output-styles/. Safe to re-run: already-correct symlinks
 # are left alone, and anything else found at the destination (a real file, a
 # symlink elsewhere) is backed up to "<name>.bak" first rather than clobbered.
+# If "<name>.bak" already exists (an earlier backup this function itself
+# never got a chance to reconcile), that file is skipped rather than
+# overwriting the older backup.
 install_claude_output_styles() {
     local src_dir="$1" dest_dir="$HOME/.claude/output-styles" src dest name
 
@@ -28,6 +31,11 @@ install_claude_output_styles() {
         if [ -L "$dest" ] && [ "$(readlink "$dest")" = "$src" ]; then
             echo "  $name already linked."
         elif [ -e "$dest" ] || [ -L "$dest" ]; then
+            if [ -e "$dest.bak" ] || [ -L "$dest.bak" ]; then
+                echo "  Skipping $name: $dest.bak already exists, so backing up $dest would"
+                echo "    overwrite it. Move $dest.bak aside and re-run to link $name."
+                continue
+            fi
             mv "$dest" "$dest.bak"
             ln -s "$src" "$dest"
             echo "  Backed up existing $name to $name.bak and linked to repo copy."

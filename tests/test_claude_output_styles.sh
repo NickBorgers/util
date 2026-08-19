@@ -84,6 +84,18 @@ check "now points at the repo copy" "$(is_symlink_to "$HOME/.claude/output-style
 check "old symlink preserved as .bak" "$(is_symlink_to "$HOME/.claude/output-styles/One.md.bak" "$SANDBOX/elsewhere/One.md")"
 teardown
 
+echo "== an existing .bak is never overwritten =="
+setup
+mkdir -p "$HOME/.claude/output-styles"
+echo "older backup, still needed" >"$HOME/.claude/output-styles/One.md.bak"
+echo "user's current copy" >"$HOME/.claude/output-styles/One.md"
+echo "repo copy" >"$SANDBOX/src/One.md"
+OUT="$(run_helper "$SANDBOX/src")"
+check "the old backup survives untouched" "$(eq "$(cat "$HOME/.claude/output-styles/One.md.bak")" "older backup, still needed")"
+check "the user's file is left in place, not linked" "$(eq "$(cat "$HOME/.claude/output-styles/One.md")" "user's current copy")"
+check "says so" "$(contains "$OUT" "Skipping One.md")"
+teardown
+
 echo "== no source directory is a silent no-op =="
 setup
 OUT="$(run_helper "$SANDBOX/does-not-exist")"
