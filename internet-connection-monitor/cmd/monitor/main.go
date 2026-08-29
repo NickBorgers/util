@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"log/slog"
 	"os"
 	"os/signal"
 	"syscall"
@@ -14,6 +15,7 @@ import (
 	"github.com/nickborgers/monorepo/internet-connection-monitor/internal/health"
 	"github.com/nickborgers/monorepo/internet-connection-monitor/internal/metrics"
 	"github.com/nickborgers/monorepo/internet-connection-monitor/internal/outputs"
+	"github.com/nickborgers/monorepo/internet-connection-monitor/internal/reaper"
 	"github.com/nickborgers/monorepo/internet-connection-monitor/internal/testloop"
 )
 
@@ -31,6 +33,14 @@ func main() {
 	log.Printf("Loaded configuration: %d sites to monitor", len(cfg.Sites.List))
 	log.Printf("  Inter-test delay: %v", cfg.General.InterTestDelay)
 	log.Printf("  Global timeout: %v", cfg.General.GlobalTimeout)
+
+	// This process runs as PID 1 in the container (no tini / --init), and
+	// each probe's headless Chrome forks children (zygote, GPU, renderer)
+	// that chromedp never knows about and never waits on. Once Chrome is
+	// killed at the end of a probe, those children are re-parented onto
+	// us; without a reaper they exit and stay zombies forever, eventually
+	// exhausting the container's cgroup PID limit. See internal/reaper.
+	reaper.Start(slog.Default())
 
 	// Create context for graceful shutdown
 	ctx, cancel := context.WithCancel(context.Background())

@@ -53,6 +53,14 @@ func NewControllerImpl(cfg *config.BrowserConfig) (*ControllerImpl, error) {
 		chromedp.Flag("disable-http2", "true"),  // Force HTTP/1.1 (no connection multiplexing)
 		chromedp.Flag("disable-quic", "true"),   // Disable HTTP/3
 		chromedp.Flag("disable-features", "NetworkService,TLSSessionResumption"), // Disable TLS session cache
+		// Chrome forks its own zygote/GPU/renderer children. chromedp's
+		// default cancellation only SIGKILLs the single Chrome process it
+		// started, leaving those children running as orphans that get
+		// re-parented onto us (see internal/reaper for why that leaks
+		// zombies). Put Chrome in its own process group so we can kill
+		// the whole tree together, deterministically, the moment a probe
+		// ends - success, error, or timeout.
+		chromedp.ModifyCmdFunc(setProcessGroupAndGroupKill),
 	}
 
 	if cfg.Headless {
