@@ -15,6 +15,11 @@ services:
     hostname: internet-monitor-01
     restart: unless-stopped
 
+    # REQUIRED. Runs tini as PID 1 so Chrome's orphaned child processes get
+    # reaped. Without this the container leaks a zombie per probe and
+    # eventually cannot fork at all. See TROUBLESHOOTING.md.
+    init: true
+
     # Use host networking for accurate DNS measurements
     # This ensures the container uses the same DNS servers and network stack as the host,
     # providing realistic DNS resolution timing that matches user experience.

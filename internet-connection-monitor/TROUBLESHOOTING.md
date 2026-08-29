@@ -183,6 +183,62 @@ SITES=google.com,github.com   # Just 2 sites
 
 ---
 
+## Zombie Processes / Container Cannot Fork
+
+**Symptoms:**
+- Container stops probing after running for a while, then recovers, repeatedly
+- Hundreds or thousands of `<defunct>` processes owned by `/app/internet-monitor`
+- On the host, kernel logs:
+```
+cgroup: fork rejected by pids controller in /system.slice/docker-<id>.scope
+```
+- Errors mentioning `fork/exec: resource temporarily unavailable`
+
+**Cause:**
+
+The container is running **without an init process**. Each probe launches
+headless Chrome, which forks its own zygote, GPU and renderer processes.
+chromedp kills only the top-level Chrome process when a probe ends, so those
+children are orphaned and re-parented onto PID 1. When PID 1 is the monitor
+binary itself, nothing calls `wait()` on them and each becomes a permanent
+zombie -- about five per probe. They accumulate until the container's PID
+limit is reached, after which every `fork()` in the container fails.
+
+This is not caused by a particular site failing. Every probe leaks the same
+way, whether it succeeds or errors.
+
+**Check:**
+```bash
+# Should print an init (e.g. /sbin/docker-init), not /app/internet-monitor
+docker exec <container> cat /proc/1/cmdline | tr '\0' ' '
+
+# Count zombies
+docker top <container> | grep -c defunct
+```
+
+**Fix:**
+
+Run the container with an init process:
+
+```yaml
+services:
+  internet-monitor:
+    init: true
+```
+
+or, for `docker run`:
+
+```bash
+docker run --init ...
+```
+
+The compose files under `deployments/` already set this. Measured with
+`--pids-limit 400` and an otherwise identical workload: without `--init` the
+container hit the ceiling at t=40s with 348 zombies and died by t=120s; with
+`--init` it held at 66-81 PIDs and 0 zombies.
+
+---
+
 ## Docker Build Fails
 
 **Symptoms:**
