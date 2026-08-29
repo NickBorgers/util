@@ -19,7 +19,47 @@ echo ""
 echo "Installing packages from Brewfile..."
 brew bundle --file="$SCRIPT_DIR/Brewfile"
 
-# 3. Add source line to ~/.zshrc
+# 3. Reinstall formulae whose libraries moved out from under them
+#
+# When Homebrew upgrades a library, dependents keep pointing at the old
+# filename. mosh breaks this way every time protobuf bumps a major version:
+#   dyld: Library not loaded: /opt/homebrew/opt/protobuf/lib/libprotobuf.35.1.0.dylib
+# The upgrade in step 2 usually fixes it, but only once Homebrew ships a
+# rebuilt bottle. Until then the dependent stays broken, so check directly.
+#
+# `brew linkage --test` reports missing libraries and exits non-zero. It is a
+# developer command, so running it turns developer mode on. Save the setting
+# and put it back.
+echo ""
+echo "Checking installed formulae for broken library links..."
+LINKAGE_DEV_WAS_ON=0
+if brew developer 2>/dev/null | grep -q "is enabled"; then
+    LINKAGE_DEV_WAS_ON=1
+fi
+# A newline-separated string, not an array: macOS ships bash 3.2, where
+# expanding an empty array under `set -u` aborts the script.
+BROKEN_FORMULAE=""
+while read -r formula; do
+    [ -n "$formula" ] || continue
+    if ! brew linkage --test "$formula" >/dev/null 2>&1; then
+        BROKEN_FORMULAE="$BROKEN_FORMULAE$formula"$'\n'
+    fi
+done < <(brew list --formula --installed-on-request 2>/dev/null || true)
+if [ "$LINKAGE_DEV_WAS_ON" -eq 0 ]; then
+    brew developer off >/dev/null 2>&1 || true
+fi
+if [ -z "$BROKEN_FORMULAE" ]; then
+    echo "All formulae link correctly."
+else
+    echo "Broken library links: $(echo "$BROKEN_FORMULAE" | tr '\n' ' ')"
+    while read -r formula; do
+        [ -n "$formula" ] || continue
+        echo "  Reinstalling $formula..."
+        brew reinstall "$formula" || echo "  WARNING: could not reinstall $formula."
+    done <<< "$BROKEN_FORMULAE"
+fi
+
+# 4. Add source line to ~/.zshrc
 echo ""
 SOURCE_LINE="source \"$SCRIPT_DIR/profile\""
 if [ ! -f "$HOME/.zshrc" ]; then
@@ -40,7 +80,7 @@ if grep -q "^function reduce_framerate" "$HOME/.zshrc" 2>/dev/null; then
     echo "These may conflict with the sourced profile. Consider removing them."
 fi
 
-# 4. Symlink tmux.conf
+# 5. Symlink tmux.conf
 echo ""
 if [ -L "$HOME/.tmux.conf" ] && [ "$(readlink "$HOME/.tmux.conf")" = "$SCRIPT_DIR/tmux.conf" ]; then
     echo "~/.tmux.conf symlink already correct."
@@ -53,14 +93,14 @@ else
     echo "Created ~/.tmux.conf symlink."
 fi
 
-# 5. Install the agent CLIs themselves
+# 6. Install the agent CLIs themselves
 echo ""
 echo "Installing agent CLIs..."
 # shellcheck source=lib/agent-clis.sh
 source "$SCRIPT_DIR/lib/agent-clis.sh"
 install_agent_clis
 
-# 6. Install Claude Code output styles
+# 7. Install Claude Code output styles
 echo ""
 echo "Installing Claude Code output styles..."
 # shellcheck source=lib/claude-output-styles.sh
@@ -68,7 +108,7 @@ source "$SCRIPT_DIR/lib/claude-output-styles.sh"
 install_claude_output_styles "$SCRIPT_DIR/claude-output-styles"
 configure_claude_output_style "PlainTech"
 
-# 7. Install plugins for Claude Code
+# 8. Install plugins for Claude Code
 echo ""
 echo "Installing plugins for Claude Code..."
 if command -v claude &>/dev/null; then
@@ -166,14 +206,14 @@ else
     echo "    claude mcp add -s user codex -- codex mcp-server -c approval_policy=never"
 fi
 
-# 8. Install Claude Code skills
+# 9. Install Claude Code skills
 echo ""
 echo "Installing Claude Code skills..."
 # shellcheck source=lib/claude-skills.sh
 source "$SCRIPT_DIR/lib/claude-skills.sh"
 install_adversarial_skills
 
-# 9. Summary
+# 10. Summary
 echo ""
 echo "=== Done ==="
 echo ""
