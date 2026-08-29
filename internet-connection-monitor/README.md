@@ -235,8 +235,30 @@ Then update your `docker-compose.yml` to use the GHCR image:
 services:
   internet-monitor:
     image: ghcr.io/nickborgers/internet-connection-monitor:latest
+    init: true  # required - see "Running the container" below
     # ... rest of your configuration
 ```
+
+### Running the container
+
+**The container must be run with an init process (`init: true`, or
+`docker run --init`).** Every probe launches headless Chrome, which forks
+its own zygote, GPU and renderer processes. When the probe ends, those
+children are orphaned and re-parented onto PID 1. If PID 1 is the monitor
+binary itself, nothing ever calls `wait()` on them and each one becomes a
+permanent zombie -- roughly five per probe. They accumulate until the
+container hits its PID limit and every subsequent `fork()` fails.
+
+Running with an init puts tini at PID 1 instead, which reaps those orphans
+as they exit. Measured on a real deployment with `--pids-limit 400` and an
+otherwise identical workload:
+
+| | PIDs in use | zombies | outcome |
+|---|---|---|---|
+| without `--init` | hit the 400 ceiling at t=40s | 348 | container dead by t=120s |
+| with `--init` | 66-81, stable | 0 | healthy |
+
+The compose files under `deployments/` already set this.
 
 ### Option 2: Build from Source
 
