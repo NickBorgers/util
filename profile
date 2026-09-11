@@ -270,7 +270,9 @@ function mosht() {
 		return 1
 	fi
 	ssh "$host" "pkill mosh-server; true"
-	mosh "$host" -- bash -c "tmux attach -t $session || tmux new-session -s $session"
+	# Show "mosht <host>:<window>" in the terminal tab. tmux runs on the remote,
+	# so it can't know the alias we typed here; pass it in via set-titles-string.
+	mosh "$host" -- bash -c "tmux set-option -g set-titles on; tmux set-option -g set-titles-string 'mosht $host:#{window_name}'; tmux attach -t $session || tmux new-session -s $session"
 }
 
 function ett() {

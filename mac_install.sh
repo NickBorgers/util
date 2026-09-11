@@ -19,6 +19,12 @@ echo ""
 echo "Installing packages from Brewfile..."
 brew bundle --file="$SCRIPT_DIR/Brewfile"
 
+# Reinstall mosh if present — protobuf upgrades break its dylib links
+if brew list mosh &>/dev/null; then
+    echo "Reinstalling mosh to fix dynamic library links..."
+    brew reinstall mosh
+fi
+
 # 3. Add source line to ~/.zshrc
 echo ""
 SOURCE_LINE="source \"$SCRIPT_DIR/profile\""
