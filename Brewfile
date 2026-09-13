@@ -1,6 +1,7 @@
 brew "git"
 brew "tmux"
 brew "et"
+brew "mosh"
 brew "jq"
 brew "wget"
 brew "htop"
