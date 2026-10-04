@@ -215,6 +215,46 @@ run dcr "$SANDBOX/proj" >/dev/null
 check "no memory mount" "$(not_called "target=/home/vscode/.claude/projects/")"
 teardown
 
+echo "== dcs says so when the running container lacks a mount =="
+setup
+seed_credentials
+mkdir -p "$SANDBOX/proj"
+KEY="$(printf '%s' "$(cd "$SANDBOX/proj" && pwd -P)" | sed 's/[^A-Za-z0-9]/-/g')"
+mkdir -p "$HOME/.claude/projects/$KEY/memory"
+# docker stub: `ps` finds a container; `inspect` lists the destinations in
+# $HAVE_MOUNTS, one per line.
+cat >"$SANDBOX/bin/docker" <<'STUB'
+#!/bin/bash
+case "${1:-}" in
+    ps) echo abc123 ;;
+    inspect) printf '%s\n' $HAVE_MOUNTS ;;
+esac
+STUB
+chmod +x "$SANDBOX/bin/docker"
+OUT="$(HAVE_MOUNTS="/util /run/util/claude-oauth-token" run dcs "$SANDBOX/proj")"
+check "names the missing project memory" "$(contains "$OUT" "/home/vscode/.claude/projects/$KEY/memory")"
+check "names a missing host config mount" "$(contains "$OUT" "/host-claude-config/CLAUDE.md")"
+check "does not name a mount it has" "$(not_called_out "$OUT" "created without: /util")"
+check "says to run dcr" "$(contains "$OUT" "Run dcr to recreate it")"
+check "still brings the container up" "$(called "up")"
+: >"$CALLS"
+ALL="$(printf '%s ' /util /run/util/claude-oauth-token /host-claude.json /home/vscode/.codex/auth.json /host-claude-config/CLAUDE.md /host-claude-config/agents /host-claude-config/skills/synced "/home/vscode/.claude/projects/$KEY/memory")"
+OUT="$(HAVE_MOUNTS="$ALL" run dcs "$SANDBOX/proj")"
+check "silent when nothing is missing" "$(not_called_out "$OUT" "created without")"
+teardown
+
+echo "== dcs is quiet when there is no running container =="
+setup
+seed_credentials
+cat >"$SANDBOX/bin/docker" <<'STUB'
+#!/bin/bash
+exit 0
+STUB
+chmod +x "$SANDBOX/bin/docker"
+OUT="$(run dcs /work)"
+check "no warning" "$(not_called_out "$OUT" "created without")"
+teardown
+
 echo "== a UTIL_DIR that is not a checkout is not mounted =="
 setup
 seed_credentials
