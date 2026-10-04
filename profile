@@ -174,67 +174,52 @@ fi
 # devcontainers base images uses `vscode`; override for one that does not.
 : "${UTIL_DEVCONTAINER_USER:=vscode}"
 
-# Where the container's Claude token lives on the host. Not under ~/.claude:
-# that directory is the host login's, and this token must stay independent of it.
+# Where the container's copy of the host's Claude access token lives. Not under
+# ~/.claude, so it can be mounted without exposing the host login beside it.
 function _claude_container_token_file() {
 	echo "${UTIL_CLAUDE_TOKEN_FILE:-$HOME/.config/util/claude-oauth-token}"
 }
 
-# Make sure a container-only Claude token exists and is fresh, creating or
-# renewing it so dcs/dcr stay "run it and it works". `claude setup-token` mints
-# a long-lived token that is separate from the host login, so a container can
-# never rotate the host's refresh token. Needs a terminal and a browser; without
-# them it warns and the container starts unauthenticated (or keeps the old token).
+# Derive the container's Claude token from the host login, with no prompts.
 #
-# Renewed when missing, older than UTIL_CLAUDE_TOKEN_MAX_AGE_DAYS (default 300;
-# setup-token tokens last about a year), or when UTIL_REFRESH_CLAUDE_TOKEN=1.
-# A failed renewal keeps the existing token. The file is rewritten in place so a
-# running container's bind mount sees the new value; new shells pick it up.
+# Only the short-lived access token is handed over, never the refresh token.
+# The refresh token rotates on use, so a copy in a container could invalidate
+# the host's; with only the access token the container cannot refresh anything,
+# and the host stays the sole refresher. The cost is that a container's login
+# lasts as long as the access token (hours): re-run dcs, which rewrites the file
+# in place, so a running container's mount sees it and new shells pick it up.
+#
+# Takes the host's token as it is, so run claude on the host if it has expired.
 function _ensure_claude_container_token() {
-	local file max_age
+	local creds="$HOME/.claude/.credentials.json"
+	local file token expires_ms now_ms
 	file="$(_claude_container_token_file)"
-	max_age="${UTIL_CLAUDE_TOKEN_MAX_AGE_DAYS:-300}"
+	[ -r "$creds" ] || return 0
 
-	local reason=""
-	if [ ! -s "$file" ]; then
-		reason="No container Claude token yet"
-	elif [ -n "${UTIL_REFRESH_CLAUDE_TOKEN:-}" ]; then
-		reason="Refreshing the container Claude token (requested)"
-	elif [ -n "$(find "$file" -mtime +"$max_age" 2>/dev/null)" ]; then
-		reason="Container Claude token is over $max_age days old"
+	if command -v jq &>/dev/null; then
+		token="$(jq -r '.claudeAiOauth.accessToken // empty' "$creds" 2>/dev/null)"
+		expires_ms="$(jq -r '.claudeAiOauth.expiresAt // empty' "$creds" 2>/dev/null)"
+	elif command -v python3 &>/dev/null; then
+		token="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1])).get("claudeAiOauth",{}).get("accessToken",""))' "$creds" 2>/dev/null)"
+		expires_ms="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1])).get("claudeAiOauth",{}).get("expiresAt",""))' "$creds" 2>/dev/null)"
 	fi
-	[ -z "$reason" ] && return 0
-
-	command -v claude &>/dev/null || return 0
-	if [ ! -t 0 ] || [ ! -t 1 ]; then
-		echo "$reason, and there is no terminal to renew it." >&2
-		echo "  Run dcs/dcr from a terminal to create it (uses \`claude setup-token\`)." >&2
+	if [ -z "${token:-}" ]; then
+		echo "No Claude login found on the host; the container will need its own login." >&2
 		return 0
 	fi
 
-	echo "$reason. Running \`claude setup-token\`..." >&2
-	local log token
-	log="$(mktemp)"
-	chmod 600 "$log"
-	if command -v script &>/dev/null && [ "$(uname)" != "Darwin" ]; then
-		script -qec "claude setup-token" "$log" || true
-	else
-		claude setup-token || true
-	fi
-	token="$(tr -d '\r' <"$log" 2>/dev/null | sed 's/\x1b\[[0-9;?]*[A-Za-z]//g' | grep -o 'sk-ant-[A-Za-z0-9_-]\{40,\}' | tail -1)"
-	rm -f "$log"
-	if [ -z "$token" ]; then
-		printf 'Could not read the token automatically. Paste it here (blank to skip, input hidden): ' >&2
-		read -rs token
-		echo >&2
-	fi
-	if [ -z "$token" ]; then
-		echo "No new token saved; keeping what was there." >&2
+	now_ms=$(( $(date +%s) * 1000 ))
+	if [ -n "${expires_ms:-}" ] && [ "$expires_ms" -le "$now_ms" ] 2>/dev/null; then
+		echo "The host Claude token has expired; run claude on the host, then dcs again." >&2
+		echo "  The container will need its own login until then." >&2
 		return 0
 	fi
+
 	mkdir -p "$(dirname "$file")" && chmod 700 "$(dirname "$file")"
 	( umask 077; printf '%s\n' "$token" >"$file" )
-	echo "Saved container Claude token to $file" >&2
+	if [ -n "${expires_ms:-}" ]; then
+		echo "Container Claude token refreshed from the host; valid for about $(( (expires_ms - now_ms) / 3600000 ))h." >&2
+	fi
 }
 
 # Sets _DC_MOUNTS to the bind mounts every container should get.
@@ -273,16 +258,19 @@ function _devcontainer_util_mounts() {
 		echo "  Set UTIL_DIR to the checkout to change that." >&2
 	fi
 
+	# Mounts that must be read-only are named in lib/docker-runtime.sh, which adds
+	# the flag on the docker side: the devcontainer CLI's --mount rejects it.
+	#
 	# Claude does not get the host's .credentials.json. Its OAuth refresh token
 	# rotates on use, so a container refreshing from a shared copy invalidates
 	# the host's - and, when the other side presents the already-rotated token,
-	# can get every session logged out at once. Containers authenticate with
-	# their own long-lived `claude setup-token` token instead, handed in as a
-	# read-only file the container's profile exports as CLAUDE_CODE_OAUTH_TOKEN.
+	# can get every session logged out at once. Containers get only the access
+	# token (see _ensure_claude_container_token), as a read-only file the
+	# container's profile exports as CLAUDE_CODE_OAUTH_TOKEN.
 	local token_file
 	token_file="$(_claude_container_token_file)"
 	if [ -s "$token_file" ]; then
-		_DC_MOUNTS+=(--mount "type=bind,source=$token_file,target=/run/util/claude-oauth-token,readonly")
+		_DC_MOUNTS+=(--mount "type=bind,source=$token_file,target=/run/util/claude-oauth-token")
 	fi
 
 	for rel in ".codex/auth.json"; do
@@ -298,7 +286,7 @@ function _devcontainer_util_mounts() {
 	# .credentials.json (a readable refresh token is one the container can rotate).
 	for rel in "CLAUDE.md" "agents" "skills/synced"; do
 		[ -e "$HOME/.claude/$rel" ] || continue
-		_DC_MOUNTS+=(--mount "type=bind,source=$HOME/.claude/$rel,target=/host-claude-config/$rel,readonly")
+		_DC_MOUNTS+=(--mount "type=bind,source=$HOME/.claude/$rel,target=/host-claude-config/$rel")
 	done
 
 	# The token alone does not spare you a login: onboarding state lives in
@@ -306,7 +294,7 @@ function _devcontainer_util_mounts() {
 	# container's own MCP config, so it is mounted aside rather than over the
 	# container's copy, and the bootstrap lifts only the identity keys out.
 	if [ -f "$HOME/.claude.json" ]; then
-		_DC_MOUNTS+=(--mount "type=bind,source=$HOME/.claude.json,target=/host-claude.json,readonly")
+		_DC_MOUNTS+=(--mount "type=bind,source=$HOME/.claude.json,target=/host-claude.json")
 	fi
 }
 

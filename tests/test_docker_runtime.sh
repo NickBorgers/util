@@ -85,6 +85,24 @@ UTIL_DOCKER_DNS=1.1.1.1 wrap run alpine
 check "DNS can be overridden" "$(arg "1.1.1.1")"
 teardown
 
+echo "== host-derived mounts are made read-only =="
+setup
+wrap run --mount type=bind,src=/h/tok,dst=/run/util/claude-oauth-token \
+    --mount type=bind,src=/h/a,dst=/host-claude-config/agents \
+    --mount type=bind,src=/h/c.json,dst=/host-claude.json \
+    --mount type=bind,src=/w,dst=/w \
+    --mount type=bind,src=/h/codex,dst=/home/vscode/.codex/auth.json alpine
+check "token mount" "$(arg "type=bind,src=/h/tok,dst=/run/util/claude-oauth-token,readonly")"
+check "host config mount" "$(arg "type=bind,src=/h/a,dst=/host-claude-config/agents,readonly")"
+check "host claude.json mount" "$(arg "type=bind,src=/h/c.json,dst=/host-claude.json,readonly")"
+check "workspace mount untouched" "$(arg "type=bind,src=/w,dst=/w")"
+check "other mounts untouched" "$(arg "type=bind,src=/h/codex,dst=/home/vscode/.codex/auth.json")"
+check "image still last" "$(arg alpine)"
+: >"$CALLS"
+wrap run --mount type=bind,src=/h/tok,target=/run/util/claude-oauth-token,readonly alpine
+check "no doubled readonly" "$(arg "type=bind,src=/h/tok,target=/run/util/claude-oauth-token,readonly")"
+teardown
+
 echo "== other subcommands are untouched =="
 setup
 RUNTIMES_JSON='{"kata-clh":{}}' wrap ps -q

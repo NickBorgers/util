@@ -12,6 +12,11 @@
 #            NXDOMAIN for *.ts.net, so tailnet hosts do not resolve in
 #            containers.
 #
+#   mounts   The devcontainer CLI's --mount cannot say "readonly", so mounts
+#            whose target is one of the host-derived paths below are made
+#            read-only here: the Claude access token, the host's Claude config
+#            and the host's ~/.claude.json.
+#
 # Written for bash 3.2.
 
 docker_bin="${UTIL_REAL_DOCKER:-docker}"
@@ -41,6 +46,27 @@ if [ "${1:-}" = run ] || [ "${1:-}" = create ]; then
         extra+=(--dns "$dns")
     fi
 
-    exec "$docker_bin" "$sub" ${extra[@]+"${extra[@]}"} "$@"
+    # Rewrite `--mount ...,dst=<target>` into a read-only mount for the targets
+    # that carry host data. devcontainer emits src=/dst= (and accepts target=).
+    args=()
+    while [ $# -gt 0 ]; do
+        if [ "$1" = --mount ] && [ $# -gt 1 ]; then
+            mount="$2"
+            case ",$mount," in
+                *,readonly,*|*,ro,*) ;;
+                *,dst=/run/util/*,*|*,target=/run/util/*,*|\
+                *,dst=/host-claude-config/*,*|*,target=/host-claude-config/*,*|\
+                *,dst=/host-claude.json,*|*,target=/host-claude.json,*)
+                    mount="$mount,readonly" ;;
+            esac
+            args+=(--mount "$mount")
+            shift 2
+        else
+            args+=("$1")
+            shift
+        fi
+    done
+
+    exec "$docker_bin" "$sub" ${extra[@]+"${extra[@]}"} ${args[@]+"${args[@]}"}
 fi
 exec "$docker_bin" "$@"
