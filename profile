@@ -222,6 +222,14 @@ function _ensure_claude_container_token() {
 	fi
 }
 
+# The folder name Claude Code gives a workspace under ~/.claude/projects: the
+# absolute path with every non-alphanumeric character turned into a dash.
+function _claude_project_key() {
+	local abs
+	abs="$(cd "$1" 2>/dev/null && pwd -P)" || return 1
+	printf '%s' "$abs" | sed 's/[^A-Za-z0-9]/-/g'
+}
+
 # Sets _DC_MOUNTS to the bind mounts every container should get.
 #
 # A devcontainer is otherwise whatever its base image shipped: no profile, no
@@ -235,6 +243,7 @@ function _ensure_claude_container_token() {
 # and a container refreshing against a copy would strand the host on a token
 # that is no longer valid.
 function _devcontainer_util_mounts() {
+	local workspace="${1:-.}"
 	_DC_MOUNTS=()
 	local home="/home/$UTIL_DEVCONTAINER_USER" rel
 
@@ -289,6 +298,23 @@ function _devcontainer_util_mounts() {
 		_DC_MOUNTS+=(--mount "type=bind,source=$HOME/.claude/$rel,target=/host-claude-config/$rel")
 	done
 
+	# This project's memory. Knowledge a project depends on (how to read its logs,
+	# say) lives there, and a container that cannot see it cannot do the work.
+	# Read-write on purpose: it is plain markdown, and what the agent learns in the
+	# container should outlive it. Only this project's memory directory is shared,
+	# never the sessions beside it or the credentials. Opt out with
+	# UTIL_SHARE_MEMORY=none, or make it read-only with UTIL_SHARE_MEMORY=ro
+	# (applied in lib/docker-runtime.sh, like the other read-only mounts).
+	# Mounted at the path Claude looks in, not symlinked from a staging path: Claude
+	# resolves links and then treats the target as outside its memory directory,
+	# so every read would need a permission prompt. Docker creates the missing
+	# parents as root; the bootstrap hands them back.
+	local key memdir
+	if [ "${UTIL_SHARE_MEMORY:-rw}" != none ] && key="$(_claude_project_key "$workspace")" \
+		&& memdir="$HOME/.claude/projects/$key/memory" && [ -d "$memdir" ]; then
+		_DC_MOUNTS+=(--mount "type=bind,source=$memdir,target=$home/.claude/projects/$key/memory")
+	fi
+
 	# The token alone does not spare you a login: onboarding state lives in
 	# ~/.claude.json. That file also holds per-path project history and the
 	# container's own MCP config, so it is mounted aside rather than over the
@@ -303,7 +329,8 @@ function _devcontainer_util_mounts() {
 # attach would put a network round trip in front of every shell.
 # UTIL_FORCE_BOOTSTRAP=1 re-runs it anyway.
 function _devcontainer_util_bootstrap() {
-	local workspace="$1"
+	local workspace="$1" key
+	key="$(_claude_project_key "$workspace")"
 	devcontainer exec --workspace-folder "$workspace" bash -lc '
 		stamp="$HOME/.util-bootstrapped"
 		if [ -e "$stamp" ] && [ -z "$1" ]; then exit 0; fi
@@ -332,15 +359,21 @@ function _devcontainer_util_bootstrap() {
 				ln -s "/host-claude-config/$rel" "$HOME/.claude/$rel"
 			done
 		fi
+		# The shared project memory is mounted into ~/.claude/projects/<key>/memory,
+		# so docker created those parents as root. Hand them back, non-recursively,
+		# or Claude cannot write its own session files beside the memory.
+		if [ -n "$2" ] && [ -d "$HOME/.claude/projects/$2/memory" ]; then
+			sudo chown "$(id -u):$(id -g)" "$HOME/.claude/projects" "$HOME/.claude/projects/$2" 2>/dev/null || true
+		fi
 		UTIL_SKIP_PACKAGES=1 /util/linux_install.sh && touch "$stamp"
-	' util-bootstrap "${UTIL_FORCE_BOOTSTRAP:-}"
+	' util-bootstrap "${UTIL_FORCE_BOOTSTRAP:-}" "$key"
 }
 
 function dcs() {
 	_ensure_devcontainer_cli || return 1
 	local workspace="${1:-.}"
 	_ensure_claude_container_token
-	_devcontainer_util_mounts
+	_devcontainer_util_mounts "$workspace"
 	devcontainer up --workspace-folder "$workspace" "${_DC_MOUNTS[@]}" && \
 	_devcontainer_util_bootstrap "$workspace" && \
 	devcontainer exec --workspace-folder "$workspace" bash
@@ -350,7 +383,7 @@ function dcr() {
 	_ensure_devcontainer_cli || return 1
 	local workspace="${1:-.}"
 	_ensure_claude_container_token
-	_devcontainer_util_mounts
+	_devcontainer_util_mounts "$workspace"
 	devcontainer up --workspace-folder "$workspace" --remove-existing-container "${_DC_MOUNTS[@]}" && \
 	_devcontainer_util_bootstrap "$workspace" && \
 	devcontainer exec --workspace-folder "$workspace" bash

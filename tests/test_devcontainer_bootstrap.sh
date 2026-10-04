@@ -183,6 +183,38 @@ check "passes --docker-path" "$(arg "--docker-path")"
 check "pointing at lib/docker-runtime.sh" "$(arg "$REPO_DIR/lib/docker-runtime.sh")"
 teardown
 
+echo "== this project's memory is shared, and only this project's =="
+setup
+seed_credentials
+mkdir -p "$SANDBOX/proj"
+KEY="$(printf '%s' "$(cd "$SANDBOX/proj" && pwd -P)" | sed 's/[^A-Za-z0-9]/-/g')"
+mkdir -p "$HOME/.claude/projects/$KEY/memory" "$HOME/.claude/projects/-other-project/memory"
+echo note >"$HOME/.claude/projects/$KEY/memory/logs.md"
+run dcr "$SANDBOX/proj" >/dev/null
+check "mounts the project memory where Claude looks" "$(called "source=$HOME/.claude/projects/$KEY/memory,target=/home/vscode/.claude/projects/$KEY/memory")"
+check "does not mount other projects" "$(not_called "-other-project")"
+check "bootstrap hands back the mount-created parents" "$(called 'sudo chown "$(id -u):$(id -g)" "$HOME/.claude/projects"')"
+check "passes the project key to the bootstrap" "$(arg "$KEY")"
+teardown
+
+echo "== memory sharing can be turned off =="
+setup
+seed_credentials
+mkdir -p "$SANDBOX/proj"
+KEY="$(printf '%s' "$(cd "$SANDBOX/proj" && pwd -P)" | sed 's/[^A-Za-z0-9]/-/g')"
+mkdir -p "$HOME/.claude/projects/$KEY/memory"
+UTIL_SHARE_MEMORY=none run dcr "$SANDBOX/proj" >/dev/null
+check "no memory mount" "$(not_called "target=/home/vscode/.claude/projects/")"
+teardown
+
+echo "== a project with no memory mounts nothing =="
+setup
+seed_credentials
+mkdir -p "$SANDBOX/proj"
+run dcr "$SANDBOX/proj" >/dev/null
+check "no memory mount" "$(not_called "target=/home/vscode/.claude/projects/")"
+teardown
+
 echo "== a UTIL_DIR that is not a checkout is not mounted =="
 setup
 seed_credentials

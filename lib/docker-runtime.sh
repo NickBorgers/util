@@ -15,7 +15,9 @@
 #   mounts   The devcontainer CLI's --mount cannot say "readonly", so mounts
 #            whose target is one of the host-derived paths below are made
 #            read-only here: the Claude access token, the host's Claude config
-#            and the host's ~/.claude.json.
+#            and the host's ~/.claude.json. The shared project memory
+#            (.../.claude/projects/<key>/memory) is read-write unless
+#            UTIL_SHARE_MEMORY=ro.
 #
 # Written for bash 3.2.
 
@@ -58,6 +60,8 @@ if [ "${1:-}" = run ] || [ "${1:-}" = create ]; then
                 *,dst=/host-claude-config/*,*|*,target=/host-claude-config/*,*|\
                 *,dst=/host-claude.json,*|*,target=/host-claude.json,*)
                     mount="$mount,readonly" ;;
+                *,dst=*/.claude/projects/*/memory,*|*,target=*/.claude/projects/*/memory,*)
+                    [ "${UTIL_SHARE_MEMORY:-rw}" = ro ] && mount="$mount,readonly" ;;
             esac
             args+=(--mount "$mount")
             shift 2
