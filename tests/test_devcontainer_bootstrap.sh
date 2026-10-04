@@ -48,6 +48,11 @@ seed_credentials() {
     mkdir -p "$HOME/.claude" "$HOME/.codex"
     echo '{}' >"$HOME/.claude/.credentials.json"
     echo '{}' >"$HOME/.codex/auth.json"
+    echo '{}' >"$HOME/.claude.json"
+    mkdir -p "$HOME/.claude/agents" "$HOME/.claude/skills/synced"
+    echo hi >"$HOME/.claude/CLAUDE.md"
+    mkdir -p "$HOME/.config/util"
+    echo 'sk-ant-oat01-test' >"$HOME/.config/util/claude-oauth-token"
 }
 
 # Subshell so the sourced profile cannot leak functions or PATH between cases.
@@ -72,6 +77,7 @@ not_called() { grep -qF -- "$1" "$CALLS" && echo 0 || echo 1; }
 # and matching every line that happens to contain a 1.
 arg() { grep -qxF -- "$1" "$CALLS" && echo 1 || echo 0; }
 # For the helpers' own stderr, which never reaches the devcontainer stub.
+not_called_out() { grep -qF -- "$2" <<<"$1" && echo 0 || echo 1; }
 contains() { grep -qF -- "$2" <<<"$1" && echo 1 || echo 0; }
 count_of() { grep -cF -- "$1" "$CALLS"; }
 eq() { [ "$1" = "$2" ] && echo 1 || echo 0; }
@@ -81,8 +87,10 @@ setup
 seed_credentials
 run dcr /work >/dev/null
 check "mounts this checkout at /util" "$(called "type=bind,source=$REPO_DIR,target=/util")"
-check "mounts the Claude credentials" \
-    "$(called "type=bind,source=$HOME/.claude/.credentials.json,target=/home/vscode/.claude/.credentials.json")"
+check "mounts the container Claude token read-only" \
+    "$(called "type=bind,source=$HOME/.config/util/claude-oauth-token,target=/run/util/claude-oauth-token,readonly")"
+check "never mounts the host Claude login (refresh token rotates)" "$(not_called ".claude/.credentials.json")"
+check "mounts the host Claude config read-only" "$(called "target=/host-claude.json,readonly")"
 check "mounts the Codex credentials" \
     "$(called "type=bind,source=$HOME/.codex/auth.json,target=/home/vscode/.codex/auth.json")"
 check "still recreates the container" "$(arg "--remove-existing-container")"
@@ -94,7 +102,7 @@ setup
 seed_credentials
 run dcs /work >/dev/null
 check "mounts this checkout at /util" "$(called "type=bind,source=$REPO_DIR,target=/util")"
-check "mounts the Claude credentials" "$(called "target=/home/vscode/.claude/.credentials.json")"
+check "mounts the container Claude token" "$(called "target=/run/util/claude-oauth-token,readonly")"
 check "does not recreate the container" "$(not_called "--remove-existing-container")"
 teardown
 
@@ -102,8 +110,57 @@ echo "== credentials that do not exist are not mounted =="
 setup
 run dcr /work >/dev/null
 check "mounts the checkout regardless" "$(called "target=/util")"
-check "no Claude mount" "$(not_called ".credentials.json")"
+check "no Claude token mount" "$(not_called "claude-oauth-token")"
 check "no Codex mount" "$(not_called "auth.json")"
+teardown
+
+echo "== the container Claude token is renewed, not just created =="
+setup
+seed_credentials
+OUT="$(UTIL_REFRESH_CLAUDE_TOKEN=1 run dcr /work)"
+# No terminal in the test run, so renewal is reported and skipped, never blocking.
+check "says it wants to refresh" "$(contains "$OUT" "Refreshing the container Claude token")"
+check "does not hang without a terminal" "$(contains "$OUT" "no terminal to renew it")"
+check "keeps mounting the existing token" "$(called "target=/run/util/claude-oauth-token,readonly")"
+teardown
+
+echo "== an old container Claude token is flagged =="
+setup
+seed_credentials
+touch -d '400 days ago' "$HOME/.config/util/claude-oauth-token"
+OUT="$(run dcs /work)"
+check "notices the age" "$(contains "$OUT" "days old")"
+teardown
+
+echo "== a fresh container Claude token is left alone =="
+setup
+seed_credentials
+OUT="$(run dcs /work)"
+check "no renewal chatter" "$(not_called_out "$OUT" "no terminal")"
+teardown
+
+echo "== host-authored Claude config is shared read-only, never the login =="
+setup
+seed_credentials
+run dcr /work >/dev/null
+check "mounts CLAUDE.md read-only" "$(called "source=$HOME/.claude/CLAUDE.md,target=/host-claude-config/CLAUDE.md,readonly")"
+check "mounts agents read-only" "$(called "target=/host-claude-config/agents,readonly")"
+check "mounts synced skills read-only" "$(called "target=/host-claude-config/skills/synced,readonly")"
+check "does not mount the whole ~/.claude" "$(not_called "target=/home/vscode/.claude,")"
+check "bootstrap links it into place" "$(called 'ln -s "/host-claude-config/$rel"')"
+teardown
+
+echo "== host-authored Claude config that does not exist is not mounted =="
+setup
+run dcr /work >/dev/null
+check "no host-claude-config mounts" "$(not_called "target=/host-claude-config")"
+teardown
+
+echo "== the docker wrapper is handed to the devcontainer CLI =="
+setup
+run dcr /work >/dev/null
+check "passes --docker-path" "$(arg "--docker-path")"
+check "pointing at lib/docker-runtime.sh" "$(arg "$REPO_DIR/lib/docker-runtime.sh")"
 teardown
 
 echo "== a UTIL_DIR that is not a checkout is not mounted =="
@@ -124,7 +181,7 @@ echo "== the container user is overridable =="
 setup
 seed_credentials
 UTIL_DEVCONTAINER_USER=node run dcr /work >/dev/null
-check "targets that user's home" "$(called "target=/home/node/.claude/.credentials.json")"
+check "targets that user's home" "$(called "target=/home/node/.codex/auth.json")"
 check "and not the default" "$(not_called "/home/vscode/")"
 teardown
 
