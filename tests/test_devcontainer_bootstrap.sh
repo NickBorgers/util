@@ -52,7 +52,10 @@ seed_credentials() {
     mkdir -p "$HOME/.claude/agents" "$HOME/.claude/skills/synced"
     echo hi >"$HOME/.claude/CLAUDE.md"
     mkdir -p "$HOME/.config/util"
-    echo 'sk-ant-oat01-test' >"$HOME/.config/util/claude-oauth-token"
+    # A fresh access token, far from expiry, and a refresh token that must never
+    # reach the container.
+    local exp=$(( ($(date +%s) + 7200) * 1000 ))
+    printf '{"claudeAiOauth":{"accessToken":"sk-ant-oat01-ACCESS","refreshToken":"sk-ant-ort01-REFRESH","expiresAt":%s}}' "$exp" >"$HOME/.claude/.credentials.json"
 }
 
 # Subshell so the sourced profile cannot leak functions or PATH between cases.
@@ -88,9 +91,9 @@ seed_credentials
 run dcr /work >/dev/null
 check "mounts this checkout at /util" "$(called "type=bind,source=$REPO_DIR,target=/util")"
 check "mounts the container Claude token read-only" \
-    "$(called "type=bind,source=$HOME/.config/util/claude-oauth-token,target=/run/util/claude-oauth-token,readonly")"
+    "$(called "type=bind,source=$HOME/.config/util/claude-oauth-token,target=/run/util/claude-oauth-token")"
 check "never mounts the host Claude login (refresh token rotates)" "$(not_called ".claude/.credentials.json")"
-check "mounts the host Claude config read-only" "$(called "target=/host-claude.json,readonly")"
+check "mounts the host Claude config read-only" "$(called "target=/host-claude.json")"
 check "mounts the Codex credentials" \
     "$(called "type=bind,source=$HOME/.codex/auth.json,target=/home/vscode/.codex/auth.json")"
 check "still recreates the container" "$(arg "--remove-existing-container")"
@@ -102,7 +105,7 @@ setup
 seed_credentials
 run dcs /work >/dev/null
 check "mounts this checkout at /util" "$(called "type=bind,source=$REPO_DIR,target=/util")"
-check "mounts the container Claude token" "$(called "target=/run/util/claude-oauth-token,readonly")"
+check "mounts the container Claude token" "$(called "target=/run/util/claude-oauth-token")"
 check "does not recreate the container" "$(not_called "--remove-existing-container")"
 teardown
 
@@ -114,38 +117,55 @@ check "no Claude token mount" "$(not_called "claude-oauth-token")"
 check "no Codex mount" "$(not_called "auth.json")"
 teardown
 
-echo "== the container Claude token is renewed, not just created =="
+echo "== the container Claude token comes from the host login, without prompts =="
 setup
 seed_credentials
-OUT="$(UTIL_REFRESH_CLAUDE_TOKEN=1 run dcr /work)"
-# No terminal in the test run, so renewal is reported and skipped, never blocking.
-check "says it wants to refresh" "$(contains "$OUT" "Refreshing the container Claude token")"
-check "does not hang without a terminal" "$(contains "$OUT" "no terminal to renew it")"
-check "keeps mounting the existing token" "$(called "target=/run/util/claude-oauth-token,readonly")"
+OUT="$(run dcr /work)"
+TOKEN_FILE="$HOME/.config/util/claude-oauth-token"
+check "writes the access token" "$(eq "$(cat "$TOKEN_FILE" 2>/dev/null)" "sk-ant-oat01-ACCESS")"
+check "never writes the refresh token" "$([ -f "$TOKEN_FILE" ] && grep -q REFRESH "$TOKEN_FILE" && echo 0 || echo 1)"
+check "keeps the token file private" "$(eq "$(stat -c %a "$TOKEN_FILE" 2>/dev/null)" "600")"
+check "says how long it lasts" "$(contains "$OUT" "valid for about")"
+check "mounts it read-only" "$(called "source=$TOKEN_FILE,target=/run/util/claude-oauth-token")"
 teardown
 
-echo "== an old container Claude token is flagged =="
+echo "== dcs refreshes the token in place =="
 setup
 seed_credentials
-touch -d '400 days ago' "$HOME/.config/util/claude-oauth-token"
-OUT="$(run dcs /work)"
-check "notices the age" "$(contains "$OUT" "days old")"
+run dcs /work >/dev/null
+INODE_BEFORE="$(stat -c %i "$HOME/.config/util/claude-oauth-token")"
+printf '{"claudeAiOauth":{"accessToken":"sk-ant-oat01-NEWER","expiresAt":%s}}' "$(( ($(date +%s) + 7200) * 1000 ))" >"$HOME/.claude/.credentials.json"
+run dcs /work >/dev/null
+check "picks up the host's newer token" "$(eq "$(cat "$HOME/.config/util/claude-oauth-token")" "sk-ant-oat01-NEWER")"
+# A bind-mounted file only follows writes made in place; a rename would leave a
+# running container on the old inode.
+check "rewrites the same file" "$(eq "$(stat -c %i "$HOME/.config/util/claude-oauth-token")" "$INODE_BEFORE")"
 teardown
 
-echo "== a fresh container Claude token is left alone =="
+echo "== an expired host token is not handed over =="
 setup
 seed_credentials
-OUT="$(run dcs /work)"
-check "no renewal chatter" "$(not_called_out "$OUT" "no terminal")"
+printf '{"claudeAiOauth":{"accessToken":"sk-ant-oat01-OLD","expiresAt":1000}}' >"$HOME/.claude/.credentials.json"
+OUT="$(run dcr /work)"
+check "says to refresh on the host" "$(contains "$OUT" "has expired")"
+check "writes no token" "$([ -f "$HOME/.config/util/claude-oauth-token" ] && echo 0 || echo 1)"
+check "mounts no token" "$(not_called "claude-oauth-token")"
+teardown
+
+echo "== no host login: container is left to log in itself =="
+setup
+OUT="$(run dcr /work)"
+check "still brings up the container" "$(called "up")"
+check "mounts no token" "$(not_called "claude-oauth-token")"
 teardown
 
 echo "== host-authored Claude config is shared read-only, never the login =="
 setup
 seed_credentials
 run dcr /work >/dev/null
-check "mounts CLAUDE.md read-only" "$(called "source=$HOME/.claude/CLAUDE.md,target=/host-claude-config/CLAUDE.md,readonly")"
-check "mounts agents read-only" "$(called "target=/host-claude-config/agents,readonly")"
-check "mounts synced skills read-only" "$(called "target=/host-claude-config/skills/synced,readonly")"
+check "mounts CLAUDE.md read-only" "$(called "source=$HOME/.claude/CLAUDE.md,target=/host-claude-config/CLAUDE.md")"
+check "mounts agents read-only" "$(called "target=/host-claude-config/agents")"
+check "mounts synced skills read-only" "$(called "target=/host-claude-config/skills/synced")"
 check "does not mount the whole ~/.claude" "$(not_called "target=/home/vscode/.claude,")"
 check "bootstrap links it into place" "$(called 'ln -s "/host-claude-config/$rel"')"
 teardown
