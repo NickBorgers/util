@@ -222,6 +222,27 @@ function _ensure_claude_container_token() {
 	fi
 }
 
+# The container's copy of the host's GitHub token, so gh and git work inside it.
+# Unlike Claude's, a gh OAuth token does not rotate, so sharing it cannot log the
+# host out; it is still handed over as a read-only file, never ~/.config/gh.
+function _gh_container_token_file() {
+	echo "${UTIL_GH_TOKEN_FILE:-$HOME/.config/util/gh-token}"
+}
+
+function _ensure_gh_container_token() {
+	local file token
+	file="$(_gh_container_token_file)"
+	command -v gh &>/dev/null || return 0
+	token="$(gh auth token 2>/dev/null)"
+	if [ -z "$token" ]; then
+		echo "gh is not logged in on the host; the container will have no GitHub access." >&2
+		echo "  Run: gh auth login" >&2
+		return 0
+	fi
+	mkdir -p "$(dirname "$file")" && chmod 700 "$(dirname "$file")"
+	( umask 077; printf '%s\n' "$token" >"$file" )
+}
+
 # The folder name Claude Code gives a workspace under ~/.claude/projects: the
 # absolute path with every non-alphanumeric character turned into a dash.
 function _claude_project_key() {
@@ -280,6 +301,12 @@ function _devcontainer_util_mounts() {
 	token_file="$(_claude_container_token_file)"
 	if [ -s "$token_file" ]; then
 		_DC_MOUNTS+=(--mount "type=bind,source=$token_file,target=/run/util/claude-oauth-token")
+	fi
+
+	local gh_token_file
+	gh_token_file="$(_gh_container_token_file)"
+	if [ -s "$gh_token_file" ]; then
+		_DC_MOUNTS+=(--mount "type=bind,source=$gh_token_file,target=/run/util/gh-token")
 	fi
 
 	for rel in ".codex/auth.json"; do
@@ -399,6 +426,7 @@ function dcs() {
 	_ensure_devcontainer_cli || return 1
 	local workspace="${1:-.}"
 	_ensure_claude_container_token
+	_ensure_gh_container_token
 	_devcontainer_util_mounts "$workspace"
 	_devcontainer_util_warn_stale "$workspace"
 	devcontainer up --workspace-folder "$workspace" "${_DC_MOUNTS[@]}" && \
@@ -410,6 +438,7 @@ function dcr() {
 	_ensure_devcontainer_cli || return 1
 	local workspace="${1:-.}"
 	_ensure_claude_container_token
+	_ensure_gh_container_token
 	_devcontainer_util_mounts "$workspace"
 	devcontainer up --workspace-folder "$workspace" --remove-existing-container "${_DC_MOUNTS[@]}" && \
 	_devcontainer_util_bootstrap "$workspace" && \
@@ -465,4 +494,10 @@ alias codex-yolo='codex --dangerously-bypass-approvals-and-sandbox'
 if [ -r /run/util/claude-oauth-token ]; then
 	CLAUDE_CODE_OAUTH_TOKEN="$(cat /run/util/claude-oauth-token)"
 	export CLAUDE_CODE_OAUTH_TOKEN
+fi
+
+# Likewise GitHub: gh and git inside a devcontainer use the host's token.
+if [ -r /run/util/gh-token ]; then
+	GH_TOKEN="$(cat /run/util/gh-token)"
+	export GH_TOKEN
 fi

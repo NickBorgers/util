@@ -106,6 +106,13 @@ echo "Installing agent CLIs..."
 source "$SCRIPT_DIR/lib/agent-clis.sh"
 install_agent_clis
 
+# GitHub CLI, for the same containers that have no gh and nothing to push with.
+echo ""
+echo "Installing GitHub CLI..."
+# shellcheck source=lib/gh-cli.sh
+source "$SCRIPT_DIR/lib/gh-cli.sh"
+install_gh
+
 # No-op unless the host's config has been mounted in, which only dcs/dcr do.
 # shellcheck source=lib/agent-identity.sh
 source "$SCRIPT_DIR/lib/agent-identity.sh"
