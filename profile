@@ -369,11 +369,38 @@ function _devcontainer_util_bootstrap() {
 	' util-bootstrap "${UTIL_FORCE_BOOTSTRAP:-}" "$key"
 }
 
+# Mounts are fixed when a container is created, so `dcs` reusing a container that
+# predates a mount - an older profile in an open shell, an editor that brought it
+# up - gives a shell that silently lacks it (project memory, the Claude token).
+# Say so, and what to do. Warns only: recreating loses the container's own state.
+function _devcontainer_util_warn_stale() {
+	local workspace="$1" abs cid have want missing="" i arg
+	abs="$(cd "$workspace" 2>/dev/null && pwd -P)" || return 0
+	command -v docker &>/dev/null || return 0
+	cid="$(docker ps -q --filter "label=devcontainer.local_folder=$abs" 2>/dev/null | head -1)"
+	[ -n "$cid" ] || return 0
+	have="$(docker inspect -f '{{range .Mounts}}{{.Destination}}{{"\n"}}{{end}}' "$cid" 2>/dev/null)"
+	[ -n "$have" ] || return 0
+	for i in "${!_DC_MOUNTS[@]}"; do
+		[ "${_DC_MOUNTS[$i]}" = "--mount" ] || continue
+		arg="${_DC_MOUNTS[$((i + 1))]}"
+		want="$(printf '%s' "$arg" | sed -n 's/.*target=\([^,]*\).*/\1/p')"
+		[ -n "$want" ] || continue
+		grep -qxF -- "$want" <<<"$have" || missing="$missing $want"
+	done
+	if [ -n "$missing" ]; then
+		echo "This container was created without:$missing" >&2
+		echo "  Mounts are fixed at creation, so dcs cannot add them. Run dcr to recreate it." >&2
+		echo "  (If you just updated util, run: source $UTIL_DIR/profile)" >&2
+	fi
+}
+
 function dcs() {
 	_ensure_devcontainer_cli || return 1
 	local workspace="${1:-.}"
 	_ensure_claude_container_token
 	_devcontainer_util_mounts "$workspace"
+	_devcontainer_util_warn_stale "$workspace"
 	devcontainer up --workspace-folder "$workspace" "${_DC_MOUNTS[@]}" && \
 	_devcontainer_util_bootstrap "$workspace" && \
 	devcontainer exec --workspace-folder "$workspace" bash
