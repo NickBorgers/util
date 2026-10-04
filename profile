@@ -174,6 +174,69 @@ fi
 # devcontainers base images uses `vscode`; override for one that does not.
 : "${UTIL_DEVCONTAINER_USER:=vscode}"
 
+# Where the container's Claude token lives on the host. Not under ~/.claude:
+# that directory is the host login's, and this token must stay independent of it.
+function _claude_container_token_file() {
+	echo "${UTIL_CLAUDE_TOKEN_FILE:-$HOME/.config/util/claude-oauth-token}"
+}
+
+# Make sure a container-only Claude token exists and is fresh, creating or
+# renewing it so dcs/dcr stay "run it and it works". `claude setup-token` mints
+# a long-lived token that is separate from the host login, so a container can
+# never rotate the host's refresh token. Needs a terminal and a browser; without
+# them it warns and the container starts unauthenticated (or keeps the old token).
+#
+# Renewed when missing, older than UTIL_CLAUDE_TOKEN_MAX_AGE_DAYS (default 300;
+# setup-token tokens last about a year), or when UTIL_REFRESH_CLAUDE_TOKEN=1.
+# A failed renewal keeps the existing token. The file is rewritten in place so a
+# running container's bind mount sees the new value; new shells pick it up.
+function _ensure_claude_container_token() {
+	local file max_age
+	file="$(_claude_container_token_file)"
+	max_age="${UTIL_CLAUDE_TOKEN_MAX_AGE_DAYS:-300}"
+
+	local reason=""
+	if [ ! -s "$file" ]; then
+		reason="No container Claude token yet"
+	elif [ -n "${UTIL_REFRESH_CLAUDE_TOKEN:-}" ]; then
+		reason="Refreshing the container Claude token (requested)"
+	elif [ -n "$(find "$file" -mtime +"$max_age" 2>/dev/null)" ]; then
+		reason="Container Claude token is over $max_age days old"
+	fi
+	[ -z "$reason" ] && return 0
+
+	command -v claude &>/dev/null || return 0
+	if [ ! -t 0 ] || [ ! -t 1 ]; then
+		echo "$reason, and there is no terminal to renew it." >&2
+		echo "  Run dcs/dcr from a terminal to create it (uses \`claude setup-token\`)." >&2
+		return 0
+	fi
+
+	echo "$reason. Running \`claude setup-token\`..." >&2
+	local log token
+	log="$(mktemp)"
+	chmod 600 "$log"
+	if command -v script &>/dev/null && [ "$(uname)" != "Darwin" ]; then
+		script -qec "claude setup-token" "$log" || true
+	else
+		claude setup-token || true
+	fi
+	token="$(tr -d '\r' <"$log" 2>/dev/null | sed 's/\x1b\[[0-9;?]*[A-Za-z]//g' | grep -o 'sk-ant-[A-Za-z0-9_-]\{40,\}' | tail -1)"
+	rm -f "$log"
+	if [ -z "$token" ]; then
+		printf 'Could not read the token automatically. Paste it here (blank to skip, input hidden): ' >&2
+		read -rs token
+		echo >&2
+	fi
+	if [ -z "$token" ]; then
+		echo "No new token saved; keeping what was there." >&2
+		return 0
+	fi
+	mkdir -p "$(dirname "$file")" && chmod 700 "$(dirname "$file")"
+	( umask 077; printf '%s\n' "$token" >"$file" )
+	echo "Saved container Claude token to $file" >&2
+}
+
 # Sets _DC_MOUNTS to the bind mounts every container should get.
 #
 # A devcontainer is otherwise whatever its base image shipped: no profile, no
@@ -190,6 +253,14 @@ function _devcontainer_util_mounts() {
 	_DC_MOUNTS=()
 	local home="/home/$UTIL_DEVCONTAINER_USER" rel
 
+	# The devcontainer CLI has no runtime or DNS flag, so route its docker calls
+	# through a wrapper that adds them: Kata microVM isolation when Docker has it
+	# registered, Tailscale DNS when this host has Tailscale. Both auto-detect and
+	# pass through untouched otherwise; see lib/docker-runtime.sh.
+	if [ -x "$UTIL_DIR/lib/docker-runtime.sh" ]; then
+		_DC_MOUNTS+=(--docker-path "$UTIL_DIR/lib/docker-runtime.sh")
+	fi
+
 	# Only mount a real checkout. Docker creates a missing bind source as a
 	# root-owned directory on the host, so a wrong UTIL_DIR - the zsh fallback
 	# on a machine that keeps the checkout elsewhere, say - would silently
@@ -202,9 +273,32 @@ function _devcontainer_util_mounts() {
 		echo "  Set UTIL_DIR to the checkout to change that." >&2
 	fi
 
-	for rel in ".claude/.credentials.json" ".codex/auth.json"; do
+	# Claude does not get the host's .credentials.json. Its OAuth refresh token
+	# rotates on use, so a container refreshing from a shared copy invalidates
+	# the host's - and, when the other side presents the already-rotated token,
+	# can get every session logged out at once. Containers authenticate with
+	# their own long-lived `claude setup-token` token instead, handed in as a
+	# read-only file the container's profile exports as CLAUDE_CODE_OAUTH_TOKEN.
+	local token_file
+	token_file="$(_claude_container_token_file)"
+	if [ -s "$token_file" ]; then
+		_DC_MOUNTS+=(--mount "type=bind,source=$token_file,target=/run/util/claude-oauth-token,readonly")
+	fi
+
+	for rel in ".codex/auth.json"; do
 		[ -f "$HOME/$rel" ] || continue
 		_DC_MOUNTS+=(--mount "type=bind,source=$HOME/$rel,target=$home/$rel")
+	done
+
+	# Host-authored Claude config the bootstrap cannot recreate: global
+	# CLAUDE.md, hand-written agents, synced skills. Mounted read-only under a
+	# staging path and symlinked into ~/.claude by the bootstrap, rather than over
+	# ~/.claude itself - that keeps the container's own installs writable, avoids
+	# docker creating root-owned mount points in its home, and never exposes
+	# .credentials.json (a readable refresh token is one the container can rotate).
+	for rel in "CLAUDE.md" "agents" "skills/synced"; do
+		[ -e "$HOME/.claude/$rel" ] || continue
+		_DC_MOUNTS+=(--mount "type=bind,source=$HOME/.claude/$rel,target=/host-claude-config/$rel,readonly")
 	done
 
 	# The token alone does not spare you a login: onboarding state lives in
@@ -212,7 +306,7 @@ function _devcontainer_util_mounts() {
 	# container's own MCP config, so it is mounted aside rather than over the
 	# container's copy, and the bootstrap lifts only the identity keys out.
 	if [ -f "$HOME/.claude.json" ]; then
-		_DC_MOUNTS+=(--mount "type=bind,source=$HOME/.claude.json,target=/host-claude.json")
+		_DC_MOUNTS+=(--mount "type=bind,source=$HOME/.claude.json,target=/host-claude.json,readonly")
 	fi
 }
 
@@ -240,6 +334,16 @@ function _devcontainer_util_bootstrap() {
 		# belong to the host, and chowning through a bind mount would retitle
 		# them there too.
 		sudo chown "$(id -u):$(id -g)" "$HOME/.claude" "$HOME/.codex" 2>/dev/null || true
+		# Link the read-only host Claude config (see _devcontainer_util_mounts)
+		# into place. Never replaces anything the container already has.
+		if [ -d /host-claude-config ]; then
+			for rel in CLAUDE.md agents skills/synced; do
+				[ -e "/host-claude-config/$rel" ] || continue
+				[ -e "$HOME/.claude/$rel" ] || [ -L "$HOME/.claude/$rel" ] && continue
+				mkdir -p "$HOME/.claude/$(dirname "$rel")"
+				ln -s "/host-claude-config/$rel" "$HOME/.claude/$rel"
+			done
+		fi
 		UTIL_SKIP_PACKAGES=1 /util/linux_install.sh && touch "$stamp"
 	' util-bootstrap "${UTIL_FORCE_BOOTSTRAP:-}"
 }
@@ -247,6 +351,7 @@ function _devcontainer_util_bootstrap() {
 function dcs() {
 	_ensure_devcontainer_cli || return 1
 	local workspace="${1:-.}"
+	_ensure_claude_container_token
 	_devcontainer_util_mounts
 	devcontainer up --workspace-folder "$workspace" "${_DC_MOUNTS[@]}" && \
 	_devcontainer_util_bootstrap "$workspace" && \
@@ -256,6 +361,7 @@ function dcs() {
 function dcr() {
 	_ensure_devcontainer_cli || return 1
 	local workspace="${1:-.}"
+	_ensure_claude_container_token
 	_devcontainer_util_mounts
 	devcontainer up --workspace-folder "$workspace" --remove-existing-container "${_DC_MOUNTS[@]}" && \
 	_devcontainer_util_bootstrap "$workspace" && \
@@ -306,3 +412,9 @@ function publish_report() {
 alias claude-yolo='claude --dangerously-skip-permissions'
 alias codex-yolo='codex --dangerously-bypass-approvals-and-sandbox'
 
+# Inside a devcontainer, authenticate Claude with the container-only token
+# dcs/dcr mounted (see _devcontainer_util_mounts) rather than the host login.
+if [ -r /run/util/claude-oauth-token ]; then
+	CLAUDE_CODE_OAUTH_TOKEN="$(cat /run/util/claude-oauth-token)"
+	export CLAUDE_CODE_OAUTH_TOKEN
+fi

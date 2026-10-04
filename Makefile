@@ -12,5 +12,6 @@ test:
 	./tests/test_claude_skills.sh
 	./tests/test_agent_clis.sh
 	./tests/test_devcontainer_bootstrap.sh
+	./tests/test_docker_runtime.sh
 	./tests/test_agent_identity.sh
 	./tests/test_claude_output_styles.sh
