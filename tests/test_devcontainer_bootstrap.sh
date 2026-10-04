@@ -36,6 +36,15 @@ setup() {
 { echo "=== devcontainer"; printf '%s\n' "$@"; } >> "$CALLS"
 STUB
     chmod +x "$SANDBOX/bin/devcontainer"
+
+    # gh stub, so a real host login can never leak into a case: `auth token`
+    # prints $GH_STUB_TOKEN, and nothing at all when it is unset (logged out).
+    cat >"$SANDBOX/bin/gh" <<'STUB'
+#!/bin/bash
+[ "${1:-} ${2:-}" = "auth token" ] && { [ -n "${GH_STUB_TOKEN:-}" ] && echo "$GH_STUB_TOKEN"; exit 0; }
+exit 0
+STUB
+    chmod +x "$SANDBOX/bin/gh"
 }
 
 teardown() {
@@ -253,6 +262,25 @@ STUB
 chmod +x "$SANDBOX/bin/docker"
 OUT="$(run dcs /work)"
 check "no warning" "$(not_called_out "$OUT" "created without")"
+teardown
+
+echo "== the host's GitHub token reaches the container as a read-only file =="
+setup
+seed_credentials
+GH_STUB_TOKEN=gho_TESTGH run dcr /work >/dev/null
+GH_FILE="$HOME/.config/util/gh-token"
+check "writes the token" "$(eq "$(cat "$GH_FILE" 2>/dev/null)" "gho_TESTGH")"
+check "keeps the file private" "$(eq "$(stat -c %a "$GH_FILE" 2>/dev/null)" "600")"
+check "mounts it at /run/util/gh-token" "$(called "source=$GH_FILE,target=/run/util/gh-token")"
+check "never mounts ~/.config/gh" "$(not_called ".config/gh")"
+teardown
+
+echo "== gh logged out on the host: no token, a clear note =="
+setup
+seed_credentials
+OUT="$(run dcr /work)"
+check "says to log in" "$(contains "$OUT" "gh auth login")"
+check "mounts no token" "$(not_called "gh-token")"
 teardown
 
 echo "== a UTIL_DIR that is not a checkout is not mounted =="
