@@ -103,6 +103,15 @@ wrap run --mount type=bind,src=/h/tok,target=/run/util/claude-oauth-token,readon
 check "no doubled readonly" "$(arg "type=bind,src=/h/tok,target=/run/util/claude-oauth-token,readonly")"
 teardown
 
+echo "== project memory is read-write unless asked otherwise =="
+setup
+wrap run --mount type=bind,src=/h/mem,dst=/home/vscode/.claude/projects/-k/memory alpine
+check "read-write by default" "$(arg "type=bind,src=/h/mem,dst=/home/vscode/.claude/projects/-k/memory")"
+: >"$CALLS"
+UTIL_SHARE_MEMORY=ro wrap run --mount type=bind,src=/h/mem,dst=/home/vscode/.claude/projects/-k/memory alpine
+check "read-only with UTIL_SHARE_MEMORY=ro" "$(arg "type=bind,src=/h/mem,dst=/home/vscode/.claude/projects/-k/memory,readonly")"
+teardown
+
 echo "== other subcommands are untouched =="
 setup
 RUNTIMES_JSON='{"kata-clh":{}}' wrap ps -q
