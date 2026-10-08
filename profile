@@ -222,6 +222,80 @@ function _ensure_claude_container_token() {
 	fi
 }
 
+# Where the container's sanitized copy of the host's Codex login lives. Not under
+# ~/.codex, so it can be mounted without exposing the host login beside it.
+function _codex_container_auth_file() {
+	echo "${UTIL_CODEX_AUTH_FILE:-$HOME/.config/util/codex-auth.json}"
+}
+
+# Derive the container's Codex login from the host's, with no prompts.
+#
+# Codex has the same hazard as Claude: a ChatGPT login holds a refresh token
+# that rotates on use, so a container refreshing from a shared copy can log the
+# host out. A read-only mount does not help, as the refresh happens over the
+# network before any write. So the container gets a copy whose refresh_token is
+# an empty string: Codex still reads it as a login and uses the access token
+# (valid about 10 days), but any attempt to refresh fails instead of rotating
+# anything. The key must stay present - Codex rejects a file without it.
+# An API-key login does not rotate, so that file is handed over unchanged.
+#
+# The file is rewritten in place (same inode) so running containers see it.
+# Takes the host's token as it is, so run codex on the host if it has expired.
+function _ensure_codex_container_auth() {
+	local auth="$HOME/.codex/auth.json"
+	local file mode out exp now
+	file="$(_codex_container_auth_file)"
+	[ -r "$auth" ] || return 0
+
+	if command -v jq &>/dev/null; then
+		mode="$(jq -r '.auth_mode // empty' "$auth" 2>/dev/null)"
+	elif command -v python3 &>/dev/null; then
+		mode="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1])).get("auth_mode") or "")' "$auth" 2>/dev/null)"
+	else
+		return 0
+	fi
+
+	if [ "$mode" = "chatgpt" ]; then
+		exp="$(_codex_token_expiry "$auth")"
+		now="$(date +%s)"
+		if [ -n "$exp" ] && [ "$exp" -le "$now" ] 2>/dev/null; then
+			echo "The host Codex token has expired; run codex on the host, then dcs again." >&2
+			echo "  The container will need its own login until then." >&2
+			return 0
+		fi
+		if command -v jq &>/dev/null; then
+			out="$(jq '.tokens.refresh_token = ""' "$auth" 2>/dev/null)"
+		else
+			out="$(python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); d.setdefault("tokens",{})["refresh_token"]=""; print(json.dumps(d))' "$auth" 2>/dev/null)"
+		fi
+	else
+		out="$(cat "$auth")"
+	fi
+	[ -n "$out" ] || return 0
+
+	mkdir -p "$(dirname "$file")" && chmod 700 "$(dirname "$file")"
+	( umask 077; printf '%s\n' "$out" >"$file" )
+	if [ -n "${exp:-}" ]; then
+		echo "Container Codex login refreshed from the host; valid for about $(( (exp - now) / 3600 ))h." >&2
+	fi
+}
+
+# Prints the access token's expiry (epoch seconds) from its JWT payload, or
+# nothing if it cannot be read. Decoded locally; no network.
+function _codex_token_expiry() {
+	local payload
+	if command -v jq &>/dev/null; then
+		payload="$(jq -r '.tokens.access_token // empty' "$1" 2>/dev/null | cut -d. -f2 | tr '_-' '/+')"
+		[ -n "$payload" ] || return 0
+		printf '%s==' "$payload" | base64 -d 2>/dev/null | jq -r '.exp // empty' 2>/dev/null
+	elif command -v python3 &>/dev/null; then
+		python3 -c 'import json,sys,base64
+t=json.load(open(sys.argv[1])).get("tokens",{}).get("access_token","")
+p=t.split(".")[1] if t.count(".")>=2 else ""
+print(json.loads(base64.urlsafe_b64decode(p+"=="*2)).get("exp","") if p else "")' "$1" 2>/dev/null
+	fi
+}
+
 # The container's copy of the host's GitHub token, so gh and git work inside it.
 # Unlike Claude's, a gh OAuth token does not rotate, so sharing it cannot log the
 # host out; it is still handed over as a read-only file, never ~/.config/gh.
@@ -258,11 +332,10 @@ function _claude_project_key() {
 # describes that project, not this machine, and should not have to know about
 # either. So mount this checkout and let its bootstrap run inside.
 #
-# Credentials are mounted per-file rather than by mounting ~/.claude wholesale:
-# the container installs its own plugins and settings, and those must not write
-# back over the host's. Read-write on purpose - both CLIs rotate their tokens,
-# and a container refreshing against a copy would strand the host on a token
-# that is no longer valid.
+# Credentials are never mounted from ~/.claude or ~/.codex: the container
+# installs its own plugins and settings, and those must not write back over the
+# host's. Both CLIs rotate refresh tokens, so containers get derived files with
+# no usable refresh token instead (see the _ensure_*_container_* helpers).
 function _devcontainer_util_mounts() {
 	local workspace="${1:-.}"
 	_DC_MOUNTS=()
@@ -309,10 +382,13 @@ function _devcontainer_util_mounts() {
 		_DC_MOUNTS+=(--mount "type=bind,source=$gh_token_file,target=/run/util/gh-token")
 	fi
 
-	for rel in ".codex/auth.json"; do
-		[ -f "$HOME/$rel" ] || continue
-		_DC_MOUNTS+=(--mount "type=bind,source=$HOME/$rel,target=$home/$rel")
-	done
+	# Codex likewise gets a sanitized copy (see _ensure_codex_container_auth),
+	# not ~/.codex/auth.json: the bootstrap links ~/.codex/auth.json to it.
+	local codex_file
+	codex_file="$(_codex_container_auth_file)"
+	if [ -s "$codex_file" ]; then
+		_DC_MOUNTS+=(--mount "type=bind,source=$codex_file,target=/run/util/codex-auth.json")
+	fi
 
 	# Host-authored Claude config the bootstrap cannot recreate: global
 	# CLAUDE.md, hand-written agents, synced skills. Mounted read-only under a
@@ -376,6 +452,12 @@ function _devcontainer_util_bootstrap() {
 		# belong to the host, and chowning through a bind mount would retitle
 		# them there too.
 		sudo chown "$(id -u):$(id -g)" "$HOME/.claude" "$HOME/.codex" 2>/dev/null || true
+		# Codex reads its login through a link to the read-only sanitized copy
+		# (empty refresh token), so it can use the access token but never rotate.
+		if [ -e /run/util/codex-auth.json ]; then
+			mkdir -p "$HOME/.codex"
+			ln -sf /run/util/codex-auth.json "$HOME/.codex/auth.json"
+		fi
 		# Link the read-only host Claude config (see _devcontainer_util_mounts)
 		# into place. Never replaces anything the container already has.
 		if [ -d /host-claude-config ]; then
@@ -426,6 +508,7 @@ function dcs() {
 	_ensure_devcontainer_cli || return 1
 	local workspace="${1:-.}"
 	_ensure_claude_container_token
+	_ensure_codex_container_auth
 	_ensure_gh_container_token
 	_devcontainer_util_mounts "$workspace"
 	_devcontainer_util_warn_stale "$workspace"
@@ -438,6 +521,7 @@ function dcr() {
 	_ensure_devcontainer_cli || return 1
 	local workspace="${1:-.}"
 	_ensure_claude_container_token
+	_ensure_codex_container_auth
 	_ensure_gh_container_token
 	_devcontainer_util_mounts "$workspace"
 	devcontainer up --workspace-folder "$workspace" --remove-existing-container "${_DC_MOUNTS[@]}" && \

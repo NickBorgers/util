@@ -14,7 +14,8 @@
 #
 #   mounts   The devcontainer CLI's --mount cannot say "readonly", so mounts
 #            whose target is one of the host-derived paths below are made
-#            read-only here: the Claude access token, the host's Claude config
+#            read-only here: the Claude access token, the sanitized Codex
+#            login, the host's Claude config
 #            and the host's ~/.claude.json. The shared project memory
 #            (.../.claude/projects/<key>/memory) is read-write unless
 #            UTIL_SHARE_MEMORY=ro.
