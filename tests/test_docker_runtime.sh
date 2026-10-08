@@ -90,13 +90,15 @@ setup
 wrap run --mount type=bind,src=/h/tok,dst=/run/util/claude-oauth-token \
     --mount type=bind,src=/h/a,dst=/host-claude-config/agents \
     --mount type=bind,src=/h/c.json,dst=/host-claude.json \
+    --mount type=bind,src=/h/cx,dst=/run/util/codex-auth.json \
     --mount type=bind,src=/w,dst=/w \
-    --mount type=bind,src=/h/codex,dst=/home/vscode/.codex/auth.json alpine
+    --mount type=bind,src=/h/other,dst=/home/vscode/other alpine
 check "token mount" "$(arg "type=bind,src=/h/tok,dst=/run/util/claude-oauth-token,readonly")"
 check "host config mount" "$(arg "type=bind,src=/h/a,dst=/host-claude-config/agents,readonly")"
 check "host claude.json mount" "$(arg "type=bind,src=/h/c.json,dst=/host-claude.json,readonly")"
 check "workspace mount untouched" "$(arg "type=bind,src=/w,dst=/w")"
-check "other mounts untouched" "$(arg "type=bind,src=/h/codex,dst=/home/vscode/.codex/auth.json")"
+check "codex login mount" "$(arg "type=bind,src=/h/cx,dst=/run/util/codex-auth.json,readonly")"
+check "other mounts untouched" "$(arg "type=bind,src=/h/other,dst=/home/vscode/other")"
 check "image still last" "$(arg alpine)"
 : >"$CALLS"
 wrap run --mount type=bind,src=/h/tok,target=/run/util/claude-oauth-token,readonly alpine

@@ -56,8 +56,8 @@ trap teardown EXIT
 seed_credentials() {
     mkdir -p "$HOME/.claude" "$HOME/.codex"
     echo '{}' >"$HOME/.claude/.credentials.json"
-    echo '{}' >"$HOME/.codex/auth.json"
     echo '{}' >"$HOME/.claude.json"
+    seed_codex 864000
     mkdir -p "$HOME/.claude/agents" "$HOME/.claude/skills/synced"
     echo hi >"$HOME/.claude/CLAUDE.md"
     mkdir -p "$HOME/.config/util"
@@ -65,6 +65,17 @@ seed_credentials() {
     # reach the container.
     local exp=$(( ($(date +%s) + 7200) * 1000 ))
     printf '{"claudeAiOauth":{"accessToken":"sk-ant-oat01-ACCESS","refreshToken":"sk-ant-ort01-REFRESH","expiresAt":%s}}' "$exp" >"$HOME/.claude/.credentials.json"
+}
+
+# A Codex login as the host has it, with a JWT access token expiring in $1
+# seconds (negative = already expired) and a refresh token that must never
+# reach the container. $2 is the auth_mode.
+seed_codex() {
+    mkdir -p "$HOME/.codex"
+    local exp=$(( $(date +%s) + $1 )) payload
+    payload="$(printf '{"exp":%s}' "$exp" | base64 -w0 | tr '+/' '-_' | tr -d '=')"
+    printf '{"OPENAI_API_KEY":null,"auth_mode":"%s","last_refresh":"x","tokens":{"access_token":"h.%s.s","account_id":"acct","id_token":"i","refresh_token":"rt_REAL_REFRESH"}}' \
+        "${2:-chatgpt}" "$payload" >"$HOME/.codex/auth.json"
 }
 
 # Subshell so the sourced profile cannot leak functions or PATH between cases.
@@ -103,8 +114,10 @@ check "mounts the container Claude token read-only" \
     "$(called "type=bind,source=$HOME/.config/util/claude-oauth-token,target=/run/util/claude-oauth-token")"
 check "never mounts the host Claude login (refresh token rotates)" "$(not_called ".claude/.credentials.json")"
 check "mounts the host Claude config read-only" "$(called "target=/host-claude.json")"
-check "mounts the Codex credentials" \
-    "$(called "type=bind,source=$HOME/.codex/auth.json,target=/home/vscode/.codex/auth.json")"
+check "mounts the sanitized Codex login" \
+    "$(called "type=bind,source=$HOME/.config/util/codex-auth.json,target=/run/util/codex-auth.json")"
+check "never mounts the host Codex login (refresh token rotates)" "$(not_called "source=$HOME/.codex")"
+check "no read-write Codex mount in the home" "$(not_called ".codex/auth.json,")"
 check "still recreates the container" "$(arg "--remove-existing-container")"
 check "passes the workspace through" "$(arg "/work")"
 teardown
@@ -123,7 +136,7 @@ setup
 run dcr /work >/dev/null
 check "mounts the checkout regardless" "$(called "target=/util")"
 check "no Claude token mount" "$(not_called "claude-oauth-token")"
-check "no Codex mount" "$(not_called "auth.json")"
+check "no Codex mount" "$(not_called "target=/run/util/codex-auth.json")"
 teardown
 
 echo "== the container Claude token comes from the host login, without prompts =="
@@ -247,7 +260,7 @@ check "does not name a mount it has" "$(not_called_out "$OUT" "created without: 
 check "says to run dcr" "$(contains "$OUT" "Run dcr to recreate it")"
 check "still brings the container up" "$(called "up")"
 : >"$CALLS"
-ALL="$(printf '%s ' /util /run/util/claude-oauth-token /host-claude.json /home/vscode/.codex/auth.json /host-claude-config/CLAUDE.md /host-claude-config/agents /host-claude-config/skills/synced "/home/vscode/.claude/projects/$KEY/memory")"
+ALL="$(printf '%s ' /util /run/util/claude-oauth-token /run/util/codex-auth.json /host-claude.json /host-claude-config/CLAUDE.md /host-claude-config/agents /host-claude-config/skills/synced "/home/vscode/.claude/projects/$KEY/memory")"
 OUT="$(HAVE_MOUNTS="$ALL" run dcs "$SANDBOX/proj")"
 check "silent when nothing is missing" "$(not_called_out "$OUT" "created without")"
 teardown
@@ -262,6 +275,60 @@ STUB
 chmod +x "$SANDBOX/bin/docker"
 OUT="$(run dcs /work)"
 check "no warning" "$(not_called_out "$OUT" "created without")"
+teardown
+
+echo "== the container Codex login is the host login minus its refresh token =="
+setup
+seed_credentials
+OUT="$(run dcr /work)"
+CX="$HOME/.config/util/codex-auth.json"
+check "refresh_token is an empty string" "$(eq "$(jq -c '.tokens.refresh_token' "$CX" 2>/dev/null)" '""')"
+check "keeps the other tokens" "$(eq "$(jq -r '.tokens.account_id' "$CX" 2>/dev/null)" "acct")"
+check "keeps the access token" "$(eq "$(jq -r '.tokens.access_token|startswith("h.")' "$CX" 2>/dev/null)" "true")"
+check "never contains the real refresh token" "$(grep -q REAL_REFRESH "$CX" && echo 0 || echo 1)"
+check "leaves the host file alone" "$(grep -q rt_REAL_REFRESH "$HOME/.codex/auth.json" && echo 1 || echo 0)"
+check "keeps the file private" "$(eq "$(stat -c %a "$CX" 2>/dev/null)" "600")"
+check "says how long it lasts" "$(grep -qE "Container Codex login refreshed from the host; valid for about 2(39|40)h" <<<"$OUT" && echo 1 || echo 0)"
+INODE="$(stat -c %i "$CX")"
+run dcs /work >/dev/null
+check "rewritten in place on the next run (same inode)" "$(eq "$(stat -c %i "$CX")" "$INODE")"
+teardown
+
+echo "== an expired host Codex token is not handed over =="
+setup
+seed_credentials
+seed_codex -60
+OUT="$(run dcr /work)"
+check "says to run codex on the host" "$(contains "$OUT" "host Codex token has expired; run codex on the host")"
+check "writes no file" "$([ -e "$HOME/.config/util/codex-auth.json" ] && echo 0 || echo 1)"
+check "mounts nothing" "$(not_called "target=/run/util/codex-auth.json")"
+teardown
+
+echo "== an API-key Codex login is copied unchanged =="
+setup
+seed_credentials
+seed_codex 864000 apikey
+run dcr /work >/dev/null
+check "identical to the host file" "$(eq "$(jq -cS . "$HOME/.config/util/codex-auth.json")" "$(jq -cS . "$HOME/.codex/auth.json")")"
+check "still mounted" "$(called "target=/run/util/codex-auth.json")"
+teardown
+
+echo "== no host Codex login: nothing happens =="
+setup
+seed_credentials
+rm "$HOME/.codex/auth.json"
+OUT="$(run dcr /work)"
+check "no file" "$([ -e "$HOME/.config/util/codex-auth.json" ] && echo 0 || echo 1)"
+check "no mount" "$(not_called "target=/run/util/codex-auth.json")"
+check "no mention of Codex" "$(not_called_out "$OUT" "Codex")"
+teardown
+
+echo "== the Codex file location is overridable =="
+setup
+seed_credentials
+UTIL_CODEX_AUTH_FILE="$SANDBOX/elsewhere.json" run dcr /work >/dev/null
+check "writes there" "$([ -s "$SANDBOX/elsewhere.json" ] && echo 1 || echo 0)"
+check "mounts from there" "$(called "source=$SANDBOX/elsewhere.json,target=/run/util/codex-auth.json")"
 teardown
 
 echo "== the host's GitHub token reaches the container as a read-only file =="
@@ -293,15 +360,18 @@ check "no /util mount" "$(not_called "target=/util")"
 check "says what is missing" "$(contains "$OUT" "util checkout not found")"
 check "names the path it looked at" "$(contains "$OUT" "$SANDBOX/not-a-checkout")"
 check "still brings up the container" "$(called "up")"
-check "still mounts the credentials" "$(called "target=/home/vscode/.codex/auth.json")"
+check "still mounts the credentials" "$(called "target=/run/util/codex-auth.json")"
 check "bootstrap degrades inside the container" "$(called "util is not mounted at /util")"
 teardown
 
 echo "== the container user is overridable =="
 setup
 seed_credentials
-UTIL_DEVCONTAINER_USER=node run dcr /work >/dev/null
-check "targets that user's home" "$(called "target=/home/node/.codex/auth.json")"
+mkdir -p "$SANDBOX/proj"
+KEY="$(printf '%s' "$(cd "$SANDBOX/proj" && pwd -P)" | sed 's/[^A-Za-z0-9]/-/g')"
+mkdir -p "$HOME/.claude/projects/$KEY/memory"
+UTIL_DEVCONTAINER_USER=node run dcr "$SANDBOX/proj" >/dev/null
+check "targets that user's home" "$(called "target=/home/node/.claude/projects/$KEY/memory")"
 check "and not the default" "$(not_called "/home/vscode/")"
 teardown
 
@@ -312,6 +382,7 @@ check "runs the Linux bootstrap from the mount" "$(called "/util/linux_install.s
 check "skips the apt step inside a container" "$(called "UTIL_SKIP_PACKAGES=1")"
 check "stamps the container so it runs once" "$(called 'touch "$stamp"')"
 check "reclaims the mount-created config dirs" "$(called "sudo chown")"
+check "links the Codex login to the read-only copy" "$(called 'ln -sf /run/util/codex-auth.json "$HOME/.codex/auth.json"')"
 check "degrades if the mount is missing" "$(called "util is not mounted at /util")"
 check "says how to fix it" "$(called "Run dcr to recreate it")"
 teardown
