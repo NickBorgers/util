@@ -164,6 +164,18 @@ check "picks up the host's newer token" "$(eq "$(cat "$HOME/.config/util/claude-
 check "rewrites the same file" "$(eq "$(stat -c %i "$HOME/.config/util/claude-oauth-token")" "$INODE_BEFORE")"
 teardown
 
+echo "== a long-lived setup-token beats the host login =="
+setup
+seed_credentials
+mkdir -p "$HOME/.config/claude-devcontainer"
+echo "sk-ant-oat01-LONG" >"$HOME/.config/claude-devcontainer/oauth-token"
+OUT="$(run dcs /work)"
+TOKEN_FILE="$HOME/.config/util/claude-oauth-token"
+check "writes the long-lived token" "$(eq "$(cat "$TOKEN_FILE" 2>/dev/null)" "sk-ant-oat01-LONG")"
+check "keeps the token file private" "$(eq "$(stat -c %a "$TOKEN_FILE" 2>/dev/null)" "600")"
+check "mounts it read-only" "$(called "source=$TOKEN_FILE,target=/run/util/claude-oauth-token")"
+teardown
+
 echo "== an expired host token is not handed over =="
 setup
 seed_credentials

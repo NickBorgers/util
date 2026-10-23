@@ -190,10 +190,23 @@ function _claude_container_token_file() {
 # in place, so a running container's mount sees it and new shells pick it up.
 #
 # Takes the host's token as it is, so run claude on the host if it has expired.
+# Or avoid the hours-long limit: a `claude setup-token` token (see below) lasts about a year.
 function _ensure_claude_container_token() {
 	local creds="$HOME/.claude/.credentials.json"
 	local file token expires_ms now_ms
 	file="$(_claude_container_token_file)"
+
+	# A long-lived token from `claude setup-token` (about a year, no refresh
+	# token) beats the host login's access token. Save it in
+	# ~/.config/claude-devcontainer/oauth-token, mode 600.
+	local long_file="${XDG_CONFIG_HOME:-$HOME/.config}/claude-devcontainer/oauth-token"
+	if [ -s "$long_file" ]; then
+		mkdir -p "$(dirname "$file")" && chmod 700 "$(dirname "$file")"
+		( umask 077; tr -d '[:space:]' <"$long_file" >"$file"; printf '\n' >>"$file" )
+		echo "Container Claude token set from the long-lived setup-token (about a year)." >&2
+		return 0
+	fi
+
 	[ -r "$creds" ] || return 0
 
 	if command -v jq &>/dev/null; then
