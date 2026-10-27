@@ -194,6 +194,23 @@ function _ensure_claude_container_token() {
 	local creds="$HOME/.claude/.credentials.json"
 	local file token expires_ms now_ms
 	file="$(_claude_container_token_file)"
+
+	# A long-lived token (`claude setup-token`, valid about a year, no refresh
+	# token) beats the host's short-lived access token. It is the same file the
+	# devcontainer's init-host-credentials.sh reads, so both paths agree.
+	local ll_file ll_token
+	ll_file="${XDG_CONFIG_HOME:-$HOME/.config}/claude-devcontainer/oauth-token"
+	ll_token="$(printf '%s' "${CLAUDE_DEVCONTAINER_OAUTH_TOKEN:-}" | tr -d '[:space:]')"
+	if [ -z "$ll_token" ] && [ -s "$ll_file" ]; then
+		ll_token="$(tr -d '[:space:]' <"$ll_file")"
+	fi
+	if [ -n "$ll_token" ]; then
+		mkdir -p "$(dirname "$file")" && chmod 700 "$(dirname "$file")"
+		( umask 077; printf '%s\n' "$ll_token" >"$file" )
+		echo "Container Claude token set from the long-lived token." >&2
+		return 0
+	fi
+
 	[ -r "$creds" ] || return 0
 
 	if command -v jq &>/dev/null; then
@@ -211,6 +228,21 @@ function _ensure_claude_container_token() {
 	now_ms=$(( $(date +%s) * 1000 ))
 	if [ -n "${expires_ms:-}" ] && [ "$expires_ms" -le "$now_ms" ] 2>/dev/null; then
 		echo "The host Claude token has expired; run claude on the host, then dcs again." >&2
+		echo "  Or make it permanent: run \`claude setup-token\`, then paste the token here." >&2
+		if [ -t 0 ] && [ -t 2 ]; then
+			local pasted
+			read -r -s -p "  Long-lived token (Enter to skip): " pasted >&2 || true
+			echo >&2
+			pasted="$(printf '%s' "$pasted" | tr -d '[:space:]')"
+			if [ -n "$pasted" ]; then
+				mkdir -p "$(dirname "$ll_file")" && chmod 700 "$(dirname "$ll_file")"
+				( umask 077; printf '%s\n' "$pasted" >"$ll_file" )
+				mkdir -p "$(dirname "$file")" && chmod 700 "$(dirname "$file")"
+				( umask 077; printf '%s\n' "$pasted" >"$file" )
+				echo "  Saved to $ll_file." >&2
+				return 0
+			fi
+		fi
 		echo "  The container will need its own login until then." >&2
 		return 0
 	fi
