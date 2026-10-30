@@ -181,6 +181,39 @@ check "still brings up the container" "$(called "up")"
 check "mounts no token" "$(not_called "claude-oauth-token")"
 teardown
 
+echo "== each project gets its own writable Claude login dir =="
+setup
+KEY="$(source "$REPO_DIR/profile"; _claude_project_key /)"
+run dcr / >/dev/null
+check "mounts the per-project login dir" \
+    "$(called "type=bind,source=$HOME/.claude-devcontainer/$KEY,target=/host-claude-login")"
+check "creates it private on the host" "$(eq "$(stat -c %a "$HOME/.claude-devcontainer/$KEY")" 700)"
+check "outside /run/util, which the runtime wrapper makes read-only" \
+    "$(not_called "target=/run/util/claude-login")"
+: >"$CALLS"
+UTIL_CLAUDE_LOGIN=none run dcr / >/dev/null
+check "opt-out mounts nothing" "$(not_called "host-claude-login")"
+teardown
+
+echo "== the profile links the login dir into ~/.claude =="
+setup
+LOGIN="$SANDBOX/login"; mkdir -p "$LOGIN"
+link() { ( export HOME; source "$REPO_DIR/profile"; sed "s#/host-claude-login#$LOGIN#" <<<"$(declare -f _link_claude_login)" > "$SANDBOX/fn"; . "$SANDBOX/fn"; _link_claude_login ); }
+link
+CRED="$HOME/.claude/.credentials.json"
+check "symlinks credentials into the login dir" "$(eq "$(readlink "$CRED")" "$LOGIN/.credentials.json")"
+printf 'one' >"$CRED"
+check "a login written through the link reaches the host dir" "$(eq "$(cat "$LOGIN/.credentials.json")" one)"
+rm "$CRED"; printf 'two' >"$CRED"
+link
+check "a replaced file is moved into the host dir" "$(eq "$(cat "$LOGIN/.credentials.json")" two)"
+check "and the link restored" "$([ -L "$CRED" ] && echo 1 || echo 0)"
+rm -rf "$LOGIN"
+rm "$CRED"; printf 'kept' >"$CRED"
+link
+check "no login dir mounted: leaves credentials alone" "$(eq "$(cat "$CRED")" kept)"
+teardown
+
 echo "== host-authored Claude config is shared read-only, never the login =="
 setup
 seed_credentials
@@ -260,7 +293,7 @@ check "does not name a mount it has" "$(not_called_out "$OUT" "created without: 
 check "says to run dcr" "$(contains "$OUT" "Run dcr to recreate it")"
 check "still brings the container up" "$(called "up")"
 : >"$CALLS"
-ALL="$(printf '%s ' /util /run/util/claude-oauth-token /run/util/codex-auth.json /host-claude.json /host-claude-config/CLAUDE.md /host-claude-config/agents /host-claude-config/skills/synced "/home/vscode/.claude/projects/$KEY/memory")"
+ALL="$(printf '%s ' /util /run/util/claude-oauth-token /run/util/codex-auth.json /host-claude.json /host-claude-login /host-claude-config/CLAUDE.md /host-claude-config/agents /host-claude-config/skills/synced "/home/vscode/.claude/projects/$KEY/memory")"
 OUT="$(HAVE_MOUNTS="$ALL" run dcs "$SANDBOX/proj")"
 check "silent when nothing is missing" "$(not_called_out "$OUT" "created without")"
 teardown

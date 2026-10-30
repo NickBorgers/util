@@ -450,6 +450,19 @@ function _devcontainer_util_mounts() {
 		_DC_MOUNTS+=(--mount "type=bind,source=$memdir,target=$home/.claude/projects/$key/memory")
 	fi
 
+	# This project's own Claude login. The container does its own /login, once per
+	# project: a separate login has its own refresh-token family, so the container
+	# refreshes it without disturbing the host's, and a full-scope login is what
+	# /remote-control needs. It lives here, per project on the host, so it survives
+	# dcr. The profile links ~/.claude/.credentials.json into it (_link_claude_login).
+	# Opt out with UTIL_CLAUDE_LOGIN=none.
+	local loginkey logindir
+	if [ "${UTIL_CLAUDE_LOGIN:-persist}" != none ] && loginkey="$(_claude_project_key "$workspace")"; then
+		logindir="$HOME/.claude-devcontainer/$loginkey"
+		mkdir -p "$logindir" && chmod 700 "$HOME/.claude-devcontainer" "$logindir" \
+			&& _DC_MOUNTS+=(--mount "type=bind,source=$logindir,target=/host-claude-login")
+	fi
+
 	# The token alone does not spare you a login: onboarding state lives in
 	# ~/.claude.json. That file also holds per-path project history and the
 	# container's own MCP config, so it is mounted aside rather than over the
@@ -604,6 +617,22 @@ function publish_report() {
 
 alias claude-yolo='claude --dangerously-skip-permissions'
 alias codex-yolo='codex --dangerously-bypass-approvals-and-sandbox'
+
+# Inside a devcontainer, point Claude's credentials at the per-project login dir
+# dcs/dcr mounted (see _devcontainer_util_mounts). Runs in every shell, not just
+# the bootstrap: if Claude replaces the symlink with a regular file, the file is
+# moved into the mount and the link restored, so the newest refresh token is
+# never left only in the container.
+function _link_claude_login() {
+	local dir=/host-claude-login cred="$HOME/.claude/.credentials.json"
+	[ -d "$dir" ] || return 0
+	mkdir -p "$HOME/.claude" || return 0
+	if [ -f "$cred" ] && [ ! -L "$cred" ]; then
+		cp -f "$cred" "$dir/.credentials.json" && chmod 600 "$dir/.credentials.json" && rm -f "$cred"
+	fi
+	ln -sfn "$dir/.credentials.json" "$cred"
+}
+_link_claude_login
 
 # Inside a devcontainer, authenticate Claude with the container-only token
 # dcs/dcr mounted (see _devcontainer_util_mounts) rather than the host login.
