@@ -607,7 +607,10 @@ alias codex-yolo='codex --dangerously-bypass-approvals-and-sandbox'
 
 # Inside a devcontainer, authenticate Claude with the container-only token
 # dcs/dcr mounted (see _devcontainer_util_mounts) rather than the host login.
-if [ -r /run/util/claude-oauth-token ]; then
+# Only until the container has a login of its own: a project that persists one
+# (~/.claude/.credentials.json, via /login) refreshes it itself, and an exported
+# token would override it and expire within hours.
+if [ -r /run/util/claude-oauth-token ] && [ ! -s "$HOME/.claude/.credentials.json" ]; then
 	CLAUDE_CODE_OAUTH_TOKEN="$(cat /run/util/claude-oauth-token)"
 	export CLAUDE_CODE_OAUTH_TOKEN
 fi
