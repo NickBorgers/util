@@ -584,7 +584,10 @@ function mosht() {
 	ssh "$host" "pkill mosh-server; true"
 	# Show "<host>" in the terminal tab. tmux runs on the remote,
 	# so it can't know the alias we typed here; pass it in via set-titles-string.
-	mosh "$host" -- bash -c "tmux set-option -g set-titles on; tmux set-option -g set-titles-string '$host'; tmux attach -t $session || tmux new-session -s $session"
+	# Create the session detached first: set-option needs a running tmux server,
+	# and on a fresh server it would fail before new-session ever started one.
+	# mosh-client prefixes remote titles with "[mosh] " unless told not to.
+	MOSH_TITLE_NOPREFIX=1 mosh "$host" -- bash -c "tmux new-session -d -s $session 2>/dev/null; tmux set-option -g set-titles on; tmux set-option -g set-titles-string '$host'; tmux attach -t $session"
 }
 
 function ett() {
