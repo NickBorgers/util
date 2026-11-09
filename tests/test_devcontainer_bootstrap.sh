@@ -202,16 +202,42 @@ link() { ( export HOME; source "$REPO_DIR/profile"; sed "s#/host-claude-login#$L
 link
 CRED="$HOME/.claude/.credentials.json"
 check "symlinks credentials into the login dir" "$(eq "$(readlink "$CRED")" "$LOGIN/.credentials.json")"
-printf 'one' >"$CRED"
-check "a login written through the link reaches the host dir" "$(eq "$(cat "$LOGIN/.credentials.json")" one)"
-rm "$CRED"; printf 'two' >"$CRED"
+ONE='{"claudeAiOauth":{"refreshToken":"one"}}'; TWO='{"claudeAiOauth":{"refreshToken":"two"}}'
+printf '%s' "$ONE" >"$CRED"
+check "a login written through the link reaches the host dir" "$(eq "$(cat "$LOGIN/.credentials.json")" "$ONE")"
+rm "$CRED"; printf '%s' "$TWO" >"$CRED"
 link
-check "a replaced file is moved into the host dir" "$(eq "$(cat "$LOGIN/.credentials.json")" two)"
+check "a replaced file is moved into the host dir" "$(eq "$(cat "$LOGIN/.credentials.json")" "$TWO")"
 check "and the link restored" "$([ -L "$CRED" ] && echo 1 || echo 0)"
 rm -rf "$LOGIN"
 rm "$CRED"; printf 'kept' >"$CRED"
 link
 check "no login dir mounted: leaves credentials alone" "$(eq "$(cat "$CRED")" kept)"
+teardown
+
+echo "== a stub login (empty tokens) is discarded =="
+setup
+LOGIN="$SANDBOX/login"; mkdir -p "$LOGIN"
+printf '%s' '{"claudeAiOauth":{"accessToken":"","refreshToken":"","expiresAt":0}}' >"$LOGIN/.credentials.json"
+link
+check "stub removed so /login starts clean" "$([ -e "$LOGIN/.credentials.json" ] && echo 0 || echo 1)"
+teardown
+
+echo "== the profile links the Codex login dir into ~/.codex =="
+setup
+CXL="$SANDBOX/cxlogin"; SEED="$SANDBOX/seed.json"; mkdir -p "$CXL"
+printf '%s' '{"auth_mode":"chatgpt","tokens":{"access_token":"a","refresh_token":""}}' >"$SEED"
+cxlink() { ( export HOME; source "$REPO_DIR/profile"; sed "s#/host-codex-login#$CXL#;s#/run/util/codex-auth.json#$SEED#" <<<"$(declare -f _link_codex_login)" > "$SANDBOX/fn"; . "$SANDBOX/fn"; _link_codex_login ); }
+CXA="$HOME/.codex/auth.json"
+cxlink
+check "seeds from the sanitized host copy" "$(eq "$(cat "$CXL/auth.json")" "$(cat "$SEED")")"
+check "links auth.json into the login dir" "$(eq "$(readlink "$CXA")" "$CXL/auth.json")"
+REAL='{"auth_mode":"chatgpt","tokens":{"access_token":"b","refresh_token":"rt_real"}}'
+rm "$CXA"; printf '%s' "$REAL" >"$CXA"
+cxlink
+check "a codex login written in the container is moved into the host dir" "$(eq "$(cat "$CXL/auth.json")" "$REAL")"
+cxlink
+check "a real login is never overwritten by the seed" "$(eq "$(cat "$CXL/auth.json")" "$REAL")"
 teardown
 
 echo "== host-authored Claude config is shared read-only, never the login =="
@@ -293,7 +319,7 @@ check "does not name a mount it has" "$(not_called_out "$OUT" "created without: 
 check "says to run dcr" "$(contains "$OUT" "Run dcr to recreate it")"
 check "still brings the container up" "$(called "up")"
 : >"$CALLS"
-ALL="$(printf '%s ' /util /run/util/claude-oauth-token /run/util/codex-auth.json /host-claude.json /host-claude-login /host-claude-config/CLAUDE.md /host-claude-config/agents /host-claude-config/skills/synced "/home/vscode/.claude/projects/$KEY/memory")"
+ALL="$(printf '%s ' /util /run/util/claude-oauth-token /run/util/codex-auth.json /host-claude.json /host-claude-login /host-codex-login /host-claude-config/CLAUDE.md /host-claude-config/agents /host-claude-config/skills/synced "/home/vscode/.claude/projects/$KEY/memory")"
 OUT="$(HAVE_MOUNTS="$ALL" run dcs "$SANDBOX/proj")"
 check "silent when nothing is missing" "$(not_called_out "$OUT" "created without")"
 teardown
