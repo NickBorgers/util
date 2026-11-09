@@ -463,6 +463,18 @@ function _devcontainer_util_mounts() {
 			&& _DC_MOUNTS+=(--mount "type=bind,source=$logindir,target=/host-claude-login")
 	fi
 
+	# This project's own Codex login, the same idea: the container runs `codex login`
+	# once per project and refreshes its own token family, so it never rotates the
+	# host's. Kept per project on the host so it survives dcr. Until it holds a
+	# real login, the profile seeds it from the read-only sanitized host copy
+	# (_link_codex_login). Opt out with UTIL_CODEX_LOGIN=none.
+	local cxkey cxdir
+	if [ "${UTIL_CODEX_LOGIN:-persist}" != none ] && cxkey="$(_claude_project_key "$workspace")"; then
+		cxdir="$HOME/.codex-devcontainer/$cxkey"
+		mkdir -p "$cxdir" && chmod 700 "$HOME/.codex-devcontainer" "$cxdir" \
+			&& _DC_MOUNTS+=(--mount "type=bind,source=$cxdir,target=/host-codex-login")
+	fi
+
 	# The token alone does not spare you a login: onboarding state lives in
 	# ~/.claude.json. That file also holds per-path project history and the
 	# container's own MCP config, so it is mounted aside rather than over the
@@ -499,7 +511,8 @@ function _devcontainer_util_bootstrap() {
 		sudo chown "$(id -u):$(id -g)" "$HOME/.claude" "$HOME/.codex" 2>/dev/null || true
 		# Codex reads its login through a link to the read-only sanitized copy
 		# (empty refresh token), so it can use the access token but never rotate.
-		if [ -e /run/util/codex-auth.json ]; then
+		# With a per-project login mounted, the profile manages the link instead.
+		if [ -e /run/util/codex-auth.json ] && [ ! -d /host-codex-login ]; then
 			mkdir -p "$HOME/.codex"
 			ln -sf /run/util/codex-auth.json "$HOME/.codex/auth.json"
 		fi
@@ -633,16 +646,45 @@ function _link_claude_login() {
 	if [ -f "$cred" ] && [ ! -L "$cred" ]; then
 		cp -f "$cred" "$dir/.credentials.json" && chmod 600 "$dir/.credentials.json" && rm -f "$cred"
 	fi
+	# A stub with empty tokens (left by a failed refresh) is no login. Drop it so
+	# /login starts clean and the exported-token fallback below can apply.
+	if [ -f "$dir/.credentials.json" ] \
+		&& ! grep -Eq '"refreshToken" *: *"[^"]+"' "$dir/.credentials.json" 2>/dev/null; then
+		rm -f "$dir/.credentials.json"
+	fi
 	ln -sfn "$dir/.credentials.json" "$cred"
 }
 _link_claude_login
+
+# Codex counterpart of _link_claude_login: ~/.codex/auth.json lives in the
+# per-project login dir. A login with no refresh token and no API key (nothing
+# yet, or the sanitized host copy, which cannot rotate) is replaced from the
+# host copy on every shell, so a fresh host token flows in until the container
+# does its own `codex login`; after that the container's login is left alone.
+function _link_codex_login() {
+	local dir=/host-codex-login auth="$HOME/.codex/auth.json" seed=/run/util/codex-auth.json
+	[ -d "$dir" ] || return 0
+	mkdir -p "$HOME/.codex" || return 0
+	if [ -f "$auth" ] && [ ! -L "$auth" ]; then
+		cp -f "$auth" "$dir/auth.json" && chmod 600 "$dir/auth.json" && rm -f "$auth"
+	fi
+	if [ -r "$seed" ] \
+		&& ! grep -Eq '"(refresh_token|OPENAI_API_KEY)" *: *"[^"]+"' "$dir/auth.json" 2>/dev/null; then
+		cp -f "$seed" "$dir/auth.json" && chmod 600 "$dir/auth.json"
+	fi
+	ln -sfn "$dir/auth.json" "$auth"
+}
+_link_codex_login
 
 # Inside a devcontainer, authenticate Claude with the container-only token
 # dcs/dcr mounted (see _devcontainer_util_mounts) rather than the host login.
 # Only until the container has a login of its own: a project that persists one
 # (~/.claude/.credentials.json, via /login) refreshes it itself, and an exported
 # token would override it and expire within hours.
-if [ -r /run/util/claude-oauth-token ] && [ ! -s "$HOME/.claude/.credentials.json" ]; then
+# "Has a login" means a non-empty refresh token: Claude leaves a stub with empty
+# tokens behind after a failed refresh, and a stub must not block the fallback.
+if [ -r /run/util/claude-oauth-token ] \
+	&& ! grep -Eq '"refreshToken" *: *"[^"]+"' "$HOME/.claude/.credentials.json" 2>/dev/null; then
 	CLAUDE_CODE_OAUTH_TOKEN="$(cat /run/util/claude-oauth-token)"
 	export CLAUDE_CODE_OAUTH_TOKEN
 fi
