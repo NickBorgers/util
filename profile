@@ -357,6 +357,17 @@ function _claude_project_key() {
 	printf '%s' "$abs" | sed 's/[^A-Za-z0-9]/-/g'
 }
 
+# Sets _DC_DOCKER to the --docker-path argument every devcontainer subcommand
+# needs. The wrapper picks the engine (rootful nerdctl on dev, else Docker) and
+# containers made by one engine are invisible to the other, so up, exec and the
+# stale-mount check must all go through it. Empty when the checkout is missing.
+function _devcontainer_util_docker_path() {
+	_DC_DOCKER=()
+	if [ -x "$UTIL_DIR/lib/docker-runtime.sh" ]; then
+		_DC_DOCKER=(--docker-path "$UTIL_DIR/lib/docker-runtime.sh")
+	fi
+}
+
 # Sets _DC_MOUNTS to the bind mounts every container should get.
 #
 # A devcontainer is otherwise whatever its base image shipped: no profile, no
@@ -374,12 +385,11 @@ function _devcontainer_util_mounts() {
 	local home="/home/$UTIL_DEVCONTAINER_USER" rel
 
 	# The devcontainer CLI has no runtime or DNS flag, so route its docker calls
-	# through a wrapper that adds them: Kata microVM isolation when Docker has it
-	# registered, Tailscale DNS when this host has Tailscale. Both auto-detect and
-	# pass through untouched otherwise; see lib/docker-runtime.sh.
-	if [ -x "$UTIL_DIR/lib/docker-runtime.sh" ]; then
-		_DC_MOUNTS+=(--docker-path "$UTIL_DIR/lib/docker-runtime.sh")
-	fi
+	# through a wrapper that adds them: Kata microVM isolation when the engine has
+	# it, Tailscale DNS when this host has Tailscale. Both auto-detect and pass
+	# through untouched otherwise; see lib/docker-runtime.sh.
+	_devcontainer_util_docker_path
+	_DC_MOUNTS+=(${_DC_DOCKER[@]+"${_DC_DOCKER[@]}"})
 
 	# Only mount a real checkout. Docker creates a missing bind source as a
 	# root-owned directory on the host, so a wrong UTIL_DIR - the zsh fallback
@@ -491,7 +501,8 @@ function _devcontainer_util_mounts() {
 function _devcontainer_util_bootstrap() {
 	local workspace="$1" key
 	key="$(_claude_project_key "$workspace")"
-	devcontainer exec --workspace-folder "$workspace" bash -lc '
+	_devcontainer_util_docker_path
+	devcontainer exec --workspace-folder "$workspace" ${_DC_DOCKER[@]+"${_DC_DOCKER[@]}"} bash -lc '
 		stamp="$HOME/.util-bootstrapped"
 		if [ -e "$stamp" ] && [ -z "$1" ]; then exit 0; fi
 		if [ ! -x /util/linux_install.sh ]; then
@@ -543,10 +554,14 @@ function _devcontainer_util_bootstrap() {
 function _devcontainer_util_warn_stale() {
 	local workspace="$1" abs cid have want missing="" i arg
 	abs="$(cd "$workspace" 2>/dev/null && pwd -P)" || return 0
-	command -v docker &>/dev/null || return 0
-	cid="$(docker ps -q --filter "label=devcontainer.local_folder=$abs" 2>/dev/null | head -1)"
+	# Ask the same engine that made the container: the wrapper forwards ps and
+	# inspect to it. Without the wrapper, plain docker.
+	local engine=docker
+	[ -x "$UTIL_DIR/lib/docker-runtime.sh" ] && engine="$UTIL_DIR/lib/docker-runtime.sh"
+	command -v "$engine" &>/dev/null || return 0
+	cid="$("$engine" ps -q --filter "label=devcontainer.local_folder=$abs" 2>/dev/null | head -1)"
 	[ -n "$cid" ] || return 0
-	have="$(docker inspect -f '{{range .Mounts}}{{.Destination}}{{"\n"}}{{end}}' "$cid" 2>/dev/null)"
+	have="$("$engine" inspect -f '{{range .Mounts}}{{.Destination}}{{"\n"}}{{end}}' "$cid" 2>/dev/null)"
 	[ -n "$have" ] || return 0
 	for i in "${!_DC_MOUNTS[@]}"; do
 		[ "${_DC_MOUNTS[$i]}" = "--mount" ] || continue
@@ -572,7 +587,7 @@ function dcs() {
 	_devcontainer_util_warn_stale "$workspace"
 	devcontainer up --workspace-folder "$workspace" "${_DC_MOUNTS[@]}" && \
 	_devcontainer_util_bootstrap "$workspace" && \
-	devcontainer exec --workspace-folder "$workspace" bash
+	devcontainer exec --workspace-folder "$workspace" ${_DC_DOCKER[@]+"${_DC_DOCKER[@]}"} bash
 }
 
 function dcr() {
@@ -584,7 +599,7 @@ function dcr() {
 	_devcontainer_util_mounts "$workspace"
 	devcontainer up --workspace-folder "$workspace" --remove-existing-container "${_DC_MOUNTS[@]}" && \
 	_devcontainer_util_bootstrap "$workspace" && \
-	devcontainer exec --workspace-folder "$workspace" bash
+	devcontainer exec --workspace-folder "$workspace" ${_DC_DOCKER[@]+"${_DC_DOCKER[@]}"} bash
 }
 
 function mosht() {

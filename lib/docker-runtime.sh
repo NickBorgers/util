@@ -3,9 +3,17 @@
 # dcs/dcr pass it as --docker-path; it injects flags into `docker run` and
 # `docker create` and forwards everything else untouched.
 #
-#   runtime  UTIL_DOCKER_RUNTIME if set (empty or "none" = leave Docker's
-#            default), else kata-clh when Docker has it registered (a microVM
-#            per container; see lib/kata-install.sh), else Docker's default.
+#   engine   UTIL_REAL_DOCKER if set (UTIL_REAL_DOCKER=docker opts out of
+#            nerdctl), else `nerdctl-sudo` when it is on PATH (rootful nerdctl,
+#            so Kata gets a block-device root filesystem), else `docker`.
+#            Containers made by one engine are invisible to the other, so
+#            profile sends every devcontainer call through this wrapper.
+#   runtime  UTIL_DOCKER_RUNTIME if set (empty or "none" = leave the engine's
+#            default), else a Kata microVM per container (see
+#            lib/kata-install.sh) when available: for nerdctl,
+#            io.containerd.kata-clh.v2 if containerd-shim-kata-clh-v2 is on
+#            PATH (`nerdctl info` lists no runtimes); for Docker, kata-clh when
+#            Docker has it registered. Otherwise the engine's default.
 #   dns      UTIL_DOCKER_DNS if set ("none" = skip), else Tailscale's resolver
 #            (100.100.100.100) when `tailscale` is installed on this host.
 #            Docker otherwise puts the LAN resolver first, which answers
@@ -22,7 +30,13 @@
 #
 # Written for bash 3.2.
 
-docker_bin="${UTIL_REAL_DOCKER:-docker}"
+if [ -n "${UTIL_REAL_DOCKER:-}" ]; then
+    docker_bin="$UTIL_REAL_DOCKER"
+elif command -v nerdctl-sudo >/dev/null 2>&1; then
+    docker_bin="nerdctl-sudo"
+else
+    docker_bin="docker"
+fi
 
 if [ "${1:-}" = run ] || [ "${1:-}" = create ]; then
     sub="$1"
@@ -32,9 +46,16 @@ if [ "${1:-}" = run ] || [ "${1:-}" = create ]; then
     runtime="${UTIL_DOCKER_RUNTIME-__auto__}"
     if [ "$runtime" = "__auto__" ]; then
         runtime=""
-        if "$docker_bin" info --format '{{json .Runtimes}}' 2>/dev/null | grep -q '"kata-clh"'; then
-            runtime="kata-clh"
-        fi
+        case "${docker_bin##*/}" in
+        nerdctl*)
+            command -v containerd-shim-kata-clh-v2 >/dev/null 2>&1 && runtime="io.containerd.kata-clh.v2"
+            ;;
+        *)
+            if "$docker_bin" info --format '{{json .Runtimes}}' 2>/dev/null | grep -q '"kata-clh"'; then
+                runtime="kata-clh"
+            fi
+            ;;
+        esac
     fi
     if [ -n "$runtime" ] && [ "$runtime" != none ]; then
         extra+=(--runtime="$runtime")

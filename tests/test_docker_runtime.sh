@@ -30,6 +30,11 @@ STUB
     ln -s "$REAL_GREP" "$SANDBOX/bin/grep"
     unset UTIL_DOCKER_RUNTIME UTIL_DOCKER_DNS RUNTIMES_JSON 2>/dev/null || true
 }
+# A stub engine named <name> in the sandbox, recording its argv to $CALLS.
+stub_engine() {
+    printf '#!/bin/bash\nprintf "%%s\\n" "%s" "$@" >>"$CALLS"\necho "--" >>"$CALLS"\n' "$1" >"$SANDBOX/bin/$1"
+    chmod +x "$SANDBOX/bin/$1"
+}
 teardown() { rm -rf "$SANDBOX"; }
 # Only the wrapper sees the sandbox PATH, so a real tailscale or docker on this
 # machine cannot leak into the cases, and the test shell keeps its own tools.
@@ -119,6 +124,47 @@ setup
 RUNTIMES_JSON='{"kata-clh":{}}' wrap ps -q
 check "forwards ps" "$(arg ps)"
 check "no injected runtime" "$(not_arg "--runtime=kata-clh")"
+teardown
+
+echo "== engine choice =="
+setup
+unset UTIL_REAL_DOCKER
+stub_engine nerdctl-sudo
+wrap ps -q
+check "nerdctl-sudo on PATH is used" "$(arg nerdctl-sudo)"
+: >"$CALLS"
+UTIL_REAL_DOCKER="$SANDBOX/bin/docker" wrap ps -q
+check "UTIL_REAL_DOCKER wins over nerdctl-sudo" "$(not_arg nerdctl-sudo)"
+teardown
+setup
+unset UTIL_REAL_DOCKER
+wrap ps -q
+check "falls back to docker without nerdctl-sudo" "$(arg ps)"
+teardown
+
+echo "== nerdctl runtime detection =="
+setup
+stub_engine nerdctl-sudo
+export UTIL_REAL_DOCKER="$SANDBOX/bin/nerdctl-sudo"
+wrap run alpine
+check "no shim, no runtime" "$(not_arg "--runtime=io.containerd.kata-clh.v2")"
+check "never the Docker name" "$(not_arg "--runtime=kata-clh")"
+printf '#!/bin/sh\n' >"$SANDBOX/bin/containerd-shim-kata-clh-v2"; chmod +x "$SANDBOX/bin/containerd-shim-kata-clh-v2"
+: >"$CALLS"
+wrap run alpine
+check "shim on PATH selects the containerd runtime name" "$(arg "--runtime=io.containerd.kata-clh.v2")"
+: >"$CALLS"
+wrap create alpine
+check "create too" "$(arg "--runtime=io.containerd.kata-clh.v2")"
+: >"$CALLS"
+UTIL_DOCKER_RUNTIME=none wrap run alpine
+check "none still opts out" "$(not_arg "--runtime=io.containerd.kata-clh.v2")"
+: >"$CALLS"
+UTIL_DOCKER_RUNTIME=runsc wrap run alpine
+check "explicit runtime still wins" "$(arg "--runtime=runsc")"
+: >"$CALLS"
+UTIL_REAL_DOCKER="$SANDBOX/bin/docker" wrap run alpine
+check "UTIL_REAL_DOCKER=docker ignores the shim" "$(not_arg "--runtime=io.containerd.kata-clh.v2")"
 teardown
 
 echo ""

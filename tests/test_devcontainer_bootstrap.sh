@@ -264,6 +264,17 @@ check "passes --docker-path" "$(arg "--docker-path")"
 check "pointing at lib/docker-runtime.sh" "$(arg "$REPO_DIR/lib/docker-runtime.sh")"
 teardown
 
+echo "== every devcontainer subcommand uses the same engine wrapper =="
+setup
+run dcs /work >/dev/null
+check "up, the bootstrap exec and the shell exec all pass --docker-path" "$(eq "$(grep -cxF -- "--docker-path" "$CALLS")" 3)"
+check "each with the wrapper path" "$(eq "$(grep -cxF -- "$REPO_DIR/lib/docker-runtime.sh" "$CALLS")" 3)"
+teardown
+setup
+run dcr /work >/dev/null
+check "dcr: up and both execs pass --docker-path" "$(eq "$(grep -cxF -- "--docker-path" "$CALLS")" 3)"
+teardown
+
 echo "== this project's memory is shared, and only this project's =="
 setup
 seed_credentials
@@ -322,6 +333,26 @@ check "still brings the container up" "$(called "up")"
 ALL="$(printf '%s ' /util /run/util/claude-oauth-token /run/util/codex-auth.json /host-claude.json /host-claude-login /host-codex-login /host-claude-config/CLAUDE.md /host-claude-config/agents /host-claude-config/skills/synced "/home/vscode/.claude/projects/$KEY/memory")"
 OUT="$(HAVE_MOUNTS="$ALL" run dcs "$SANDBOX/proj")"
 check "silent when nothing is missing" "$(not_called_out "$OUT" "created without")"
+teardown
+
+echo "== the stale-mount check asks the engine the wrapper picks =="
+setup
+seed_credentials
+mkdir -p "$SANDBOX/proj"
+# nerdctl-sudo stub is the only engine that sees the container; docker sees none.
+cat >"$SANDBOX/bin/nerdctl-sudo" <<'STUB'
+#!/bin/bash
+case "${1:-}" in
+    ps) echo abc123 ;;
+    inspect) printf '%s\n' /util ;;
+esac
+STUB
+chmod +x "$SANDBOX/bin/nerdctl-sudo"
+printf '#!/bin/bash\nexit 0\n' >"$SANDBOX/bin/docker"; chmod +x "$SANDBOX/bin/docker"
+OUT="$(run dcs "$SANDBOX/proj")"
+check "finds the nerdctl container and warns" "$(contains "$OUT" "created without")"
+OUT="$(UTIL_REAL_DOCKER=docker run dcs "$SANDBOX/proj")"
+check "UTIL_REAL_DOCKER=docker opts out of nerdctl" "$(not_called_out "$OUT" "created without")"
 teardown
 
 echo "== dcs is quiet when there is no running container =="
